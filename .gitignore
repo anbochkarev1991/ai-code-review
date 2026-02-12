@@ -1,5 +1,6 @@
-# Cursor IDE (optional - remove if you want to commit .cursor/rules)
-.cursor/
+# Cursor IDE (keep .cursor/rules/ for versioned rules)
+.cursor/*
+!.cursor/rules/
 
 # OS
 .DS_Store

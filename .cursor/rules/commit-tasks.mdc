@@ -1,0 +1,58 @@
+---
+description: Commit each task separately with feat format; only Day 1 today; pass review before commit
+alwaysApply: true
+---
+
+# Task Commit Conventions
+
+## One commit per task
+
+Each task from TODOS.md must be committed in a **separate commit**. Do not combine multiple tasks into one commit.
+
+## Commit message format
+
+Use conventional commits with the pattern:
+
+```
+feat: day N task X.Y
+```
+
+Where:
+- **N** = day number (e.g. 1, 2, 3)
+- **X.Y** = task identifier from TODOS.md (e.g. 1.1, 1.2, 1.2a, 1.3, …)
+
+### Examples (Day 1)
+
+- `feat: day 1 task 1.1` — Create frontend Next.js
+- `feat: day 1 task 1.2` — Create backend Nest.js
+- `feat: day 1 task 1.2a` — Backend modules structure
+- `feat: day 1 task 1.3` — Add shared types
+- `feat: day 1 task 1.4` — Create Supabase project
+- … (continue for 1.5–1.13 as per TODOS.md)
+
+## Scope: Day 1 only today
+
+Today's scope is **Day 1 only**. Do not implement or commit Day 2+ tasks until Day 1 is complete. Workflow tasks (1.W1, 1.W2) may be included in Day 1 scope.
+
+## Gitignore is crucial
+
+Keep the repository clean by ensuring:
+
+- **Never commit** `node_modules/`, `dist/`, `.env` (secrets), or build artifacts
+- Each package/app (`backend/`, `frontend/`, `shared/`) has a `.gitignore` that ignores its dependencies and output
+- Add `.gitignore` entries as soon as you add new generated paths (e.g. new build output, coverage, IDE config)
+- If you introduce a new package or build step, add its output to `.gitignore` in the same commit
+
+A clean git status (no `dist/`, `node_modules/` in changes) keeps the repo maintainable and avoids accidental commits of build artifacts.
+
+## Pass review before commit
+
+Before committing each task:
+
+1. Run local tests (if applicable)
+2. Verify the task meets its "How to test locally" criteria in TODOS.md
+3. Address any lint or type errors
+4. Ensure the change passes review without issues
+5. Ensure no build artifacts or secrets would be committed (check `git status`)
+
+Commit only when the task is complete and verified.
