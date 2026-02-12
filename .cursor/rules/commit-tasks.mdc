@@ -5,9 +5,19 @@ alwaysApply: true
 
 # Task Commit Conventions
 
+## One branch per task
+
+Each task from TODOS.md must be developed in a **separate branch**. Do not mix multiple tasks in one branch.
+
+**Workflow:**
+1. Create branch from `main`: `git checkout -b day-N-task-X.Y` (e.g. `day-1-task-1.2a`)
+2. Implement the task
+3. Commit with the message format below
+4. Merge to `main` (via PR or direct merge) only after the task passes review
+
 ## One commit per task
 
-Each task from TODOS.md must be committed in a **separate commit**. Do not combine multiple tasks into one commit.
+Each task must be committed in a **separate commit**. Do not combine multiple tasks into one commit.
 
 ## Commit message format
 
