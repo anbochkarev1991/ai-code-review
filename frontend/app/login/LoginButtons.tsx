@@ -8,7 +8,7 @@ export function LoginButtons() {
 
   const handleSignIn = useCallback(
     async (provider: "google" | "azure") => {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
       await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo },
