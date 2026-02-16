@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Param,
   Query,
   Req,
   Redirect,
@@ -117,5 +118,39 @@ export class GitHubController {
     const perPageNum = perPage ? parseInt(perPage, 10) || 30 : 30;
 
     return this.githubService.listRepos(accessToken, pageNum, perPageNum);
+  }
+
+  @Get('repos/:owner/:repo/pulls')
+  @UseGuards(JwtAuthGuard)
+  async listPulls(
+    @CurrentUser() user: User,
+    @Req() req: AuthenticatedRequest,
+    @Param('owner') owner: string,
+    @Param('repo') repo: string,
+    @Query('state') state?: string,
+  ) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+
+    if (!token) {
+      throw new UnauthorizedException('Missing Bearer token');
+    }
+
+    const accessToken =
+      await this.githubService.getAccessTokenForUser(user.id, token);
+
+    const validState =
+      state === 'open' || state === 'closed' || state === 'all'
+        ? state
+        : undefined;
+
+    return this.githubService.listPulls(
+      accessToken,
+      owner,
+      repo,
+      validState,
+    );
   }
 }
