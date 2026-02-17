@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Controller,
   Headers,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
 } from '@nestjs/common';
@@ -14,6 +16,7 @@ export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Post('webhook')
+  @HttpCode(HttpStatus.OK)
   webhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string | undefined,

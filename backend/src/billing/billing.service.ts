@@ -20,14 +20,12 @@ export class BillingService {
   ): Stripe.Event {
     const stripe = this.getStripe();
     try {
-      return stripe.webhooks.constructEvent(
-        rawBody,
-        signature,
-        webhookSecret,
-      );
+      return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (err) {
       throw new BadRequestException(
-        err instanceof Error ? err.message : 'Webhook signature verification failed',
+        err instanceof Error
+          ? err.message
+          : 'Webhook signature verification failed',
       );
     }
   }
