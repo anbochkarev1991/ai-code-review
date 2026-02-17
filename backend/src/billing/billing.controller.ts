@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
@@ -12,8 +13,8 @@ import {
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/user.decorator';
 import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/user.decorator';
 import type { User } from '@supabase/supabase-js';
 import { BillingService } from './billing.service';
 import type { CheckoutBody } from 'shared';
@@ -34,6 +35,16 @@ export class BillingController {
       ? authHeader.slice(7).trim()
       : '';
     return this.billingService.createCheckoutSession(user, body, token);
+  }
+
+  @Get('usage')
+  @UseGuards(JwtAuthGuard)
+  async getUsage(@CurrentUser() user: User, @Req() req: AuthenticatedRequest) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    return this.billingService.getUsage(user.id, token);
   }
 
   @Post('webhook')
