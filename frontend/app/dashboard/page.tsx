@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse } from "@/lib/types";
-import { RepoSelector } from "./repo-selector";
+import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
   const backendUrl =
@@ -112,7 +112,10 @@ export default async function DashboardPage() {
             )}
 
             {me.github_connected && reposData && (
-              <RepoSelector repos={reposData.repos} />
+              <RepoAndPRSelectors
+                repos={reposData.repos}
+                accessToken={session.access_token}
+              />
             )}
             {me.github_connected && reposData === null && (
               <p className="text-sm text-amber-600 dark:text-amber-500">
