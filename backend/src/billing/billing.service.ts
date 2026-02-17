@@ -154,6 +154,44 @@ export class BillingService {
     return { review_count: reviewCount, limit, plan };
   }
 
+  /**
+   * Upserts usage for (user_id, current_month) and increments review_count.
+   * Used after successful review completion.
+   */
+  async incrementUsage(userId: string, accessToken: string): Promise<void> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    const existing = await supabase
+      .from('usage')
+      .select('review_count')
+      .eq('user_id', userId)
+      .eq('month', currentMonth)
+      .maybeSingle();
+
+    const newCount = (existing.data?.review_count ?? 0) + 1;
+    const now = new Date().toISOString();
+
+    await supabase.from('usage').upsert(
+      {
+        user_id: userId,
+        month: currentMonth,
+        review_count: newCount,
+        updated_at: now,
+      },
+      { onConflict: 'user_id,month' },
+    );
+  }
+
   async handleWebhookEvent(event: Stripe.Event): Promise<void> {
     if (!event.data?.object) return;
 

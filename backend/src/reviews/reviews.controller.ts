@@ -58,6 +58,8 @@ export class ReviewsController {
       throw new BadRequestException('pr_number must be a valid number');
     }
 
-    return this.reviewsService.runReview(user.id, repo_full_name, prNum);
+    const result = await this.reviewsService.runReview(user.id, repo_full_name, prNum);
+    await this.billingService.incrementUsage(user.id, token);
+    return result;
   }
 }
