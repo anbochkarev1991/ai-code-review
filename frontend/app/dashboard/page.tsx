@@ -83,6 +83,15 @@ export default async function DashboardPage() {
                 GitHub: {me.github_connected ? "Connected" : "Not connected"}
               </span>
             </div>
+
+            {!me.github_connected && (
+              <a
+                href={`${process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001"}/github/oauth?state=${encodeURIComponent(session.access_token)}`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                Connect GitHub
+              </a>
+            )}
           </div>
         ) : (
           <p className="text-sm text-amber-600 dark:text-amber-500">
