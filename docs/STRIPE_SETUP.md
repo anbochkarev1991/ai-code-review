@@ -30,3 +30,9 @@
 4. Restart the backend. Events forwarded by the CLI will be signed with this secret.
 
 **Verify:** `curl` or Stripe CLI trigger to the local URL returns 200 when signature is valid.
+
+## 3.4 — checkout.session.completed handler
+
+The webhook handler creates/updates the `subscriptions` table when a customer completes checkout. Requires `SUPABASE_SERVICE_ROLE_KEY` in `backend/.env`.
+
+**Verify:** Complete a test checkout (via POST `/billing/checkout` from task 3.2); the webhook will create or update a `subscriptions` row with `stripe_customer_id`, `stripe_subscription_id`, `plan=pro`, `status=active`. Ensure the checkout session includes `metadata: { user_id: <supabase_user_uuid> }`.

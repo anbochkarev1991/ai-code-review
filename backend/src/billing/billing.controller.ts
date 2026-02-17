@@ -17,10 +17,10 @@ export class BillingController {
 
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  webhook(
+  async webhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string | undefined,
-  ) {
+  ): Promise<{ received: boolean }> {
     const rawBody = req.rawBody;
     if (!rawBody) {
       throw new BadRequestException('Missing request body');
@@ -34,7 +34,8 @@ export class BillingController {
       throw new BadRequestException('Stripe webhook secret not configured');
     }
 
-    this.billingService.verifyWebhook(rawBody, signature, secret);
+    const event = this.billingService.verifyWebhook(rawBody, signature, secret);
+    await this.billingService.handleWebhookEvent(event);
     return { received: true };
   }
 }
