@@ -12,12 +12,14 @@
    - **Price:** Set your desired amount (e.g. $19/month)
 5. Click **Save product**
 6. After creating, copy the **Price ID** (starts with `price_`)
-7. Add to `backend/.env`:
+7. In Stripe Dashboard → **Developers → API keys**, copy the **Secret key** (starts with `sk_test_`)
+8. Add to `backend/.env`:
    ```bash
+   STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxx
    STRIPE_PRO_PRICE_ID=price_xxxxxxxxxxxxxxxxxxxxx
    ```
 
-**Verify:** Price ID is set in env (e.g. `STRIPE_PRO_PRICE_ID`). Upcoming tasks (3.2+) will use this for checkout.
+**Verify:** Both keys are set in env. Task 3.2+ uses these for checkout.
 
 ## 3.3 — Webhook (local testing)
 
