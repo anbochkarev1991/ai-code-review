@@ -1,11 +1,12 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
-import type { Repo, ReposResponse } from '../types';
+import type { Pull, PullsResponse, Repo, ReposResponse } from '../types';
 
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';
 const GITHUB_REPOS_URL = 'https://api.github.com/user/repos';
+const GITHUB_PULLS_URL = 'https://api.github.com/repos';
 
 interface GitHubTokenResponse {
   access_token: string;
@@ -189,5 +190,49 @@ export class GitHubService {
     }));
 
     return { repos };
+  }
+
+  async listPulls(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state?: 'open' | 'closed' | 'all',
+  ): Promise<PullsResponse> {
+    const params = new URLSearchParams();
+    if (state) {
+      params.set('state', state);
+    }
+
+    const url = `${GITHUB_PULLS_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException(
+        'Failed to fetch pull requests from GitHub',
+      );
+    }
+
+    const data = (await response.json()) as Array<{
+      number: number;
+      title: string;
+      state: string;
+      head: { ref: string };
+      created_at: string;
+    }>;
+
+    const pulls: Pull[] = data.map((p) => ({
+      number: p.number,
+      title: p.title,
+      state: p.state,
+      head: { ref: p.head.ref },
+      created_at: p.created_at,
+    }));
+
+    return { pulls };
   }
 }
