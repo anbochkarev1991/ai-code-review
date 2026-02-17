@@ -6,6 +6,7 @@ export type {
   ReposResponse,
   Pull,
   PullsResponse,
+  DiffFile,
   DiffResponse,
   ReviewResult,
   ReviewRun,

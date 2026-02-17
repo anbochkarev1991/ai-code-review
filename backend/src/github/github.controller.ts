@@ -120,6 +120,39 @@ export class GitHubController {
     return this.githubService.listRepos(accessToken, pageNum, perPageNum);
   }
 
+  @Get('repos/:owner/:repo/pulls/:pr_number/diff')
+  @UseGuards(JwtAuthGuard)
+  async getPullDiff(
+    @CurrentUser() user: User,
+    @Req() req: AuthenticatedRequest,
+    @Param('owner') owner: string,
+    @Param('repo') repo: string,
+    @Param('pr_number') prNumberStr: string,
+  ) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+
+    if (!token) {
+      throw new UnauthorizedException('Missing Bearer token');
+    }
+
+    const accessToken =
+      await this.githubService.getAccessTokenForUser(user.id, token);
+    const prNumber = parseInt(prNumberStr, 10);
+    if (Number.isNaN(prNumber) || prNumber < 1) {
+      throw new UnauthorizedException('Invalid PR number');
+    }
+
+    return this.githubService.getPullDiff(
+      accessToken,
+      owner,
+      repo,
+      prNumber,
+    );
+  }
+
   @Get('repos/:owner/:repo/pulls')
   @UseGuards(JwtAuthGuard)
   async listPulls(

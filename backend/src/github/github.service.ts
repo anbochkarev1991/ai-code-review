@@ -1,7 +1,18 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
-import type { Pull, PullsResponse, Repo, ReposResponse } from '../types';
+import type {
+  DiffFile,
+  DiffResponse,
+  Pull,
+  PullsResponse,
+  Repo,
+  ReposResponse,
+} from '../types';
 
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';
@@ -234,5 +245,70 @@ export class GitHubService {
     }));
 
     return { pulls };
+  }
+
+  async getPullDiff(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<DiffResponse> {
+    const pullsUrl = `${GITHUB_PULLS_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}`;
+    const pullResponse = await fetch(pullsUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!pullResponse.ok) {
+      if (pullResponse.status === 404) {
+        throw new NotFoundException('Pull request not found');
+      }
+      throw new UnauthorizedException(
+        'Failed to fetch pull request from GitHub',
+      );
+    }
+
+    const pull = (await pullResponse.json()) as {
+      base: { sha: string; ref: string };
+      head: { sha: string; ref: string };
+    };
+    const baseSha = pull.base.sha;
+    const headSha = pull.head.sha;
+
+    const compareUrl = `${GITHUB_PULLS_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/compare/${baseSha}...${headSha}`;
+    const compareResponse = await fetch(compareUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!compareResponse.ok) {
+      throw new UnauthorizedException(
+        'Failed to fetch diff from GitHub',
+      );
+    }
+
+    const compare = (await compareResponse.json()) as {
+      files?: Array<{
+        filename: string;
+        patch: string | null;
+        status?: string;
+      }>;
+    };
+
+    const patches = (compare.files ?? [])
+      .map((f) => f.patch)
+      .filter((p): p is string => !!p);
+    const diff = patches.join('\n');
+
+    const files: DiffFile[] = (compare.files ?? []).map((f) => ({
+      filename: f.filename,
+      patch: f.patch ?? '',
+    }));
+
+    return { diff, files };
   }
 }
