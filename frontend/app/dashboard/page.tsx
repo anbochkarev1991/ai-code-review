@@ -1,7 +1,22 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { MeResponse, ReposResponse } from "@/lib/types";
+import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
+
+async function fetchBillingUsage(
+  accessToken: string
+): Promise<UsageResponse | null> {
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+  const res = await fetch(`${backendUrl}/billing/usage`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
   const backendUrl =
@@ -55,7 +70,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const me = await fetchMe(session.access_token);
+  const [me, usage] = await Promise.all([
+    fetchMe(session.access_token),
+    fetchBillingUsage(session.access_token),
+  ]);
   const reposData =
     me?.github_connected ? await fetchRepos(session.access_token) : null;
 
@@ -95,7 +113,9 @@ export default async function DashboardPage() {
 
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                Plan: {me.plan}
+                {usage
+                  ? `${usage.review_count} / ${usage.limit} reviews this month — ${usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1)}`
+                  : `Plan: ${me.plan}`}
               </span>
               <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                 GitHub: {me.github_connected ? "Connected" : "Not connected"}
