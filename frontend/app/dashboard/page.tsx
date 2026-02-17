@@ -1,11 +1,27 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { MeResponse } from "@/lib/types";
+import type { MeResponse, ReposResponse } from "@/lib/types";
+import { RepoSelector } from "./repo-selector";
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
   const res = await fetch(`${backendUrl}/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function fetchRepos(
+  accessToken: string
+): Promise<ReposResponse | null> {
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+  const res = await fetch(`${backendUrl}/github/repos`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -40,6 +56,8 @@ export default async function DashboardPage() {
   }
 
   const me = await fetchMe(session.access_token);
+  const reposData =
+    me?.github_connected ? await fetchRepos(session.access_token) : null;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-950">
@@ -91,6 +109,16 @@ export default async function DashboardPage() {
               >
                 Connect GitHub
               </a>
+            )}
+
+            {me.github_connected && reposData && (
+              <RepoSelector repos={reposData.repos} />
+            )}
+            {me.github_connected && reposData === null && (
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                Failed to load repositories. Make sure the backend is running and
+                GitHub is connected.
+              </p>
             )}
           </div>
         ) : (
