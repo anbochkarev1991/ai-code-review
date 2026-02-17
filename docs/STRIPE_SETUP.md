@@ -18,3 +18,15 @@
    ```
 
 **Verify:** Price ID is set in env (e.g. `STRIPE_PRO_PRICE_ID`). Upcoming tasks (3.2+) will use this for checkout.
+
+## 3.3 — Webhook (local testing)
+
+1. Install [Stripe CLI](https://stripe.com/docs/stripe-cli)
+2. Run: `stripe listen --forward-to localhost:3001/billing/webhook`
+3. Copy the webhook signing secret (starts with `whsec_`) and add to `backend/.env`:
+   ```bash
+   STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxx
+   ```
+4. Restart the backend. Events forwarded by the CLI will be signed with this secret.
+
+**Verify:** `curl` or Stripe CLI trigger to the local URL returns 200 when signature is valid.
