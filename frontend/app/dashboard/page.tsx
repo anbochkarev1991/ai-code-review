@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
+import { UpgradeToProButton } from "./upgrade-to-pro-button";
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
   const backendUrl =
@@ -101,6 +102,10 @@ export default async function DashboardPage() {
                 GitHub: {me.github_connected ? "Connected" : "Not connected"}
               </span>
             </div>
+
+            {me.plan === "free" && (
+              <UpgradeToProButton accessToken={session.access_token} />
+            )}
 
             {!me.github_connected && (
               <a
