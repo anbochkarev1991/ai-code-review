@@ -122,6 +122,16 @@ export class BillingService {
           event.data.object as Stripe.Checkout.Session,
         );
         break;
+      case 'customer.subscription.updated':
+        await this.handleCustomerSubscriptionUpdated(
+          event.data.object as Stripe.Subscription,
+        );
+        break;
+      case 'customer.subscription.deleted':
+        await this.handleCustomerSubscriptionDeleted(
+          event.data.object as Stripe.Subscription,
+        );
+        break;
       default:
         break;
     }
@@ -189,5 +199,67 @@ export class BillingService {
     } else {
       await supabase.from('subscriptions').insert(row);
     }
+  }
+
+  private async handleCustomerSubscriptionUpdated(
+    subscription: Stripe.Subscription,
+  ): Promise<void> {
+    const stripeSubscriptionId = subscription.id;
+    const supabase = this.getSupabaseAdmin();
+
+    const { data: existing } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('stripe_subscription_id', stripeSubscriptionId)
+      .maybeSingle();
+
+    if (!existing) return;
+
+    const isActive =
+      subscription.status === 'active' || subscription.status === 'trialing';
+    const plan = isActive ? 'pro' : 'free';
+    const status = isActive ? 'active' : 'canceled';
+
+    let currentPeriodEnd: string | null = null;
+    const firstItem = subscription.items?.data?.[0];
+    if (firstItem?.current_period_end) {
+      currentPeriodEnd = new Date(
+        firstItem.current_period_end * 1000,
+      ).toISOString();
+    }
+
+    await supabase
+      .from('subscriptions')
+      .update({
+        plan,
+        status,
+        current_period_end: currentPeriodEnd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('stripe_subscription_id', stripeSubscriptionId);
+  }
+
+  private async handleCustomerSubscriptionDeleted(
+    subscription: Stripe.Subscription,
+  ): Promise<void> {
+    const stripeSubscriptionId = subscription.id;
+    const supabase = this.getSupabaseAdmin();
+
+    const { data: existing } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('stripe_subscription_id', stripeSubscriptionId)
+      .maybeSingle();
+
+    if (!existing) return;
+
+    await supabase
+      .from('subscriptions')
+      .update({
+        plan: 'free',
+        status: 'canceled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('stripe_subscription_id', stripeSubscriptionId);
   }
 }
