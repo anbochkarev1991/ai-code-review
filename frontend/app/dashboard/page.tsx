@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
+import { UpgradeToProButton } from "./upgrade-to-pro-button";
 
 async function fetchBillingUsage(
   accessToken: string
@@ -121,6 +122,10 @@ export default async function DashboardPage() {
                 GitHub: {me.github_connected ? "Connected" : "Not connected"}
               </span>
             </div>
+
+            {me.plan === "free" && (
+              <UpgradeToProButton accessToken={session.access_token} />
+            )}
 
             {!me.github_connected && (
               <a
