@@ -1,0 +1,89 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+import type { User } from '@supabase/supabase-js';
+import type { CheckoutBody, CheckoutResponse } from 'shared';
+
+@Injectable()
+export class BillingService {
+  private stripe: Stripe | null = null;
+
+  private getStripe(): Stripe {
+    if (!this.stripe) {
+      const secretKey = process.env.STRIPE_SECRET_KEY;
+      if (!secretKey) {
+        throw new BadRequestException('Stripe is not configured');
+      }
+      this.stripe = new Stripe(secretKey);
+    }
+    return this.stripe;
+  }
+
+  async createCheckoutSession(
+    user: User,
+    body: CheckoutBody,
+    accessToken: string,
+  ): Promise<CheckoutResponse> {
+    if (!body.success_url || !body.cancel_url) {
+      throw new BadRequestException('success_url and cancel_url are required');
+    }
+
+    const priceId = process.env.STRIPE_PRO_PRICE_ID;
+    if (!priceId) {
+      throw new BadRequestException('Stripe Pro price is not configured');
+    }
+
+    const stripe = this.getStripe();
+    const customerId = await this.getOrCreateStripeCustomerId(user, accessToken);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: body.success_url,
+      cancel_url: body.cancel_url,
+      metadata: { user_id: user.id },
+    });
+
+    if (!session.url) {
+      throw new BadRequestException('Failed to create checkout session');
+    }
+
+    return { url: session.url };
+  }
+
+  private async getOrCreateStripeCustomerId(
+    user: User,
+    accessToken: string,
+  ): Promise<string> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new BadRequestException('Supabase not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .not('stripe_customer_id', 'is', null)
+      .maybeSingle();
+
+    if (sub?.stripe_customer_id) {
+      return sub.stripe_customer_id;
+    }
+
+    const stripe = this.getStripe();
+    const customer = await stripe.customers.create({
+      email: user.email ?? undefined,
+      name: (user.user_metadata?.full_name as string) ?? (user.user_metadata?.name as string) ?? undefined,
+      metadata: { user_id: user.id },
+    });
+
+    return customer.id;
+  }
+}
