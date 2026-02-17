@@ -1,9 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
+import type { Repo, ReposResponse } from '../types';
 
 const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_USER_URL = 'https://api.github.com/user';
+const GITHUB_REPOS_URL = 'https://api.github.com/user/repos';
 
 interface GitHubTokenResponse {
   access_token: string;
@@ -121,5 +123,71 @@ export class GitHubService {
         throw new UnauthorizedException('Failed to create GitHub connection');
       }
     }
+  }
+
+  async getAccessTokenForUser(userId: string, userJwt: string): Promise<string> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new UnauthorizedException('Supabase is not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    });
+
+    const { data, error } = await supabase
+      .from('github_connections')
+      .select('access_token')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw new UnauthorizedException('Failed to fetch GitHub connection');
+    }
+    if (!data?.access_token) {
+      throw new UnauthorizedException('GitHub account not connected');
+    }
+
+    return data.access_token;
+  }
+
+  async listRepos(
+    accessToken: string,
+    page = 1,
+    perPage = 30,
+  ): Promise<ReposResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: String(Math.min(perPage, 100)),
+    });
+
+    const response = await fetch(
+      `${GITHUB_REPOS_URL}?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/vnd.github+json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Failed to fetch repositories from GitHub');
+    }
+
+    const data = (await response.json()) as Array<{
+      full_name: string;
+      private: boolean;
+      default_branch: string;
+    }>;
+
+    const repos: Repo[] = data.map((r) => ({
+      full_name: r.full_name,
+      private: r.private,
+      default_branch: r.default_branch,
+    }));
+
+    return { repos };
   }
 }

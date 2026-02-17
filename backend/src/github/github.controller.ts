@@ -2,10 +2,16 @@ import {
   Controller,
   Get,
   Query,
+  Req,
   Redirect,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/user.decorator';
+import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
+import type { User } from '@supabase/supabase-js';
 import { GitHubService } from './github.service';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
@@ -86,5 +92,30 @@ export class GitHubController {
         url: `${frontendUrl}?github=error&message=exchange_failed`,
       };
     }
+  }
+
+  @Get('repos')
+  @UseGuards(JwtAuthGuard)
+  async listRepos(
+    @CurrentUser() user: User,
+    @Req() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('per_page') perPage?: string,
+  ) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+
+    if (!token) {
+      throw new UnauthorizedException('Missing Bearer token');
+    }
+
+    const accessToken =
+      await this.githubService.getAccessTokenForUser(user.id, token);
+    const pageNum = page ? parseInt(page, 10) || 1 : 1;
+    const perPageNum = perPage ? parseInt(perPage, 10) || 30 : 30;
+
+    return this.githubService.listRepos(accessToken, pageNum, perPageNum);
   }
 }
