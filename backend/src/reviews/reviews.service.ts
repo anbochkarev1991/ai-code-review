@@ -1,5 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import type { AgentOutput, PostReviewsResponse, ReviewResult, TraceStep } from 'shared';
+import type {
+  AgentOutput,
+  GetReviewResponse,
+  PostReviewsResponse,
+  ReviewResult,
+  TraceStep,
+} from 'shared';
 import { AggregatorAgent } from './agents/aggregator.agent';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
@@ -51,6 +57,13 @@ export class ReviewsService {
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
   ) {}
+
+  /**
+   * Fetches one review run by id. Returns null if not found or not owned by user.
+   */
+  async findOne(id: string, userJwt: string): Promise<GetReviewResponse | null> {
+    return this.reviewRunsRepository.findById(id, userJwt);
+  }
 
   /**
    * Runs the full review pipeline: fetches PR diff, runs 4 domain agents,

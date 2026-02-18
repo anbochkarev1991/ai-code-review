@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpException,
   HttpStatus,
+  NotFoundException,
+  Param,
   Post,
   Req,
   UseGuards,
@@ -23,6 +26,21 @@ export class ReviewsController {
     private readonly billingService: BillingService,
     private readonly reviewsService: ReviewsService,
   ) {}
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+
+    const review = await this.reviewsService.findOne(id, token);
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    return review;
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)
