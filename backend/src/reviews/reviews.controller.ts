@@ -51,14 +51,23 @@ export class ReviewsController {
 
     const { repo_full_name, pr_number } = body ?? {};
     if (!repo_full_name || pr_number == null) {
-      throw new BadRequestException('repo_full_name and pr_number are required');
+      throw new BadRequestException(
+        'repo_full_name and pr_number are required',
+      );
     }
-    const prNum = typeof pr_number === 'number' ? pr_number : parseInt(String(pr_number), 10);
+    const prNum =
+      typeof pr_number === 'number'
+        ? pr_number
+        : parseInt(String(pr_number), 10);
     if (Number.isNaN(prNum)) {
       throw new BadRequestException('pr_number must be a valid number');
     }
 
-    const result = await this.reviewsService.runReview(user.id, repo_full_name, prNum);
+    const result = await this.reviewsService.runReview(
+      user.id,
+      repo_full_name,
+      prNum,
+    );
     await this.billingService.incrementUsage(user.id, token);
     return result;
   }

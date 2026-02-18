@@ -60,7 +60,9 @@ export class GitHubService {
       throw new UnauthorizedException('Failed to exchange code for token');
     }
 
-    const data = (await response.json()) as GitHubTokenResponse & { error?: string };
+    const data = (await response.json()) as GitHubTokenResponse & {
+      error?: string;
+    };
     if (data.error) {
       throw new UnauthorizedException(data.error);
     }
@@ -137,7 +139,10 @@ export class GitHubService {
     }
   }
 
-  async getAccessTokenForUser(userId: string, userJwt: string): Promise<string> {
+  async getAccessTokenForUser(
+    userId: string,
+    userJwt: string,
+  ): Promise<string> {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -174,18 +179,17 @@ export class GitHubService {
       per_page: String(Math.min(perPage, 100)),
     });
 
-    const response = await fetch(
-      `${GITHUB_REPOS_URL}?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/vnd.github+json',
-        },
+    const response = await fetch(`${GITHUB_REPOS_URL}?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
       },
-    );
+    });
 
     if (!response.ok) {
-      throw new UnauthorizedException('Failed to fetch repositories from GitHub');
+      throw new UnauthorizedException(
+        'Failed to fetch repositories from GitHub',
+      );
     }
 
     const data = (await response.json()) as Array<{
@@ -286,9 +290,7 @@ export class GitHubService {
     });
 
     if (!compareResponse.ok) {
-      throw new UnauthorizedException(
-        'Failed to fetch diff from GitHub',
-      );
+      throw new UnauthorizedException('Failed to fetch diff from GitHub');
     }
 
     const compare = (await compareResponse.json()) as {

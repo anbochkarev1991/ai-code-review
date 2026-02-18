@@ -45,7 +45,10 @@ describe('agentOutputSchema', () => {
   });
 
   it('rejects invalid severity', () => {
-    const invalid = { ...validSample, findings: [{ ...validSample.findings[0], severity: 'invalid' }] };
+    const invalid = {
+      ...validSample,
+      findings: [{ ...validSample.findings[0], severity: 'invalid' }],
+    };
     const result = agentOutputSchema.safeParse(invalid);
     expect(result.success).toBe(false);
   });

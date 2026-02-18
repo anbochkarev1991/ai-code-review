@@ -7,7 +7,9 @@ export const CurrentUser = createParamDecorator(
     const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
     if (!user) {
-      throw new Error('User not found on request; ensure JwtAuthGuard is applied');
+      throw new Error(
+        'User not found on request; ensure JwtAuthGuard is applied',
+      );
     }
     return user;
   },

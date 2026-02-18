@@ -10,7 +10,6 @@ const CODE_QUALITY_SYSTEM_PROMPT = `You are a code quality reviewer. Analyze pul
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
-
 @Injectable()
 export class CodeQualityAgent {
   private client: OpenAI | null = null;
@@ -68,7 +67,9 @@ Analyze the diff for code quality issues and return one JSON object.`;
   }
 
   private parseJson(raw: string): unknown {
-    const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    const stripped = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '');
     return JSON.parse(stripped) as unknown;
   }
 }

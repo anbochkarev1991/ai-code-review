@@ -40,7 +40,10 @@ export class BillingService {
     }
 
     const stripe = this.getStripe();
-    const customerId = await this.getOrCreateStripeCustomerId(user, accessToken);
+    const customerId = await this.getOrCreateStripeCustomerId(
+      user,
+      accessToken,
+    );
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -86,7 +89,10 @@ export class BillingService {
     const stripe = this.getStripe();
     const customer = await stripe.customers.create({
       email: user.email ?? undefined,
-      name: (user.user_metadata?.full_name as string) ?? (user.user_metadata?.name as string) ?? undefined,
+      name:
+        (user.user_metadata?.full_name as string) ??
+        (user.user_metadata?.name as string) ??
+        undefined,
       metadata: { user_id: user.id },
     });
 
@@ -146,8 +152,7 @@ export class BillingService {
         .maybeSingle(),
     ]);
 
-    const plan: Plan =
-      (subscriptionResult.data?.plan as Plan) ?? 'free';
+    const plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
     const reviewCount = usageResult.data?.review_count ?? 0;
     const limit = USAGE_LIMITS[plan];
 
@@ -197,19 +202,13 @@ export class BillingService {
 
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.handleCheckoutSessionCompleted(
-          event.data.object as Stripe.Checkout.Session,
-        );
+        await this.handleCheckoutSessionCompleted(event.data.object);
         break;
       case 'customer.subscription.updated':
-        await this.handleCustomerSubscriptionUpdated(
-          event.data.object as Stripe.Subscription,
-        );
+        await this.handleCustomerSubscriptionUpdated(event.data.object);
         break;
       case 'customer.subscription.deleted':
-        await this.handleCustomerSubscriptionDeleted(
-          event.data.object as Stripe.Subscription,
-        );
+        await this.handleCustomerSubscriptionDeleted(event.data.object);
         break;
       default:
         break;
@@ -228,11 +227,11 @@ export class BillingService {
     const stripeCustomerId =
       typeof session.customer === 'string'
         ? session.customer
-        : session.customer?.id ?? null;
+        : (session.customer?.id ?? null);
     const stripeSubscriptionId =
       typeof session.subscription === 'string'
         ? session.subscription
-        : session.subscription?.id ?? null;
+        : (session.subscription?.id ?? null);
 
     if (!stripeCustomerId || !stripeSubscriptionId) {
       return;
@@ -240,9 +239,8 @@ export class BillingService {
 
     let currentPeriodEnd: string | null = null;
     try {
-      const subscription = await this.getStripe().subscriptions.retrieve(
-        stripeSubscriptionId,
-      );
+      const subscription =
+        await this.getStripe().subscriptions.retrieve(stripeSubscriptionId);
       const firstItem = subscription.items?.data?.[0];
       if (firstItem?.current_period_end) {
         currentPeriodEnd = new Date(
@@ -271,10 +269,7 @@ export class BillingService {
       .maybeSingle();
 
     if (existing) {
-      await supabase
-        .from('subscriptions')
-        .update(row)
-        .eq('user_id', userId);
+      await supabase.from('subscriptions').update(row).eq('user_id', userId);
     } else {
       await supabase.from('subscriptions').insert(row);
     }

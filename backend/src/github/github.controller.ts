@@ -112,8 +112,10 @@ export class GitHubController {
       throw new UnauthorizedException('Missing Bearer token');
     }
 
-    const accessToken =
-      await this.githubService.getAccessTokenForUser(user.id, token);
+    const accessToken = await this.githubService.getAccessTokenForUser(
+      user.id,
+      token,
+    );
     const pageNum = page ? parseInt(page, 10) || 1 : 1;
     const perPageNum = perPage ? parseInt(perPage, 10) || 30 : 30;
 
@@ -138,19 +140,16 @@ export class GitHubController {
       throw new UnauthorizedException('Missing Bearer token');
     }
 
-    const accessToken =
-      await this.githubService.getAccessTokenForUser(user.id, token);
+    const accessToken = await this.githubService.getAccessTokenForUser(
+      user.id,
+      token,
+    );
     const prNumber = parseInt(prNumberStr, 10);
     if (Number.isNaN(prNumber) || prNumber < 1) {
       throw new UnauthorizedException('Invalid PR number');
     }
 
-    return this.githubService.getPullDiff(
-      accessToken,
-      owner,
-      repo,
-      prNumber,
-    );
+    return this.githubService.getPullDiff(accessToken, owner, repo, prNumber);
   }
 
   @Get('repos/:owner/:repo/pulls')
@@ -171,19 +170,16 @@ export class GitHubController {
       throw new UnauthorizedException('Missing Bearer token');
     }
 
-    const accessToken =
-      await this.githubService.getAccessTokenForUser(user.id, token);
+    const accessToken = await this.githubService.getAccessTokenForUser(
+      user.id,
+      token,
+    );
 
     const validState =
       state === 'open' || state === 'closed' || state === 'all'
         ? state
         : undefined;
 
-    return this.githubService.listPulls(
-      accessToken,
-      owner,
-      repo,
-      validState,
-    );
+    return this.githubService.listPulls(accessToken, owner, repo, validState);
   }
 }

@@ -11,10 +11,7 @@ export class MeController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getMe(
-    @CurrentUser() user: User,
-    @Req() req: AuthenticatedRequest,
-  ) {
+  async getMe(@CurrentUser() user: User, @Req() req: AuthenticatedRequest) {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7).trim()

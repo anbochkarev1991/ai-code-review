@@ -16,11 +16,25 @@ export class MeService {
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
 
-    const [profileResult, subscriptionResult, githubResult] = await Promise.all([
-      supabase.from('profiles').select('id, email, display_name, avatar_url').eq('id', user.id).maybeSingle(),
-      supabase.from('subscriptions').select('plan').eq('user_id', user.id).maybeSingle(),
-      supabase.from('github_connections').select('id').eq('user_id', user.id).maybeSingle(),
-    ]);
+    const [profileResult, subscriptionResult, githubResult] = await Promise.all(
+      [
+        supabase
+          .from('profiles')
+          .select('id, email, display_name, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('subscriptions')
+          .select('plan')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('github_connections')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ],
+    );
 
     const profileRow = profileResult.data;
     const profile: Profile = profileRow
@@ -33,7 +47,10 @@ export class MeService {
       : {
           id: user.id,
           email: user.email ?? '',
-          display_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
+          display_name:
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            undefined,
           avatar_url: user.user_metadata?.avatar_url ?? undefined,
         };
 
