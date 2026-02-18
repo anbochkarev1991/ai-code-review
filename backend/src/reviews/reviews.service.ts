@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type { AgentOutput, PostReviewsResponse, ReviewResult, TraceStep } from 'shared';
 import { AggregatorAgent } from './agents/aggregator.agent';
 import { ArchitectureAgent } from './agents/architecture.agent';
@@ -34,6 +30,16 @@ interface DomainAgentFailure {
 
 type DomainAgentOutcome = DomainAgentResult | DomainAgentFailure;
 
+/** Thrown when the review pipeline exceeds the timeout (e.g. 60s). */
+export class ReviewTimeoutError extends Error {
+  constructor() {
+    super('Request timeout (60s)');
+    this.name = 'ReviewTimeoutError';
+  }
+}
+
+const REVIEW_TIMEOUT_MS = 60_000;
+
 @Injectable()
 export class ReviewsService {
   constructor(
@@ -49,8 +55,47 @@ export class ReviewsService {
   /**
    * Runs the full review pipeline: fetches PR diff, runs 4 domain agents,
    * then Aggregator, builds trace, and saves to review_runs.
+   * Times out after REVIEW_TIMEOUT_MS (60s); on timeout saves failed run and returns.
    */
   async runReview(
+    userId: string,
+    userJwt: string,
+    repoFullName: string,
+    prNumber: number,
+  ): Promise<PostReviewsResponse> {
+    const work = this.runReviewWork(userId, userJwt, repoFullName, prNumber);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new ReviewTimeoutError()), REVIEW_TIMEOUT_MS);
+    });
+
+    try {
+      return await Promise.race([work, timeoutPromise]);
+    } catch (err) {
+      if (err instanceof ReviewTimeoutError) {
+        const id = await this.reviewRunsRepository.create(
+          {
+            userId,
+            repoFullName,
+            prNumber,
+            prTitle: null,
+            status: 'failed',
+            trace: [],
+            errorMessage: err.message,
+          },
+          userJwt,
+        );
+        return {
+          id,
+          status: 'failed',
+          trace: [],
+          error_message: err.message,
+        };
+      }
+      throw err;
+    }
+  }
+
+  private async runReviewWork(
     userId: string,
     userJwt: string,
     repoFullName: string,
