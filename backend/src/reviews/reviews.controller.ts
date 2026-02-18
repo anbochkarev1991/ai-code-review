@@ -13,13 +13,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/user.decorator';
 import type { User } from '@supabase/supabase-js';
+import type { PostReviewsBody } from 'shared';
 import { BillingService } from '../billing/billing.service';
 import { ReviewsService } from './reviews.service';
-
-interface CreateReviewBody {
-  repo_full_name: string;
-  pr_number: number;
-}
 
 @Controller('reviews')
 export class ReviewsController {
@@ -34,7 +30,7 @@ export class ReviewsController {
   async create(
     @CurrentUser() user: User,
     @Req() req: AuthenticatedRequest,
-    @Body() body: CreateReviewBody,
+    @Body() body: PostReviewsBody,
   ) {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
