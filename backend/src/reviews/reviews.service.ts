@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import type {
   AgentOutput,
   GetReviewResponse,
+  GetReviewsResponse,
   PostReviewsResponse,
   ReviewResult,
   TraceStep,
@@ -63,6 +64,17 @@ export class ReviewsService {
    */
   async findOne(id: string, userJwt: string): Promise<GetReviewResponse | null> {
     return this.reviewRunsRepository.findById(id, userJwt);
+  }
+
+  /**
+   * Lists review runs for the current user with pagination.
+   */
+  async findAll(
+    limit: number,
+    offset: number,
+    userJwt: string,
+  ): Promise<GetReviewsResponse> {
+    return this.reviewRunsRepository.findAll(limit, offset, userJwt);
   }
 
   /**
