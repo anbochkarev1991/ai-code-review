@@ -8,6 +8,9 @@
     "build": "tsc",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "zod": "^3.23"
+  },
   "devDependencies": {
     "typescript": "^5"
   }

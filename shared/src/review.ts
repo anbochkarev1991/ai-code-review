@@ -1,4 +1,25 @@
+import { z } from 'zod';
+
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+/** Zod schema for agent output — validates findings + summary from code review agents */
+export const agentOutputSchema = z.object({
+  findings: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      severity: z.enum(['critical', 'high', 'medium', 'low']),
+      category: z.string(),
+      file: z.string().optional(),
+      line: z.number().optional(),
+      message: z.string(),
+      suggestion: z.string().optional(),
+    })
+  ),
+  summary: z.string(),
+});
+
+export type AgentOutput = z.infer<typeof agentOutputSchema>;
 
 export interface Finding {
   id: string;
