@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
-import type { ReviewResult, TraceStep } from 'shared';
+import type { GetReviewsResponse, ReviewResult, ReviewRun, TraceStep } from 'shared';
 
 export interface CreateReviewRunParams {
   userId: string;
@@ -67,5 +67,63 @@ export class ReviewRunsRepository {
       throw new Error(`Failed to create review run: ${error.message}`);
     }
     return data.id;
+  }
+
+  /**
+   * Lists review runs for the current user with pagination.
+   * Uses user JWT for RLS so only the owner's runs are returned.
+   */
+  async findAll(
+    limit: number,
+    offset: number,
+    userJwt: string,
+  ): Promise<GetReviewsResponse> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    });
+
+    const select =
+      'id, user_id, repo_full_name, pr_number, pr_title, status, result_snapshot, trace, error_message, created_at, updated_at';
+
+    const [itemsRes, countRes] = await Promise.all([
+      supabase
+        .from('review_runs')
+        .select(select)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1),
+      supabase.from('review_runs').select('id', { count: 'exact', head: true }),
+    ]);
+
+    if (itemsRes.error) {
+      throw new Error(`Failed to fetch review runs: ${itemsRes.error.message}`);
+    }
+    if (countRes.error) {
+      throw new Error(`Failed to count review runs: ${countRes.error.message}`);
+    }
+
+    const total = countRes.count ?? 0;
+    const rows = (itemsRes.data ?? []) as ReviewRunRow[];
+
+    const items: ReviewRun[] = rows.map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      repo_full_name: row.repo_full_name,
+      pr_number: row.pr_number,
+      pr_title: row.pr_title ?? '',
+      status: row.status,
+      result_snapshot: row.result_snapshot as ReviewRun['result_snapshot'],
+      trace: row.trace as ReviewRun['trace'],
+      error_message: row.error_message,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+
+    return { items, total };
   }
 }

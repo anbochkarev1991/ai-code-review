@@ -3,7 +3,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { AgentOutput, PostReviewsResponse, ReviewResult, TraceStep } from 'shared';
+import type {
+  AgentOutput,
+  GetReviewsResponse,
+  PostReviewsResponse,
+  ReviewResult,
+  TraceStep,
+} from 'shared';
 import { AggregatorAgent } from './agents/aggregator.agent';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
@@ -45,6 +51,17 @@ export class ReviewsService {
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
   ) {}
+
+  /**
+   * Lists review runs for the current user with pagination.
+   */
+  async findAll(
+    limit: number,
+    offset: number,
+    userJwt: string,
+  ): Promise<GetReviewsResponse> {
+    return this.reviewRunsRepository.findAll(limit, offset, userJwt);
+  }
 
   /**
    * Runs the full review pipeline: fetches PR diff, runs 4 domain agents,

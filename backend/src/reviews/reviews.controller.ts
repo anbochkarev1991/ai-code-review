@@ -2,10 +2,14 @@ import {
   BadRequestException,
   Body,
   Controller,
+  DefaultValuePipe,
+  Get,
   HttpCode,
   HttpException,
   HttpStatus,
+  ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -27,6 +31,22 @@ export class ReviewsController {
     private readonly billingService: BillingService,
     private readonly reviewsService: ReviewsService,
   ) {}
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  async findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe)
+    limit: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe)
+    offset: number,
+  ) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    return this.reviewsService.findAll(limit, offset, token);
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)
