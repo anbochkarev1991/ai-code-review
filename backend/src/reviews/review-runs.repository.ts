@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
-import type { ReviewResult, TraceStep } from 'shared';
+import type { GetReviewResponse, ReviewResult, TraceStep } from 'shared';
 
 export interface CreateReviewRunParams {
   userId: string;
@@ -67,5 +67,53 @@ export class ReviewRunsRepository {
       throw new Error(`Failed to create review run: ${error.message}`);
     }
     return data.id;
+  }
+
+  /**
+   * Fetches one review run by id. Uses user JWT for RLS so only the owner can fetch.
+   * Returns null if not found or not owned by the authenticated user.
+   */
+  async findById(id: string, userJwt: string): Promise<GetReviewResponse | null> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    });
+
+    const { data, error } = await supabase
+      .from('review_runs')
+      .select('id, status, result_snapshot, trace, error_message, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to fetch review run: ${error.message}`);
+    }
+    if (!data) {
+      return null;
+    }
+
+    const row = data as {
+      id: string;
+      status: string;
+      result_snapshot: unknown;
+      trace: unknown;
+      error_message: string | null;
+      created_at: string;
+      updated_at: string;
+    };
+    return {
+      id: row.id,
+      status: row.status,
+      result_snapshot: row.result_snapshot as ReviewResult | undefined,
+      trace: (row.trace as TraceStep[] | undefined) ?? undefined,
+      error_message: row.error_message ?? undefined,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
   }
 }
