@@ -21,6 +21,13 @@ export const agentOutputSchema = z.object({
 
 export type AgentOutput = z.infer<typeof agentOutputSchema>;
 
+/**
+ * Short text form of the agent output schema for use in prompts.
+ * Kept in sync with agentOutputSchema.
+ */
+export const AGENT_OUTPUT_SCHEMA_PROMPT =
+  'findings: array of { id, title, severity, category, file?, line?, message, suggestion? }; summary: string';
+
 export interface Finding {
   id: string;
   title: string;

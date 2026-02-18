@@ -1,4 +1,4 @@
-import { agentOutputSchema } from 'shared';
+import { agentOutputSchema, AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
 
 describe('agentOutputSchema', () => {
   const validSample = {
@@ -63,5 +63,20 @@ describe('agentOutputSchema', () => {
     };
     const result = agentOutputSchema.safeParse(invalid);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('AGENT_OUTPUT_SCHEMA_PROMPT', () => {
+  it('contains key schema fields for prompts', () => {
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).toContain('findings');
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).toContain('summary');
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).toContain('id');
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).toContain('severity');
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).toContain('message');
+  });
+
+  it('is non-empty and suitable for agent prompts', () => {
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT.length).toBeGreaterThan(20);
+    expect(AGENT_OUTPUT_SCHEMA_PROMPT).not.toMatch(/\s{2,}/);
   });
 });
