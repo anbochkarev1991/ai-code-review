@@ -36,14 +36,21 @@ export interface CallWithValidationRetryOptions {
   agentName: string;
 }
 
+export interface CallWithValidationRetryResult {
+  output: AgentOutput;
+  rawContent: string;
+  tokensUsed?: number;
+}
+
 /**
  * Calls OpenAI chat completion, parses and validates the response with Zod.
  * On validation failure, retries up to MAX_RETRIES (2) times with an "invalid JSON" message.
  * After retries are exhausted, throws so the pipeline can mark the step as failed in the trace.
+ * Returns output, raw content, and token usage for trace recording.
  */
 export async function callWithValidationRetry(
   options: CallWithValidationRetryOptions,
-): Promise<AgentOutput> {
+): Promise<CallWithValidationRetryResult> {
   const { client, model, messages, agentName } = options;
   let currentMessages = [...messages];
   let lastError = '';
@@ -61,7 +68,12 @@ export async function callWithValidationRetry(
 
     const validated = parseAndValidate(raw);
     if (validated.success) {
-      return validated.data;
+      const tokensUsed = completion.usage?.total_tokens;
+      return {
+        output: validated.data,
+        rawContent: raw,
+        tokensUsed,
+      };
     }
 
     lastError = validated.error;
