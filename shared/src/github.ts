@@ -32,4 +32,5 @@ export interface DiffFile {
 export interface DiffResponse {
   diff: string;
   files?: DiffFile[];
+  pr_title?: string;
 }

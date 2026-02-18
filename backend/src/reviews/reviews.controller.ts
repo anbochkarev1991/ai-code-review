@@ -65,10 +65,13 @@ export class ReviewsController {
 
     const result = await this.reviewsService.runReview(
       user.id,
+      token,
       repo_full_name,
       prNum,
     );
-    await this.billingService.incrementUsage(user.id, token);
+    if (result.status === 'completed') {
+      await this.billingService.incrementUsage(user.id, token);
+    }
     return result;
   }
 }

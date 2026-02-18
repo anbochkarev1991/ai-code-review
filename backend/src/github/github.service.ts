@@ -277,6 +277,7 @@ export class GitHubService {
     const pull = (await pullResponse.json()) as {
       base: { sha: string; ref: string };
       head: { sha: string; ref: string };
+      title?: string;
     };
     const baseSha = pull.base.sha;
     const headSha = pull.head.sha;
@@ -311,6 +312,6 @@ export class GitHubService {
       patch: f.patch ?? '',
     }));
 
-    return { diff, files };
+    return { diff, files, pr_title: pull.title };
   }
 }
