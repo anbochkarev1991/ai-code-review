@@ -50,6 +50,22 @@ export interface TraceStep {
   finished_at: string;
   tokens_used?: number;
   status: 'ok' | 'failed';
+  /** Optional per-agent raw output; truncated if larger than TRACE_RAW_OUTPUT_MAX_LENGTH */
+  raw_output?: string;
+}
+
+/** Max length for raw_output stored in trace; larger outputs are truncated with ellipsis */
+export const TRACE_RAW_OUTPUT_MAX_LENGTH = 8192;
+
+/**
+ * Truncates raw output for trace storage to avoid bloating DB.
+ * Returns truncated string with ellipsis suffix if cut.
+ */
+export function truncateRawOutputForTrace(raw: string): string {
+  if (raw.length <= TRACE_RAW_OUTPUT_MAX_LENGTH) {
+    return raw;
+  }
+  return raw.slice(0, TRACE_RAW_OUTPUT_MAX_LENGTH - 3) + '...';
 }
 
 export interface ReviewRun {

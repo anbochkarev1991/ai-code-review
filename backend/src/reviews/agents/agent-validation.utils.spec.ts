@@ -113,11 +113,14 @@ describe('agent-validation.utils', () => {
     it('returns validated output on first attempt', async () => {
       mockCreate.mockResolvedValue({
         choices: [{ message: { content: JSON.stringify(validResponse) } }],
+        usage: { total_tokens: 50 },
       });
 
       const result = await callWithValidationRetry(getOptions());
 
-      expect(result).toEqual(validResponse);
+      expect(result.output).toEqual(validResponse);
+      expect(result.rawContent).toBe(JSON.stringify(validResponse));
+      expect(result.tokensUsed).toBe(50);
       expect(mockCreate).toHaveBeenCalledTimes(1);
     });
 
@@ -141,7 +144,7 @@ describe('agent-validation.utils', () => {
 
       const result = await callWithValidationRetry(getOptions());
 
-      expect(result).toEqual(validResponse);
+      expect(result.output).toEqual(validResponse);
       expect(mockCreate).toHaveBeenCalledTimes(2); // First failed validation, retry succeeded
     });
 

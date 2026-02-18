@@ -40,7 +40,7 @@ ${prDiff}
 
 Analyze the diff for code quality issues and return one JSON object.`;
 
-    return callWithValidationRetry({
+    const result = await callWithValidationRetry({
       client,
       model,
       messages: [
@@ -49,5 +49,6 @@ Analyze the diff for code quality issues and return one JSON object.`;
       ],
       agentName: 'Code Quality',
     });
+    return result.output;
   }
 }
