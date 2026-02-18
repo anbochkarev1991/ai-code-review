@@ -15,6 +15,16 @@ Each task from TODOS.md must be developed in a **separate branch**. Do not mix m
 3. Commit with the message format below
 4. Merge to `main` (via PR or direct merge) only after the task passes review
 
+## Merge to main after verification
+
+Once the task is implemented, committed, and verified by the agent:
+
+1. **Merge the feature branch to `main`** — do not leave completed work on a stale branch.
+2. Use `git checkout main && git merge day-N-task-X.Y --no-edit` (or create a PR and merge).
+3. Delete the feature branch if desired: `git branch -d day-N-task-X.Y`.
+
+The agent must merge to `main` as part of completing each task workflow — a verified commit on a feature branch alone is not complete until merged.
+
 ## One commit per task
 
 Each task must be committed in a **separate commit**. Do not combine multiple tasks into one commit.
