@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module';
+import { AggregatorAgent } from './agents/aggregator.agent';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
 import { PerformanceAgent } from './agents/performance.agent';
@@ -16,6 +17,7 @@ import { ReviewsService } from './reviews.service';
     ArchitectureAgent,
     PerformanceAgent,
     SecurityAgent,
+    AggregatorAgent,
   ],
   exports: [
     ReviewsService,
@@ -23,6 +25,7 @@ import { ReviewsService } from './reviews.service';
     ArchitectureAgent,
     PerformanceAgent,
     SecurityAgent,
+    AggregatorAgent,
   ],
 })
 export class ReviewsModule {}
