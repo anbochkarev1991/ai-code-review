@@ -36,7 +36,13 @@ export class MeService {
       ],
     );
 
-    const profileRow = profileResult.data;
+    type ProfilesRow = {
+      id: string;
+      email: string;
+      display_name: string | null;
+      avatar_url: string | null;
+    };
+    const profileRow = profileResult.data as ProfilesRow | null;
     const profile: Profile = profileRow
       ? {
           id: profileRow.id,
@@ -44,15 +50,17 @@ export class MeService {
           display_name: profileRow.display_name ?? undefined,
           avatar_url: profileRow.avatar_url ?? undefined,
         }
-      : {
-          id: user.id,
-          email: user.email ?? '',
-          display_name:
-            user.user_metadata?.full_name ??
-            user.user_metadata?.name ??
-            undefined,
-          avatar_url: user.user_metadata?.avatar_url ?? undefined,
-        };
+      : (() => {
+          const md = user.user_metadata as Record<string, unknown> | undefined;
+          const asString = (v: unknown): string | undefined =>
+            typeof v === 'string' ? v : undefined;
+          return {
+            id: user.id,
+            email: user.email ?? '',
+            display_name: asString(md?.full_name ?? md?.name),
+            avatar_url: asString(md?.avatar_url),
+          };
+        })();
 
     const plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
     const github_connected = !!githubResult.data;
