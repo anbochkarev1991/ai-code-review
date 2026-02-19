@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PostReviewsResponse, ReviewResult } from "@/lib/types";
 import { ReviewFindingsList } from "./review-findings-list";
+import { ReviewSummary } from "./review-summary";
 
 interface RunReviewButtonProps {
   repoFullName: string;
@@ -110,7 +111,12 @@ export function RunReviewButton({
           <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
         )}
       </div>
-      {result && <ReviewFindingsList findings={result.findings} />}
+      {result && (
+        <div className="flex w-full flex-col gap-4">
+          {result.summary && <ReviewSummary summary={result.summary} />}
+          <ReviewFindingsList findings={result.findings} />
+        </div>
+      )}
     </div>
   );
 }
