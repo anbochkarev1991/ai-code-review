@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { PostReviewsResponse } from "@/lib/types";
+import type { PostReviewsResponse, ReviewResult } from "@/lib/types";
+import { ReviewFindingsList } from "./review-findings-list";
 
 interface RunReviewButtonProps {
   repoFullName: string;
@@ -18,10 +19,12 @@ export function RunReviewButton({
 }: RunReviewButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ReviewResult | null>(null);
 
   const handleRunReview = async () => {
     setLoading(true);
     setError(null);
+    setResult(null);
 
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
@@ -61,10 +64,14 @@ export function RunReviewButton({
       if (data.error_message) {
         setError(data.error_message);
         setLoading(false);
+        setResult(null);
         return;
       }
 
-      // Response handling for successful reviews will be implemented in task 5.3
+      // Store result for display
+      if (data.result_snapshot) {
+        setResult(data.result_snapshot);
+      }
     } catch (err) {
       clearTimeout(timeoutId);
 
@@ -83,24 +90,27 @@ export function RunReviewButton({
   };
 
   return (
-    <div className="flex w-full flex-col gap-2">
-      <button
-        onClick={handleRunReview}
-        disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-      >
-        {loading ? (
-          <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
-            Running review...
-          </>
-        ) : (
-          "Run review"
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex w-full flex-col gap-2">
+        <button
+          onClick={handleRunReview}
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          {loading ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
+              Running review...
+            </>
+          ) : (
+            "Run review"
+          )}
+        </button>
+        {error && (
+          <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
         )}
-      </button>
-      {error && (
-        <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
-      )}
+      </div>
+      {result && <ReviewFindingsList findings={result.findings} />}
     </div>
   );
 }
