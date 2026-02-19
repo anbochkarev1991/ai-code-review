@@ -14,4 +14,5 @@ export type {
   UsageResponse,
   CheckoutBody,
   CheckoutResponse,
+  PostReviewsResponse,
 } from "shared";

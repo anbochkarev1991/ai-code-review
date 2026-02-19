@@ -7,9 +7,17 @@ interface PRSelectorProps {
   owner: string;
   repo: string;
   accessToken: string;
+  value?: string;
+  onChange?: (prNumber: string) => void;
 }
 
-export function PRSelector({ owner, repo, accessToken }: PRSelectorProps) {
+export function PRSelector({
+  owner,
+  repo,
+  accessToken,
+  value = "",
+  onChange,
+}: PRSelectorProps) {
   const [pulls, setPulls] = useState<Pull[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +113,8 @@ export function PRSelector({ owner, repo, accessToken }: PRSelectorProps) {
       <select
         id="pr-select"
         className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
-        defaultValue=""
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
         aria-label="Select a pull request"
       >
         <option value="" disabled>
