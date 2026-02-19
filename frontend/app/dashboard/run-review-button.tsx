@@ -9,6 +9,8 @@ interface RunReviewButtonProps {
   accessToken: string;
 }
 
+const REVIEW_TIMEOUT_MS = 60000; // 60 seconds
+
 export function RunReviewButton({
   repoFullName,
   prNumber,
@@ -24,6 +26,12 @@ export function RunReviewButton({
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
+    // Create AbortController for timeout handling
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, REVIEW_TIMEOUT_MS);
+
     try {
       const response = await fetch(`${backendUrl}/reviews`, {
         method: "POST",
@@ -35,7 +43,10 @@ export function RunReviewButton({
           repo_full_name: repoFullName,
           pr_number: prNumber,
         }),
+        signal: abortController.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -45,9 +56,27 @@ export function RunReviewButton({
       }
 
       const data = (await response.json()) as PostReviewsResponse;
-      // Response handling will be implemented in task 5.2
+
+      // Display error_message from response if present
+      if (data.error_message) {
+        setError(data.error_message);
+        setLoading(false);
+        return;
+      }
+
+      // Response handling for successful reviews will be implemented in task 5.3
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run review");
+      clearTimeout(timeoutId);
+
+      if (err instanceof Error) {
+        if (err.name === "AbortError") {
+          setError("Review request timed out after 60 seconds. Please try again.");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Failed to run review");
+      }
     } finally {
       setLoading(false);
     }
