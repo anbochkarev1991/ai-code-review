@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { PostReviewsResponse, ReviewResult } from "@/lib/types";
+import type { PostReviewsResponse, ReviewResult, TraceStep } from "@/lib/types";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummary } from "./review-summary";
+import { ReviewTrace } from "./review-trace";
 
 interface RunReviewButtonProps {
   repoFullName: string;
@@ -21,11 +22,13 @@ export function RunReviewButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReviewResult | null>(null);
+  const [trace, setTrace] = useState<TraceStep[] | null>(null);
 
   const handleRunReview = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setTrace(null);
 
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
@@ -66,12 +69,16 @@ export function RunReviewButton({
         setError(data.error_message);
         setLoading(false);
         setResult(null);
+        setTrace(null);
         return;
       }
 
-      // Store result for display
+      // Store result and trace for display
       if (data.result_snapshot) {
         setResult(data.result_snapshot);
+      }
+      if (data.trace) {
+        setTrace(data.trace);
       }
     } catch (err) {
       clearTimeout(timeoutId);
@@ -111,10 +118,15 @@ export function RunReviewButton({
           <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
         )}
       </div>
-      {result && (
+      {(result || trace) && (
         <div className="flex w-full flex-col gap-4">
-          {result.summary && <ReviewSummary summary={result.summary} />}
-          <ReviewFindingsList findings={result.findings} />
+          {result && (
+            <>
+              {result.summary && <ReviewSummary summary={result.summary} />}
+              <ReviewFindingsList findings={result.findings} />
+            </>
+          )}
+          {trace && <ReviewTrace trace={trace} />}
         </div>
       )}
     </div>
