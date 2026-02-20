@@ -32,22 +32,22 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         Findings ({findings.length})
       </h3>
       <div className="flex flex-col gap-3">
         {findings.map((finding) => (
           <div
             key={finding.id}
-            className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white p-3 sm:p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
           >
             <div className="flex flex-col gap-2">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="flex-1 font-medium text-zinc-900 dark:text-zinc-100">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                <h4 className="flex-1 font-medium text-sm sm:text-base text-zinc-900 dark:text-zinc-100 break-words">
                   {finding.title}
                 </h4>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${getSeverityColor(finding.severity)}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 ${getSeverityColor(finding.severity)}`}
                 >
                   {finding.severity}
                 </span>
@@ -60,9 +60,9 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
               )}
 
               {(finding.file || finding.line !== undefined) && (
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 break-all">
                   {finding.file && (
-                    <span className="font-mono">{finding.file}</span>
+                    <span className="font-mono break-all">{finding.file}</span>
                   )}
                   {finding.file && finding.line !== undefined && (
                     <span className="mx-1">:</span>
@@ -73,14 +73,14 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
                 </div>
               )}
 
-              <div className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+              <div className="mt-1 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 break-words">
                 {finding.message}
               </div>
 
               {finding.suggestion && (
-                <div className="mt-2 rounded-md border-l-4 border-blue-500 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-200">
+                <div className="mt-2 rounded-md border-l-4 border-blue-500 bg-blue-50 p-2 sm:p-3 text-xs sm:text-sm text-blue-900 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-200">
                   <div className="font-medium">Suggestion:</div>
-                  <div className="mt-1">{finding.suggestion}</div>
+                  <div className="mt-1 break-words">{finding.suggestion}</div>
                 </div>
               )}
             </div>

@@ -45,13 +45,13 @@ export function ReviewTrace({ trace }: ReviewTraceProps) {
     <div className="flex w-full flex-col gap-3">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+        className="flex w-full items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
       >
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100">
           Trace ({trace.length} steps)
         </h3>
         <svg
-          className={`h-5 w-5 text-zinc-500 transition-transform dark:text-zinc-400 ${
+          className={`h-4 w-4 sm:h-5 sm:w-5 text-zinc-500 transition-transform dark:text-zinc-400 flex-shrink-0 ${
             isExpanded ? "rotate-180" : ""
           }`}
           fill="none"
@@ -68,25 +68,25 @@ export function ReviewTrace({ trace }: ReviewTraceProps) {
       </button>
 
       {isExpanded && (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 sm:p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
           {trace.map((step, index) => (
             <div
               key={index}
-              className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50"
+              className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5 sm:p-3 dark:border-zinc-700 dark:bg-zinc-800/50"
             >
               <div className="flex flex-col gap-2">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-medium text-zinc-900 dark:text-zinc-100">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                  <h4 className="font-medium text-sm sm:text-base text-zinc-900 dark:text-zinc-100 break-words">
                     {step.agent}
                   </h4>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(step.status)}`}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 ${getStatusColor(step.status)}`}
                   >
                     {step.status}
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                <div className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400 break-words">
                   <div>
                     <span className="font-medium">Started:</span>{" "}
                     {formatDate(step.started_at)}
