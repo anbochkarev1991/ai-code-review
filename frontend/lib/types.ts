@@ -15,4 +15,6 @@ export type {
   CheckoutBody,
   CheckoutResponse,
   PostReviewsResponse,
+  GetReviewsResponse,
+  GetReviewResponse,
 } from "shared";
