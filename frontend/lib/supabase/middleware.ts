@@ -2,10 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const LOGIN_PATH = "/login";
-const DASHBOARD_PATH = "/dashboard";
+const PROTECTED_PREFIXES = ["/dashboard", "/reviews", "/billing"];
 
 function isProtectedPath(pathname: string) {
-  return pathname === DASHBOARD_PATH || pathname.startsWith(`${DASHBOARD_PATH}/`);
+  return PROTECTED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
 }
 
 export async function updateSession(request: NextRequest) {
@@ -51,7 +53,7 @@ export async function updateSession(request: NextRequest) {
 
   if (pathname === LOGIN_PATH && user) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = DASHBOARD_PATH;
+    dashboardUrl.pathname = "/dashboard";
     return NextResponse.redirect(dashboardUrl);
   }
 
