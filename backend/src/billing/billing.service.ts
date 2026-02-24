@@ -83,7 +83,7 @@ export class BillingService {
       .maybeSingle();
 
     if (sub?.stripe_customer_id) {
-      return sub.stripe_customer_id;
+      return sub.stripe_customer_id as string;
     }
 
     const stripe = this.getStripe();
@@ -153,7 +153,7 @@ export class BillingService {
     ]);
 
     const plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
-    const reviewCount = usageResult.data?.review_count ?? 0;
+    const reviewCount: number = (usageResult.data?.review_count as number) ?? 0;
     const limit = USAGE_LIMITS[plan];
 
     return { review_count: reviewCount, limit, plan };
@@ -183,7 +183,7 @@ export class BillingService {
       .eq('month', currentMonth)
       .maybeSingle();
 
-    const newCount = (existing.data?.review_count ?? 0) + 1;
+    const newCount = ((existing.data?.review_count as number) ?? 0) + 1;
     const now = new Date().toISOString();
 
     await supabase.from('usage').upsert(

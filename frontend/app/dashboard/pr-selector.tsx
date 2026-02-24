@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, startTransition } from "react";
 import type { Pull, PullsResponse } from "@/lib/types";
 
 interface PRSelectorProps {
@@ -24,8 +24,10 @@ export function PRSelector({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    startTransition(() => {
+      setLoading(true);
+      setError(null);
+    });
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
