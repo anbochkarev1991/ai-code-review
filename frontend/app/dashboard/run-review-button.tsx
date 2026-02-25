@@ -99,11 +99,11 @@ export function RunReviewButton({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex w-full flex-col gap-2">
+      <div className="flex w-full flex-col gap-3">
         <button
           onClick={handleRunReview}
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
           {loading ? (
             <>
@@ -115,7 +115,9 @@ export function RunReviewButton({
           )}
         </button>
         {error && (
-          <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+            {error}
+          </div>
         )}
       </div>
       {(result || trace) && (

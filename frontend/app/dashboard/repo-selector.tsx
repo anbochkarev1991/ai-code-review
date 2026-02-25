@@ -14,16 +14,16 @@ export function RepoSelector({
   onChange,
 }: RepoSelectorProps) {
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-3">
       <label
         htmlFor="repo-select"
-        className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
       >
         Repository
       </label>
       <select
         id="repo-select"
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
+        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-0 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         aria-label="Select a repository"

@@ -65,7 +65,7 @@ export function UpgradeToProButton({ accessToken }: UpgradeToProButtonProps) {
         {isLoading ? "Redirecting..." : "Upgrade to Pro"}
       </button>
       {error && (
-        <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
+        <p className="text-xs text-amber-600 dark:text-amber-500">{error}</p>
       )}
     </div>
   );

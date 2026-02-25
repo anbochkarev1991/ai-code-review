@@ -69,11 +69,11 @@ export function PRSelector({
 
   if (loading) {
     return (
-      <div className="flex w-full flex-col gap-2">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <div className="flex w-full flex-col gap-3">
+        <label className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Pull Request
         </label>
-        <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+        <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm text-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
           Loading pull requests...
         </div>
       </div>
@@ -82,39 +82,41 @@ export function PRSelector({
 
   if (error) {
     return (
-      <div className="flex w-full flex-col gap-2">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <div className="flex w-full flex-col gap-3">
+        <label className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Pull Request
         </label>
-        <p className="text-sm text-amber-600 dark:text-amber-500">{error}</p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          {error}
+        </div>
       </div>
     );
   }
 
   if (!pulls || pulls.length === 0) {
     return (
-      <div className="flex w-full flex-col gap-2">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <div className="flex w-full flex-col gap-3">
+        <label className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Pull Request
         </label>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
           No open pull requests in this repository.
-        </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-3">
       <label
         htmlFor="pr-select"
-        className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
       >
         Pull Request
       </label>
       <select
         id="pr-select"
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
+        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 shadow-sm transition-colors focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-0 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500 dark:focus:ring-zinc-500"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         aria-label="Select a pull request"
