@@ -23,7 +23,7 @@ export function RepoAndPRSelectors({ repos, accessToken }: RepoAndPRSelectorsPro
   };
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    <div className="flex w-full flex-col gap-4">
       <RepoSelector
         repos={repos}
         value={selectedRepo}
@@ -39,13 +39,11 @@ export function RepoAndPRSelectors({ repos, accessToken }: RepoAndPRSelectorsPro
             onChange={setSelectedPR}
           />
           {selectedPR && (
-            <div className="pt-2">
-              <RunReviewButton
-                repoFullName={selectedRepo}
-                prNumber={parseInt(selectedPR, 10)}
-                accessToken={accessToken}
-              />
-            </div>
+            <RunReviewButton
+              repoFullName={selectedRepo}
+              prNumber={parseInt(selectedPR, 10)}
+              accessToken={accessToken}
+            />
           )}
         </>
       )}
