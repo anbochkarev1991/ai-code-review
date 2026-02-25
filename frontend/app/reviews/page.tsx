@@ -58,18 +58,20 @@ export default async function ReviewsPage() {
 
   if (!session?.access_token) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
-        <main className="flex w-full max-w-3xl flex-col items-center gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No session. Redirecting to login...
-          </p>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Go to login
-          </Link>
-        </main>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+              No session. Redirecting to login...
+            </p>
+            <Link
+              href="/login"
+              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              Go to login →
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -77,20 +79,22 @@ export default async function ReviewsPage() {
   const reviewsData = await fetchReviews(session.access_token);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
-      <main className="flex w-full max-w-3xl flex-col gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 w-full">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             Past Reviews
           </h1>
           <Link
             href="/dashboard"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 self-start sm:self-auto"
+            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
-            Back to Dashboard
+            Back to Dashboard →
           </Link>
         </div>
 
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         {reviewsData === null ? (
           <p className="text-sm text-amber-600 dark:text-amber-500">
             Failed to load reviews. Make sure the backend is running.
@@ -166,7 +170,18 @@ export default async function ReviewsPage() {
             </div>
           </div>
         )}
-      </main>
+        </div>
+
+        {/* Footer Link */}
+        <div className="mt-6 text-center">
+          <Link
+            href="/"
+            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            ← Back to home
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

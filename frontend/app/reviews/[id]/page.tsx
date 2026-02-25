@@ -63,18 +63,20 @@ export default async function ReviewDetailPage({
 
   if (!session?.access_token) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
-        <main className="flex w-full max-w-3xl flex-col items-center gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No session. Redirecting to login...
-          </p>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Go to login
-          </Link>
-        </main>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+              No session. Redirecting to login...
+            </p>
+            <Link
+              href="/login"
+              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              Go to login →
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -83,56 +85,61 @@ export default async function ReviewDetailPage({
 
   if (review === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
-        <main className="flex w-full max-w-3xl flex-col items-center gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Review Not Found
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 text-center px-4">
-            The review you're looking for doesn't exist or you don't have
-            permission to view it.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-            <Link
-              href="/reviews"
-              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 text-center"
-            >
-              Back to Reviews
-            </Link>
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 text-center"
-            >
-              Dashboard
-            </Link>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <h1 className="mb-4 text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Review Not Found
+            </h1>
+            <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+              The review you're looking for doesn't exist or you don't have
+              permission to view it.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+              <Link
+                href="/reviews"
+                className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              >
+                Back to Reviews →
+              </Link>
+              <Link
+                href="/dashboard"
+                className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              >
+                Dashboard →
+              </Link>
+            </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
-      <main className="flex w-full max-w-3xl flex-col gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 w-full">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             Review Details
           </h1>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
             <Link
               href="/reviews"
-              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 self-start sm:self-auto"
+              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
-              Back to Reviews
+              Back to Reviews →
             </Link>
             <Link
               href="/dashboard"
-              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 self-start sm:self-auto"
+              className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
-              Dashboard
+              Dashboard →
             </Link>
           </div>
         </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
 
         <div className="flex flex-col gap-4">
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
@@ -194,7 +201,17 @@ export default async function ReviewDetailPage({
               </div>
             )}
         </div>
-      </main>
+
+        {/* Footer Link */}
+        <div className="mt-6 text-center">
+          <Link
+            href="/"
+            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            ← Back to home
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
