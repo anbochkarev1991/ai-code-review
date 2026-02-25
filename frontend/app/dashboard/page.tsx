@@ -1,35 +1,60 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
+import { GitHubCallbackHandler } from "./github-callback-handler";
 
 async function fetchBillingUsage(
   accessToken: string
 ): Promise<UsageResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-  const res = await fetch(`${backendUrl}/billing/usage`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${backendUrl}/billing/usage`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      console.error("Expected JSON but got:", contentType);
+      return null;
+    }
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching billing usage:", error);
+    return null;
+  }
 }
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-  const res = await fetch(`${backendUrl}/me`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${backendUrl}/me`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.error(`Failed to fetch /me: ${res.status} ${res.statusText}`);
+      return null;
+    }
+    const contentType = res.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      console.error("Expected JSON but got:", contentType);
+      return null;
+    }
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching me:", error);
+    return null;
+  }
 }
 
 async function fetchRepos(
@@ -37,14 +62,24 @@ async function fetchRepos(
 ): Promise<ReposResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-  const res = await fetch(`${backendUrl}/github/repos`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${backendUrl}/github/repos`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      console.error("Expected JSON but got:", contentType);
+      return null;
+    }
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching repos:", error);
+    return null;
+  }
 }
 
 export default async function DashboardPage() {
@@ -80,6 +115,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-3 sm:p-4 dark:bg-zinc-950">
+      <Suspense fallback={null}>
+        <GitHubCallbackHandler />
+      </Suspense>
       <main className="flex w-full max-w-md flex-col items-center gap-4 sm:gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 md:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-2 sm:gap-0">
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">

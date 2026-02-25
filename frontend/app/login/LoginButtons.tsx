@@ -9,10 +9,21 @@ export function LoginButtons() {
   const handleSignIn = useCallback(
     async (provider: "google" | "azure") => {
       const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo },
       });
+      
+      // Debug: Log the OAuth URL to see what redirect_uri Supabase is using
+      if (data?.url) {
+        const url = new URL(data.url);
+        const redirectUri = url.searchParams.get("redirect_uri");
+        console.log("Supabase OAuth redirect_uri:", redirectUri);
+        console.log("Full OAuth URL:", data.url);
+      }
+      if (error) {
+        console.error("OAuth error:", error);
+      }
     },
     [supabase]
   );

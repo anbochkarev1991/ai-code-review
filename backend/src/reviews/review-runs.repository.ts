@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type {
   GetReviewResponse,
@@ -43,7 +46,7 @@ export class ReviewRunsRepository {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase not configured');
+      throw new InternalServerErrorException('Supabase not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -70,7 +73,9 @@ export class ReviewRunsRepository {
       .single();
 
     if (error) {
-      throw new Error(`Failed to create review run: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to create review run: ${error.message}`,
+      );
     }
     return data.id;
   }
@@ -83,7 +88,7 @@ export class ReviewRunsRepository {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase not configured');
+      throw new InternalServerErrorException('Supabase not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -99,7 +104,9 @@ export class ReviewRunsRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to fetch review run: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch review run: ${error.message}`,
+      );
     }
     if (!data) {
       return null;
@@ -137,7 +144,7 @@ export class ReviewRunsRepository {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase not configured');
+      throw new InternalServerErrorException('Supabase not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -157,10 +164,14 @@ export class ReviewRunsRepository {
     ]);
 
     if (itemsRes.error) {
-      throw new Error(`Failed to fetch review runs: ${itemsRes.error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch review runs: ${itemsRes.error.message}`,
+      );
     }
     if (countRes.error) {
-      throw new Error(`Failed to count review runs: ${countRes.error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to count review runs: ${countRes.error.message}`,
+      );
     }
 
     const total = countRes.count ?? 0;
