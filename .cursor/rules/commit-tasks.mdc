@@ -10,7 +10,7 @@ alwaysApply: true
 Each task from TODOS.md must be developed in a **separate branch**. Do not mix multiple tasks in one branch.
 
 **Workflow:**
-1. Create branch from `main`: `git checkout -b day-N-task-X.Y` (e.g. `day-1-task-1.2a`)
+1. Always create branch from `main`: `git checkout main && git pull && git checkout -b day-N-task-X.Y` (e.g. `day-1-task-1.2a`). Do **not** branch from another feature branch — it may be outdated or contain unmerged work.
 2. Implement the task
 3. Commit with the message format below
 4. Merge to `main` (via PR or direct merge) only after the task passes review
