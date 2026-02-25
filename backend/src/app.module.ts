@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health';
@@ -8,7 +9,13 @@ import { BillingModule } from './billing';
 import { ReviewsModule } from './reviews';
 
 @Module({
-  imports: [AuthModule, GitHubModule, BillingModule, ReviewsModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule,
+    GitHubModule,
+    BillingModule,
+    ReviewsModule,
+  ],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })

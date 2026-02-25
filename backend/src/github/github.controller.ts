@@ -54,7 +54,7 @@ export class GitHubController {
 
     if (!code || !state) {
       return {
-        url: `${frontendUrl}?github=error&message=missing_code_or_state`,
+        url: `${frontendUrl}/dashboard?github=error&message=missing_code_or_state`,
       };
     }
 
@@ -62,7 +62,7 @@ export class GitHubController {
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
       return {
-        url: `${frontendUrl}?github=error&message=config_error`,
+        url: `${frontendUrl}/dashboard?github=error&message=config_error`,
       };
     }
 
@@ -74,7 +74,7 @@ export class GitHubController {
 
     if (error || !user) {
       return {
-        url: `${frontendUrl}?github=error&message=invalid_state`,
+        url: `${frontendUrl}/dashboard?github=error&message=invalid_state`,
       };
     }
 
@@ -87,10 +87,10 @@ export class GitHubController {
         accessToken,
         state,
       );
-      return { url: `${frontendUrl}?github=connected` };
+      return { url: `${frontendUrl}/dashboard?github=connected` };
     } catch {
       return {
-        url: `${frontendUrl}?github=error&message=exchange_failed`,
+        url: `${frontendUrl}/dashboard?github=error&message=exchange_failed`,
       };
     }
   }
