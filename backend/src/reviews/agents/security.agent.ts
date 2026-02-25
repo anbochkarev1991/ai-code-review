@@ -5,6 +5,11 @@ import {
   AGENT_OUTPUT_SCHEMA_PROMPT,
   type AgentOutput,
 } from 'shared';
+// TODO: Remove mock import once correct OpenAI API key is configured
+import {
+  MOCK_SECURITY_RESPONSE,
+  shouldUseMockResponses,
+} from './mock-responses';
 
 const SECURITY_SYSTEM_PROMPT = `You are a security reviewer. Analyze pull request diffs for security vulnerabilities: injection (SQL, command, XSS), insecure authentication, exposed secrets, insecure defaults, authorization bypasses, and unsafe data handling.
 
@@ -29,7 +34,12 @@ export class SecurityAgent {
    * Runs the Security Agent on a PR diff.
    * Returns structured findings and summary matching the agent output schema.
    */
-  async run(prDiff: string): Promise<AgentOutput> {
+  async run(prDiff: string, repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
+    // TODO: Remove mock response check once correct OpenAI API key is configured
+    if (shouldUseMockResponses(repoFullName, prNumber)) {
+      return MOCK_SECURITY_RESPONSE;
+    }
+
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 

@@ -171,11 +171,12 @@ export class ReviewsService {
     const { userId, userJwt, repoFullName, prNumber, prTitle, prDiff } = params;
     const trace: TraceStep[] = [];
 
+    // TODO: Remove repoFullName and prNumber parameters from agent.run() calls once correct OpenAI API key is configured
     const domainAgents = [
-      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(prDiff) },
-      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(prDiff) },
-      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(prDiff) },
-      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(prDiff) },
+      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(prDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(prDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(prDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(prDiff, repoFullName, prNumber) },
     ] as const;
 
     const outcomes: DomainAgentOutcome[] = [];
@@ -233,7 +234,8 @@ export class ReviewsService {
     const aggregatorStartedAt = new Date();
     let aggregatorOutput: AgentOutput;
     try {
-      aggregatorOutput = await this.aggregatorAgent.run(agentOutputs);
+      // TODO: Remove repoFullName and prNumber parameters from aggregator.run() call once correct OpenAI API key is configured
+      aggregatorOutput = await this.aggregatorAgent.run(agentOutputs, repoFullName, prNumber);
       trace.push(buildTraceStep({
         agent: aggregatorName,
         startedAt: aggregatorStartedAt,

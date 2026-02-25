@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
 import { callWithValidationRetry } from './agent-validation.utils';
+// TODO: Remove mock import once correct OpenAI API key is configured
+import {
+  MOCK_ARCHITECTURE_RESPONSE,
+  shouldUseMockResponses,
+} from './mock-responses';
 
 const ARCHITECTURE_SYSTEM_PROMPT = `You are an architecture reviewer. Analyze pull request diffs for structural issues: design patterns, layering, boundaries, modularity, coupling, cohesion, separation of concerns, and potential circular dependencies.
 
@@ -27,7 +32,12 @@ export class ArchitectureAgent {
    * Returns structured findings and summary matching the agent output schema.
    * On validation failure, retries up to 2 times with "invalid JSON" message before throwing.
    */
-  async run(prDiff: string): Promise<AgentOutput> {
+  async run(prDiff: string, repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
+    // TODO: Remove mock response check once correct OpenAI API key is configured
+    if (shouldUseMockResponses(repoFullName, prNumber)) {
+      return MOCK_ARCHITECTURE_RESPONSE;
+    }
+
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 

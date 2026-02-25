@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
 import { callWithValidationRetry } from './agent-validation.utils';
+// TODO: Remove mock import once correct OpenAI API key is configured
+import {
+  MOCK_PERFORMANCE_RESPONSE,
+  shouldUseMockResponses,
+} from './mock-responses';
 
 const PERFORMANCE_SYSTEM_PROMPT = `You are a performance reviewer. Analyze pull request diffs for performance issues: algorithmic complexity, N+1 queries, unnecessary re-renders, memory leaks, inefficient loops, missing memoization, blocking operations, and scalability concerns.
 
@@ -27,7 +32,12 @@ export class PerformanceAgent {
    * Returns structured findings and summary matching the agent output schema.
    * On validation failure, retries up to 2 times with "invalid JSON" message before throwing.
    */
-  async run(prDiff: string): Promise<AgentOutput> {
+  async run(prDiff: string, repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
+    // TODO: Remove mock response check once correct OpenAI API key is configured
+    if (shouldUseMockResponses(repoFullName, prNumber)) {
+      return MOCK_PERFORMANCE_RESPONSE;
+    }
+
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 

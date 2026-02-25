@@ -5,6 +5,11 @@ import {
   AGENT_OUTPUT_SCHEMA_PROMPT,
   type AgentOutput,
 } from 'shared';
+// TODO: Remove mock import once correct OpenAI API key is configured
+import {
+  MOCK_AGGREGATOR_RESPONSE,
+  shouldUseMockResponses,
+} from './mock-responses';
 
 const AGGREGATOR_SYSTEM_PROMPT = `You are an aggregator that merges code review findings from four specialized agents: Code Quality, Architecture, Performance, and Security.
 
@@ -36,11 +41,16 @@ export class AggregatorAgent {
    * Merges, deduplicates, and prioritizes findings; produces a single summary.
    * Returns AgentOutput matching the same schema.
    */
-  async run(agentOutputs: AgentOutput[]): Promise<AgentOutput> {
+  async run(agentOutputs: AgentOutput[], repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
     if (agentOutputs.length !== 4) {
       throw new Error(
         `Aggregator expects exactly 4 agent outputs, got ${agentOutputs.length}`,
       );
+    }
+
+    // TODO: Remove mock response check once correct OpenAI API key is configured
+    if (shouldUseMockResponses(repoFullName, prNumber)) {
+      return MOCK_AGGREGATOR_RESPONSE;
     }
 
     const client = this.getClient();
