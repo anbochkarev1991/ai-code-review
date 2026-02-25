@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import {
   agentOutputSchema,
@@ -64,13 +64,45 @@ ${outputsJson}
 
 Merge findings, remove duplicates (by similar message/file/line), assign priority (critical/high/medium/low), and produce a single summary. Return one JSON object.`;
 
-    const completion = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: AGGREGATOR_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-    });
+    let completion: OpenAI.Chat.ChatCompletion;
+    try {
+      completion = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: AGGREGATOR_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+      });
+    } catch (err) {
+      // Handle OpenAI API errors
+      if (err instanceof OpenAI.APIError) {
+        if (err.status === 429) {
+          throw new HttpException(
+            `OpenAI API quota exceeded. ${err.message || 'Please check your OpenAI plan and billing details.'}`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        if (err.status === 401) {
+          throw new HttpException(
+            `OpenAI API authentication failed: ${err.message || 'Invalid API key'}`,
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+        if (err.status === 500 || err.status === 503) {
+          throw new HttpException(
+            `OpenAI API service unavailable: ${err.message || 'Please try again later'}`,
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        // Other OpenAI API errors
+        throw new HttpException(
+          `OpenAI API error (${err.status}): ${err.message || 'Unknown error'}`,
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      // Re-throw non-OpenAI errors
+      throw err;
+    }
 
     const raw = completion.choices[0]?.message?.content?.trim();
     if (!raw) {

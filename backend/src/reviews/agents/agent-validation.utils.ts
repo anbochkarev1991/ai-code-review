@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import OpenAI from 'openai';
 import {
   agentOutputSchema,
@@ -56,10 +57,42 @@ export async function callWithValidationRetry(
   let lastError = '';
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const completion = await client.chat.completions.create({
-      model,
-      messages: currentMessages,
-    });
+    let completion: OpenAI.Chat.ChatCompletion;
+    try {
+      completion = await client.chat.completions.create({
+        model,
+        messages: currentMessages,
+      });
+    } catch (err) {
+      // Handle OpenAI API errors
+      if (err instanceof OpenAI.APIError) {
+        if (err.status === 429) {
+          throw new HttpException(
+            `OpenAI API quota exceeded. ${err.message || 'Please check your OpenAI plan and billing details.'}`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        if (err.status === 401) {
+          throw new HttpException(
+            `OpenAI API authentication failed: ${err.message || 'Invalid API key'}`,
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+        if (err.status === 500 || err.status === 503) {
+          throw new HttpException(
+            `OpenAI API service unavailable: ${err.message || 'Please try again later'}`,
+            HttpStatus.SERVICE_UNAVAILABLE,
+          );
+        }
+        // Other OpenAI API errors
+        throw new HttpException(
+          `OpenAI API error (${err.status}): ${err.message || 'Unknown error'}`,
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      // Re-throw non-OpenAI errors
+      throw err;
+    }
 
     const raw = completion.choices[0]?.message?.content?.trim();
     if (!raw) {

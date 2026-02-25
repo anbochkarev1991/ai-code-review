@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type {
   AgentOutput,
   GetReviewResponse,
@@ -97,25 +102,31 @@ export class ReviewsService {
       return await Promise.race([work, timeoutPromise]);
     } catch (err) {
       if (err instanceof ReviewTimeoutError) {
-        const id = await this.reviewRunsRepository.create(
-          {
-            userId,
-            repoFullName,
-            prNumber,
-            prTitle: null,
+        try {
+          const id = await this.reviewRunsRepository.create(
+            {
+              userId,
+              repoFullName,
+              prNumber,
+              prTitle: null,
+              status: 'failed',
+              trace: [],
+              errorMessage: err.message,
+            },
+            userJwt,
+          );
+          return {
+            id,
             status: 'failed',
             trace: [],
-            errorMessage: err.message,
-          },
-          userJwt,
-        );
-        return {
-          id,
-          status: 'failed',
-          trace: [],
-          error_message: err.message,
-        };
+            error_message: err.message,
+          };
+        } catch (repoErr) {
+          // If repository fails, still throw the original timeout error
+          throw err;
+        }
       }
+      // Re-throw HttpExceptions as-is, they'll be handled by NestJS
       throw err;
     }
   }
@@ -175,6 +186,10 @@ export class ReviewsService {
         trace.push(buildTraceStep({ agent: name, startedAt, finishedAt: new Date(), status: 'ok' }));
         outcomes.push({ output, status: 'ok' });
       } catch (err) {
+        // If it's an HttpException (e.g., OpenAI quota error), propagate it immediately
+        if (err instanceof HttpException) {
+          throw err;
+        }
         const errorMessage = err instanceof Error ? err.message : String(err);
         trace.push(buildTraceStep({ agent: name, startedAt, finishedAt: new Date(), status: 'failed' }));
         const id = await this.reviewRunsRepository.create(
@@ -226,6 +241,10 @@ export class ReviewsService {
         status: 'ok',
       }));
     } catch (err) {
+      // If it's an HttpException (e.g., OpenAI quota error), propagate it immediately
+      if (err instanceof HttpException) {
+        throw err;
+      }
       const errorMessage = err instanceof Error ? err.message : String(err);
       trace.push(buildTraceStep({
         agent: aggregatorName,
