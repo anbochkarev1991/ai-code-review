@@ -5,6 +5,7 @@ import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
 import { GitHubCallbackHandler } from "./github-callback-handler";
+import { Tooltip } from "./tooltip";
 
 async function fetchBillingUsage(
   accessToken: string
@@ -222,7 +223,24 @@ export default async function DashboardPage() {
                     Upgrade
                   </h2>
                   <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-                    Unlock more reviews and advanced features with Pro.
+                    Unlock more reviews and{" "}
+                    <Tooltip
+                      content={
+                        <div className="text-left">
+                          <div className="font-semibold mb-1">Pro Plan Benefits ($19.99/month):</div>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            <li>200 reviews per month (vs 10 for free)</li>
+                            <li>Priority processing</li>
+                            <li>Full access to all review features</li>
+                          </ul>
+                        </div>
+                      }
+                    >
+                      <span className="underline decoration-dotted cursor-help">
+                        advanced features
+                      </span>
+                    </Tooltip>{" "}
+                    with Pro.
                   </p>
                   <UpgradeToProButton accessToken={session.access_token} />
                 </div>
