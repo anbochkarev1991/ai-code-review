@@ -140,66 +140,66 @@ export default async function ReviewDetailPage({
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-
-        <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <span className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Status
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 ${getStatusColor(review.status)}`}
-                >
-                  {review.status}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400 break-words">
-                <div>
-                  <span className="font-medium">Created:</span>{" "}
-                  {formatDate(review.created_at)}
+          <div className="flex flex-col gap-4">
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <span className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Status
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 ${getStatusColor(review.status)}`}
+                  >
+                    {review.status}
+                  </span>
                 </div>
-                <div>
-                  <span className="font-medium">Updated:</span>{" "}
-                  {formatDate(review.updated_at)}
+                <div className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400 break-words">
+                  <div>
+                    <span className="font-medium">Created:</span>{" "}
+                    {formatDate(review.created_at)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Updated:</span>{" "}
+                    {formatDate(review.updated_at)}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {review.error_message && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4 dark:border-amber-800 dark:bg-amber-900/20">
-              <p className="text-xs sm:text-sm font-medium text-amber-900 dark:text-amber-200">
-                Error
-              </p>
-              <p className="mt-1 text-xs sm:text-sm text-amber-800 dark:text-amber-300 break-words">
-                {review.error_message}
-              </p>
-            </div>
-          )}
-
-          {review.result_snapshot && (
-            <div className="flex flex-col gap-4">
-              {review.result_snapshot.summary && (
-                <ReviewSummary summary={review.result_snapshot.summary} />
-              )}
-              <ReviewFindingsList
-                findings={review.result_snapshot.findings}
-              />
-            </div>
-          )}
-
-          {review.trace && review.trace.length > 0 && (
-            <ReviewTrace trace={review.trace} />
-          )}
-
-          {!review.result_snapshot &&
-            !review.error_message &&
-            review.status !== "failed" && (
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 text-xs sm:text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
-                Review is still processing or no results available.
+            {review.error_message && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                <p className="text-xs sm:text-sm font-medium text-amber-900 dark:text-amber-200">
+                  Error
+                </p>
+                <p className="mt-1 text-xs sm:text-sm text-amber-800 dark:text-amber-300 break-words">
+                  {review.error_message}
+                </p>
               </div>
             )}
+
+            {review.result_snapshot && (
+              <div className="flex flex-col gap-4">
+                {review.result_snapshot.summary && (
+                  <ReviewSummary summary={review.result_snapshot.summary} />
+                )}
+                <ReviewFindingsList
+                  findings={review.result_snapshot.findings}
+                />
+              </div>
+            )}
+
+            {review.trace && review.trace.length > 0 && (
+              <ReviewTrace trace={review.trace} />
+            )}
+
+            {!review.result_snapshot &&
+              !review.error_message &&
+              review.status !== "failed" && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 text-xs sm:text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+                  Review is still processing or no results available.
+                </div>
+              )}
+          </div>
         </div>
 
         {/* Footer Link */}
