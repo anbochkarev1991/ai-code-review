@@ -226,12 +226,20 @@ export default async function DashboardPage() {
                     Unlock more reviews and{" "}
                     <Tooltip
                       content={
-                        <div className="text-left">
-                          <div className="font-semibold mb-1">Pro Plan Benefits ($19.99/month):</div>
-                          <ul className="list-disc list-inside space-y-0.5">
+                        <div className="text-left text-white">
+                          <div className="font-semibold mb-2 text-white">Pro Plan Benefits ($19.99/month):</div>
+                          <ul className="list-disc list-inside space-y-1 text-white">
                             <li>200 reviews per month (vs 10 for free)</li>
                             <li>Priority processing</li>
-                            <li>Full access to all review features</li>
+                            <li>Full access to all review features:
+                              <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5 text-white/90">
+                                <li>Code Quality analysis</li>
+                                <li>Architecture review</li>
+                                <li>Performance optimization</li>
+                                <li>Security scanning</li>
+                                <li>Aggregated findings with severity levels</li>
+                              </ul>
+                            </li>
                           </ul>
                         </div>
                       }
