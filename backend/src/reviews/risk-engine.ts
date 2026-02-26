@@ -3,8 +3,8 @@ import type {
   Finding,
   FindingSeverity,
   RiskLevel,
-  MergeRecommendation,
 } from 'shared';
+import { decideMerge, type MergeDecision } from 'shared';
 
 /**
  * Severity weight: how much each severity level contributes to the risk score.
@@ -35,31 +35,39 @@ const CATEGORY_IMPACT_WEIGHT: Record<string, number> = {
 };
 
 /**
- * Risk engine — isolated module responsible for all risk quantification.
+ * Risk engine — pure computation module for all risk quantification.
  *
- * Formula:
- *   raw = Σ(severity_weight × confidence × impact_weight) for each finding
- *   risk_score = normalize(raw, 0–100)
- *
- * Normalization uses a saturation curve: raw scores above ~50 compress toward 100,
- * preventing a large number of low-severity findings from inflating the score.
- *
- * Scaling note: This is a pure computation module with no I/O. At 100 PR/min,
- * risk scoring is never the bottleneck — each call is < 1ms for typical finding counts.
+ * Guarantees:
+ * - calculateRiskScore is a pure function: same findings → same integer score
+ * - No randomness, no floating-point drift (truncated to integer via Math.trunc)
+ * - deriveRiskLevel and deriveMergeDecision are deterministic lookups
+ * - Merge decision uses shared/merge-decision.ts (single source of truth)
  */
 @Injectable()
 export class RiskEngine {
+  /**
+   * Pure risk score computation.
+   *
+   * Formula:
+   *   raw = Σ(severity_weight × confidence × impact_weight) for each finding
+   *   risk_score = min(100, trunc(raw))
+   *
+   * Uses Math.trunc (not Math.round) to avoid rounding-induced drift at boundaries.
+   * A finding with confidence=0.999 and another with confidence=1.0 should not
+   * produce different integer scores when they shouldn't.
+   */
   calculateRiskScore(findings: Finding[]): number {
     if (findings.length === 0) return 0;
 
-    const rawScore = findings.reduce((sum, f) => {
+    let rawScore = 0;
+    for (const f of findings) {
       const severityW = SEVERITY_WEIGHT[f.severity] ?? 1;
-      const confidence = f.confidence ?? 0.5;
+      const confidence = this.clampConfidence(f.confidence ?? 0.5);
       const categoryW = CATEGORY_IMPACT_WEIGHT[f.category] ?? 1.0;
-      return sum + severityW * confidence * categoryW;
-    }, 0);
+      rawScore += severityW * confidence * categoryW;
+    }
 
-    return Math.min(100, Math.round(rawScore));
+    return Math.min(100, Math.trunc(rawScore));
   }
 
   deriveRiskLevel(riskScore: number): RiskLevel {
@@ -69,13 +77,23 @@ export class RiskEngine {
     return 'Low';
   }
 
-  deriveMergeRecommendation(
+  /**
+   * Uses the shared decideMerge function — single source of truth for merge rules.
+   * Backend and frontend import the same logic.
+   */
+  deriveMergeDecision(
     riskScore: number,
     criticalCount: number,
     highCount: number,
-  ): MergeRecommendation {
-    if (criticalCount > 0 || riskScore >= 81) return 'Block merge';
-    if (highCount > 0 || riskScore >= 31) return 'Merge with caution';
-    return 'Safe to merge';
+  ): MergeDecision {
+    return decideMerge({
+      critical_count: criticalCount,
+      high_count: highCount,
+      risk_score: riskScore,
+    });
+  }
+
+  private clampConfidence(value: number): number {
+    return Math.max(0, Math.min(1, value));
   }
 }

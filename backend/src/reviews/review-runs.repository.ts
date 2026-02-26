@@ -16,7 +16,7 @@ export interface CreateReviewRunParams {
   repoFullName: string;
   prNumber: number;
   prTitle: string | null;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'partial' | 'failed';
   resultSnapshot?: ReviewResult;
   trace?: TraceStep[];
   errorMessage?: string | null;

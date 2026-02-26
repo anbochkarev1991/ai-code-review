@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { AgentOutput, Finding } from 'shared';
+import type { AgentOutput, Finding, ParsedFile } from 'shared';
 import type { ReviewSummary } from '../types';
 import { RiskEngine } from './risk-engine';
 import { FindingNormalizer } from './finding-normalizer';
@@ -18,13 +18,6 @@ interface AggregatedResult {
  *
  * This module orchestrates FindingNormalizer and RiskEngine but contains no risk logic itself.
  * Business rules for scoring and false-positive control are in their respective modules.
- *
- * Scaling note: At 100 PR/min, this is pure CPU work (~1ms per call).
- * The real bottleneck is upstream LLM calls (~2–10s each). To scale:
- * - Queue PR review requests (BullMQ / SQS)
- * - Run agent calls in parallel (already done)
- * - Batch multiple PRs through a worker pool
- * - Cache agent results by diff hash to avoid redundant LLM calls on re-reviews
  */
 @Injectable()
 export class DeterministicAggregator {
@@ -33,9 +26,17 @@ export class DeterministicAggregator {
     private readonly findingNormalizer: FindingNormalizer,
   ) {}
 
-  aggregate(agentOutputs: AgentOutput[], strictMode = false): AggregatedResult {
+  aggregate(
+    agentOutputs: AgentOutput[],
+    diffFiles?: ParsedFile[],
+    strictMode = false,
+  ): AggregatedResult {
     const allFindings = this.mergeFindings(agentOutputs);
-    const normalized = this.findingNormalizer.normalize(allFindings, strictMode);
+    const normalized = this.findingNormalizer.normalize(
+      allFindings,
+      diffFiles,
+      strictMode,
+    );
     const reviewSummary = this.buildSummary(normalized, agentOutputs);
 
     return { findings: normalized, review_summary: reviewSummary };
@@ -70,7 +71,7 @@ export class DeterministicAggregator {
 
     const riskScore = this.riskEngine.calculateRiskScore(findings);
     const riskLevel = this.riskEngine.deriveRiskLevel(riskScore);
-    const mergeRecommendation = this.riskEngine.deriveMergeRecommendation(
+    const mergeDecision = this.riskEngine.deriveMergeDecision(
       riskScore,
       counts.critical,
       counts.high,
@@ -91,7 +92,8 @@ export class DeterministicAggregator {
       counts,
       riskScore,
       riskLevel,
-      mergeRecommendation,
+      mergeRecommendation: mergeDecision.recommendation,
+      mergeExplanation: mergeDecision.explanation,
       primaryRiskCategory,
       mostSevereIssue,
       agentSummaries: agentSummaries as string[],
@@ -105,7 +107,8 @@ export class DeterministicAggregator {
       low_count: counts.low,
       risk_score: riskScore,
       risk_level: riskLevel,
-      merge_recommendation: mergeRecommendation,
+      merge_recommendation: mergeDecision.recommendation,
+      merge_explanation: mergeDecision.explanation,
       primary_risk_category: primaryRiskCategory,
       most_severe_issue: mostSevereIssue,
       text,
@@ -148,14 +151,15 @@ export class DeterministicAggregator {
     riskScore: number;
     riskLevel: string;
     mergeRecommendation: string;
+    mergeExplanation: string;
     primaryRiskCategory?: string;
     mostSevereIssue?: string;
     agentSummaries: string[];
   }): string {
     const {
       findings, counts, riskScore, riskLevel,
-      mergeRecommendation, primaryRiskCategory,
-      mostSevereIssue, agentSummaries,
+      mergeRecommendation, mergeExplanation,
+      primaryRiskCategory, mostSevereIssue, agentSummaries,
     } = params;
 
     if (findings.length === 0) {
@@ -188,7 +192,7 @@ export class DeterministicAggregator {
     }
 
     parts.push(`Risk: ${riskScore}/100 (${riskLevel}).`);
-    parts.push(`Recommendation: ${mergeRecommendation}.`);
+    parts.push(`${mergeExplanation}`);
 
     if (agentSummaries.length > 0) {
       parts.push(agentSummaries.join(' '));

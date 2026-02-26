@@ -11,7 +11,9 @@ function getStatusColor(status: TraceStep["status"]): string {
   switch (status) {
     case "ok":
       return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-    case "failed":
+    case "timeout":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    case "error":
       return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
     default:
       return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";

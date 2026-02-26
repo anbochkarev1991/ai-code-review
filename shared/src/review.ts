@@ -54,7 +54,18 @@ export interface Finding {
   confidence?: number;
   reasoning_trace?: string;
   impact?: string;
+  /** Set when multiple agents flagged the same issue; lists all originating agents */
+  merged_agents?: string[];
+  /** Set when merged from multiple categories during deduplication */
+  merged_categories?: string[];
+  /** True if the finding references a file or line not present in the diff */
+  outside_diff?: boolean;
 }
+
+export type AgentStatus = 'ok' | 'timeout' | 'error';
+
+/** Human-readable explanation for the merge recommendation */
+export type MergeExplanation = string;
 
 /** PR metadata collected during diff analysis for transparency */
 export interface PRMetadata {
@@ -68,10 +79,33 @@ export interface PRMetadata {
   analysis_scope: 'diff-only';
 }
 
+/** Per-model rate in USD per token for cost estimation */
+export interface ModelRate {
+  prompt: number;
+  completion: number;
+}
+
+export const MODEL_RATES: Record<string, ModelRate> = {
+  'gpt-4o': { prompt: 2.5e-6, completion: 10e-6 },
+  'gpt-4o-mini': { prompt: 0.15e-6, completion: 0.6e-6 },
+  'gpt-4-turbo': { prompt: 10e-6, completion: 30e-6 },
+  'gpt-4': { prompt: 30e-6, completion: 60e-6 },
+  'gpt-3.5-turbo': { prompt: 0.5e-6, completion: 1.5e-6 },
+};
+
+export interface CostEstimate {
+  total_usd: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  model: string;
+}
+
 export interface ExecutionMetadata {
   agent_count: number;
   duration_ms: number;
   total_tokens: number;
+  cost_estimate?: CostEstimate;
+  agents_status: Record<string, AgentStatus>;
 }
 
 export interface ReviewSummary {
@@ -83,6 +117,7 @@ export interface ReviewSummary {
   risk_score: number;
   risk_level: RiskLevel;
   merge_recommendation: MergeRecommendation;
+  merge_explanation: MergeExplanation;
   primary_risk_category?: string;
   most_severe_issue?: string;
   text: string;
@@ -107,7 +142,7 @@ export interface TraceStep {
   completion_tokens?: number;
   prompt_size_chars?: number;
   parallel: boolean;
-  status: 'ok' | 'failed';
+  status: AgentStatus;
   error_message?: string;
   finding_count?: number;
   avg_confidence?: number;

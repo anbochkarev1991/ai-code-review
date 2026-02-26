@@ -20,7 +20,7 @@ export interface BuildTraceStepOptions {
   agent: string;
   startedAt: Date;
   finishedAt: Date;
-  status: 'ok' | 'failed';
+  status: 'ok' | 'timeout' | 'error';
   tokensUsed?: number;
   promptTokens?: number;
   completionTokens?: number;

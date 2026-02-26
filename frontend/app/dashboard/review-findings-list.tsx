@@ -253,6 +253,28 @@ function FindingCard({ finding }: { finding: Finding }) {
             </button>
           </div>
 
+          {/* Outside diff warning */}
+          {finding.outside_diff && (
+            <div className="flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1.5">
+              <svg
+                className="h-3.5 w-3.5 shrink-0 text-zinc-500 dark:text-zinc-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                References code outside the diff — lower confidence
+              </span>
+            </div>
+          )}
+
           {/* AI Metadata */}
           {hasAIMetadata && (
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
@@ -261,9 +283,20 @@ function FindingCard({ finding }: { finding: Finding }) {
                   {finding.agent_name && (
                     <div className="flex items-center gap-1.5">
                       <span className="text-zinc-500 dark:text-zinc-400">Agent:</span>
-                      <span className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
-                        {finding.agent_name}
-                      </span>
+                      {finding.merged_agents ? (
+                        finding.merged_agents.map((agent) => (
+                          <span
+                            key={agent}
+                            className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
+                          >
+                            {agent}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
+                          {finding.agent_name}
+                        </span>
+                      )}
                     </div>
                   )}
                   {finding.confidence !== undefined && (

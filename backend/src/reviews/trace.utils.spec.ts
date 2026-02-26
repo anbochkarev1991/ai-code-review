@@ -96,16 +96,28 @@ describe('trace.utils', () => {
       expect(step.raw_output).toBeUndefined();
     });
 
-    it('builds trace with status failed', () => {
+    it('builds trace with status error', () => {
       const step = buildTraceStep({
         agent: 'Code Quality',
         startedAt: baseStarted,
         finishedAt: baseFinished,
-        status: 'failed',
+        status: 'error',
         parallel: true,
       });
 
-      expect(step.status).toBe('failed');
+      expect(step.status).toBe('error');
+    });
+
+    it('builds trace with status timeout', () => {
+      const step = buildTraceStep({
+        agent: 'Code Quality',
+        startedAt: baseStarted,
+        finishedAt: baseFinished,
+        status: 'timeout',
+        parallel: true,
+      });
+
+      expect(step.status).toBe('timeout');
     });
 
     it('includes telemetry fields when provided', () => {
