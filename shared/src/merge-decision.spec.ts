@@ -1,4 +1,4 @@
-import { decideMerge } from 'shared';
+import { decideMerge } from './merge-decision';
 
 describe('decideMerge', () => {
   it('blocks when critical_count > 0 (regardless of score)', () => {

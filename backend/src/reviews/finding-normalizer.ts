@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Finding, FindingSeverity, ParsedFile } from 'shared';
+import type { Finding, FindingSeverity, ParsedFile, DiffContext } from 'shared';
 
 const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   critical: 4,
@@ -27,54 +27,54 @@ const UNCERTAINTY_PHRASES = [
   'hard to tell',
 ];
 
-const LINE_PROXIMITY_THRESHOLD = 2;
+const LINE_PROXIMITY_THRESHOLD = 3;
 const JACCARD_SIMILARITY_THRESHOLD = 0.5;
+const TITLE_SIMILARITY_THRESHOLD = 0.4;
 
-/**
- * Finding normalizer — handles deduplication, confidence clamping,
- * diff enforcement, severity normalization, and quality enforcement.
- *
- * Responsibilities:
- * 1. Confidence clamping (0-1 range, auto-clamp invalid values)
- * 2. Cross-agent deduplication (same file + nearby line + similar message → merge)
- * 3. Diff enforcement (flag findings outside diff, reduce confidence)
- * 4. Confidence-severity coherence (critical + low confidence → downgrade)
- * 5. Uncertainty language detection (hedging → severity downgrade)
- * 6. Quality enforcement (truncate verbose explanations)
- * 7. strictMode filtering (suppress outside_diff findings)
- *
- * Scaling note: O(n²) deduplication is acceptable for typical review sizes (<100 findings).
- */
+const BASE_CONFIDENCE_CAP = 0.85;
+const MULTI_AGENT_BOOST = 0.05;
+const OUTSIDE_DIFF_MULTIPLIER = 0.6;
+const CONFIDENCE_MIN = 0.3;
+const CONFIDENCE_MAX = 0.95;
+const DIFF_CONTEXT_LINES = 3;
+
 @Injectable()
 export class FindingNormalizer {
-  /**
-   * Full normalization pipeline.
-   * Order matters: clamp → diff-check → deduplicate → severity rules → quality → sort → filter.
-   */
   normalize(
     findings: Finding[],
     diffFiles?: ParsedFile[],
     strictMode = false,
   ): Finding[] {
     let result = findings.map((f) => this.clampConfidence(f));
+
+    result = result.map((f) => this.capBaseConfidence(f));
+
     result = diffFiles
       ? result.map((f) => this.enforceDiffBoundary(f, diffFiles))
       : result;
+
     result = this.deduplicateFindings(result);
+
     result = result.map((f) => this.applyConfidenceSeverityCoherence(f));
     result = result.map((f) => this.applyUncertaintyDowngrade(f));
     result = result.map((f) => this.enforceQuality(f));
+
+    result = result.map((f) => this.finalConfidenceClamp(f));
+
+    if (diffFiles) {
+      result = result.map((f) => this.attachDiffContext(f, diffFiles));
+    }
+
     result = this.sortFindings(result);
 
     if (strictMode) {
       result = result.filter((f) => !f.outside_diff);
-      result = result.filter((f) => (f.confidence ?? 0.5) >= 0.6);
+      result = result.filter((f) => f.confidence >= 0.6);
     }
 
     return result;
   }
 
-  /** Clamp confidence to [0, 1]. Invalid or missing values default to 0.5. */
   private clampConfidence(finding: Finding): Finding {
     const raw = finding.confidence;
     if (raw === undefined || raw === null || isNaN(raw)) {
@@ -87,19 +87,28 @@ export class FindingNormalizer {
     return finding;
   }
 
+  /** Per-agent confidence cap at 0.85 before any boosting */
+  private capBaseConfidence(finding: Finding): Finding {
+    if (finding.confidence > BASE_CONFIDENCE_CAP) {
+      return { ...finding, confidence: BASE_CONFIDENCE_CAP };
+    }
+    return finding;
+  }
+
+  /** Final clamp to [0.3, 0.95] */
+  private finalConfidenceClamp(finding: Finding): Finding {
+    const clamped = Math.max(CONFIDENCE_MIN, Math.min(CONFIDENCE_MAX, finding.confidence));
+    if (clamped !== finding.confidence) {
+      return { ...finding, confidence: Math.round(clamped * 100) / 100 };
+    }
+    return finding;
+  }
+
   /**
-   * Cross-agent deduplication with intelligent merging.
-   *
-   * Two findings are considered duplicates when they share:
-   * - Same file
-   * - Same line (±LINE_PROXIMITY_THRESHOLD lines tolerance)
-   * - Similar explanation (Jaccard similarity > threshold)
-   *
-   * Merged finding:
-   * - Uses highest severity
-   * - Recalculates confidence as weighted average (severity-weighted)
-   * - Combines categories into merged_categories array
-   * - Lists all originating agents in merged_agents
+   * Deduplication with three matching signals:
+   * 1. Same file
+   * 2. Line delta <= 3
+   * 3. Title similarity OR message similarity above threshold
    */
   private deduplicateFindings(findings: Finding[]): Finding[] {
     const groups: Finding[][] = [];
@@ -107,7 +116,7 @@ export class FindingNormalizer {
     for (const finding of findings) {
       let merged = false;
       for (const group of groups) {
-        if (this.isSimilar(group[0], finding)) {
+        if (this.isDuplicate(group[0], finding)) {
           group.push(finding);
           merged = true;
           break;
@@ -119,6 +128,23 @@ export class FindingNormalizer {
     }
 
     return groups.map((group) => this.mergeGroup(group));
+  }
+
+  private isDuplicate(a: Finding, b: Finding): boolean {
+    if (!a.file || !b.file || a.file !== b.file) return false;
+
+    if (
+      a.line !== undefined &&
+      b.line !== undefined &&
+      Math.abs(a.line - b.line) > LINE_PROXIMITY_THRESHOLD
+    ) {
+      return false;
+    }
+
+    const titleSim = this.textSimilarity(a.title, b.title);
+    if (titleSim > TITLE_SIMILARITY_THRESHOLD) return true;
+
+    return this.textSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD;
   }
 
   private mergeGroup(group: Finding[]): Finding {
@@ -144,49 +170,48 @@ export class FindingNormalizer {
       if (f.category) categories.add(f.category);
 
       const weight = SEVERITY_ORDER[f.severity] ?? 1;
-      const conf = f.confidence ?? 0.5;
-      weightedConfidenceSum += conf * weight;
+      weightedConfidenceSum += f.confidence * weight;
       weightSum += weight;
     }
 
-    const mergedConfidence =
+    let mergedConfidence =
       weightSum > 0
-        ? Math.round((weightedConfidenceSum / weightSum) * 100) / 100
+        ? weightedConfidenceSum / weightSum
         : 0.5;
+
+    if (agents.size > 1) {
+      mergedConfidence += MULTI_AGENT_BOOST;
+    }
+
+    mergedConfidence = Math.round(mergedConfidence * 100) / 100;
 
     const agentList = [...agents];
     const categoryList = [...categories];
 
+    const bestImpact = group
+      .map(f => f.impact)
+      .filter(Boolean)
+      .sort((a, b) => (b?.length ?? 0) - (a?.length ?? 0))[0];
+
+    const bestFix = group
+      .map(f => f.suggested_fix)
+      .filter(Boolean)
+      .sort((a, b) => (b?.length ?? 0) - (a?.length ?? 0))[0];
+
     return {
       ...primary,
       confidence: mergedConfidence,
+      impact: bestImpact ?? primary.impact,
+      suggested_fix: bestFix ?? primary.suggested_fix,
       agent_name: agentList.join(', '),
       merged_agents: agentList.length > 1 ? agentList : undefined,
       merged_categories: categoryList.length > 1 ? categoryList : undefined,
     };
   }
 
-  private isSimilar(a: Finding, b: Finding): boolean {
-    if (!a.file || !b.file || a.file !== b.file) return false;
-
-    if (
-      a.line !== undefined &&
-      b.line !== undefined &&
-      Math.abs(a.line - b.line) > LINE_PROXIMITY_THRESHOLD
-    ) {
-      return false;
-    }
-
-    if (a.line === undefined && b.line === undefined) {
-      return this.messageSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD;
-    }
-
-    return this.messageSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD;
-  }
-
-  private messageSimilarity(msgA: string, msgB: string): number {
-    const a = msgA.toLowerCase();
-    const b = msgB.toLowerCase();
+  private textSimilarity(textA: string, textB: string): number {
+    const a = textA.toLowerCase();
+    const b = textB.toLowerCase();
 
     if (a === b) return 1.0;
 
@@ -203,12 +228,6 @@ export class FindingNormalizer {
     return intersection.length / union.size;
   }
 
-  /**
-   * Diff boundary enforcement.
-   *
-   * If a finding references a file not in the diff or a line not covered
-   * by any hunk, mark it outside_diff=true and reduce confidence to 0.4.
-   */
   private enforceDiffBoundary(
     finding: Finding,
     diffFiles: ParsedFile[],
@@ -220,7 +239,7 @@ export class FindingNormalizer {
       return {
         ...finding,
         outside_diff: true,
-        confidence: Math.min(finding.confidence ?? 0.5, 0.4),
+        confidence: finding.confidence * OUTSIDE_DIFF_MULTIPLIER,
       };
     }
 
@@ -234,35 +253,24 @@ export class FindingNormalizer {
       return {
         ...finding,
         outside_diff: true,
-        confidence: Math.min(finding.confidence ?? 0.5, 0.4),
+        confidence: finding.confidence * OUTSIDE_DIFF_MULTIPLIER,
       };
     }
 
     return finding;
   }
 
-  /**
-   * Confidence-severity coherence (PART 4).
-   * If severity is critical but confidence < 0.6, downgrade to high.
-   * Prevents overconfident hallucinated critical findings.
-   */
   private applyConfidenceSeverityCoherence(finding: Finding): Finding {
-    const confidence = finding.confidence ?? 0.5;
-    if (finding.severity === 'critical' && confidence < 0.6) {
+    if (finding.severity === 'critical' && finding.confidence < 0.6) {
       return { ...finding, severity: 'high' };
     }
     return finding;
   }
 
-  /**
-   * If agent uses uncertainty phrases ("might", "possibly"), downgrade severity
-   * by one level unless confidence is high (>= 0.8).
-   */
   private applyUncertaintyDowngrade(finding: Finding): Finding {
     const message = finding.message.toLowerCase();
-    const confidence = finding.confidence ?? 0.5;
 
-    if (confidence >= 0.8) return finding;
+    if (finding.confidence >= 0.8) return finding;
 
     const hasUncertainty = UNCERTAINTY_PHRASES.some((phrase) =>
       message.includes(phrase),
@@ -278,12 +286,6 @@ export class FindingNormalizer {
     return finding;
   }
 
-  /**
-   * Quality enforcement (PART 8).
-   * - message (explanation): truncate to 3 sentences max
-   * - impact: truncate to 2 sentences max
-   * - suggested_fix: no changes (must be actionable — enforced at agent prompt level)
-   */
   private enforceQuality(finding: Finding): Finding {
     const updates: Partial<Finding> = {};
 
@@ -298,6 +300,38 @@ export class FindingNormalizer {
     return { ...finding, ...updates };
   }
 
+  /** Attach surrounding diff context to a finding for inline code preview */
+  private attachDiffContext(finding: Finding, diffFiles: ParsedFile[]): Finding {
+    if (!finding.file || finding.line === undefined) return finding;
+
+    const diffFile = diffFiles.find((df) => df.path === finding.file);
+    if (!diffFile) return finding;
+
+    for (const hunk of diffFile.hunks) {
+      if (finding.line >= hunk.startLine && finding.line <= hunk.endLine) {
+        const hunkLines = hunk.content.split('\n');
+        const lineOffset = finding.line - hunk.startLine;
+
+        const snippetStart = Math.max(0, lineOffset - DIFF_CONTEXT_LINES);
+        const snippetEnd = Math.min(hunkLines.length, lineOffset + DIFF_CONTEXT_LINES + 1);
+
+        const contextBefore = hunkLines.slice(snippetStart, lineOffset).join('\n');
+        const snippet = hunkLines[lineOffset] ?? '';
+        const contextAfter = hunkLines.slice(lineOffset + 1, snippetEnd).join('\n');
+
+        const diffContext: DiffContext = {
+          snippet,
+          diff_context_before: contextBefore,
+          diff_context_after: contextAfter,
+        };
+
+        return { ...finding, diff_context: diffContext };
+      }
+    }
+
+    return finding;
+  }
+
   private truncateToSentences(text: string, maxSentences: number): string {
     const sentences = text.match(/[^.!?]+[.!?]+/g);
     if (!sentences || sentences.length <= maxSentences) return text;
@@ -309,7 +343,7 @@ export class FindingNormalizer {
       const sevDiff =
         (SEVERITY_ORDER[b.severity] ?? 0) - (SEVERITY_ORDER[a.severity] ?? 0);
       if (sevDiff !== 0) return sevDiff;
-      return (b.confidence ?? 0) - (a.confidence ?? 0);
+      return b.confidence - a.confidence;
     });
   }
 }

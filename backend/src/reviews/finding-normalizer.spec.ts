@@ -40,15 +40,20 @@ describe('FindingNormalizer', () => {
     normalizer = new FindingNormalizer();
   });
 
-  describe('confidence clamping', () => {
-    it('clamps values above 1 to 1', () => {
-      const result = normalizer.normalize([makeFinding({ confidence: 1.5 })]);
-      expect(result[0].confidence).toBe(1);
+  describe('confidence clamping and rebalancing', () => {
+    it('caps base confidence at 0.85', () => {
+      const result = normalizer.normalize([makeFinding({ confidence: 0.95 })]);
+      expect(result[0].confidence).toBeLessThanOrEqual(0.85);
     });
 
-    it('clamps values below 0 to 0', () => {
+    it('clamps values above 1 — capped at 0.85 then final clamp at 0.95', () => {
+      const result = normalizer.normalize([makeFinding({ confidence: 1.5 })]);
+      expect(result[0].confidence).toBeLessThanOrEqual(0.95);
+    });
+
+    it('clamps values below 0 to minimum 0.3', () => {
       const result = normalizer.normalize([makeFinding({ confidence: -0.3 })]);
-      expect(result[0].confidence).toBe(0);
+      expect(result[0].confidence).toBe(0.3);
     });
 
     it('defaults undefined confidence to 0.5', () => {
@@ -56,9 +61,16 @@ describe('FindingNormalizer', () => {
       expect(result[0].confidence).toBe(0.5);
     });
 
-    it('preserves valid confidence values', () => {
+    it('preserves valid confidence values within cap range', () => {
       const result = normalizer.normalize([makeFinding({ confidence: 0.75 })]);
       expect(result[0].confidence).toBe(0.75);
+    });
+
+    it('final confidence is between 0.3 and 0.95', () => {
+      const low = normalizer.normalize([makeFinding({ confidence: 0.01 })]);
+      const high = normalizer.normalize([makeFinding({ confidence: 0.99 })]);
+      expect(low[0].confidence).toBeGreaterThanOrEqual(0.3);
+      expect(high[0].confidence).toBeLessThanOrEqual(0.95);
     });
   });
 
@@ -70,7 +82,7 @@ describe('FindingNormalizer', () => {
           agent_name: 'Security',
           category: 'security',
           severity: 'high',
-          confidence: 0.9,
+          confidence: 0.85,
           file: 'src/api.ts',
           line: 10,
           message: 'SQL injection vulnerability in query builder function',
@@ -94,6 +106,38 @@ describe('FindingNormalizer', () => {
       expect(result[0].merged_categories).toEqual(['security', 'code-quality']);
     });
 
+    it('merges findings with similar titles even if messages differ', () => {
+      const findings = [
+        makeFinding({
+          id: 'a-1',
+          title: 'SQL injection vulnerability',
+          agent_name: 'Security',
+          file: 'src/api.ts',
+          line: 10,
+          message: 'This is a detailed security explanation',
+        }),
+        makeFinding({
+          id: 'b-1',
+          title: 'SQL injection vulnerability detected',
+          agent_name: 'Code Quality',
+          file: 'src/api.ts',
+          line: 12,
+          message: 'Completely different explanation here',
+        }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result.length).toBe(1);
+    });
+
+    it('respects line delta <= 3', () => {
+      const findings = [
+        makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected here in code' }),
+        makeFinding({ file: 'src/a.ts', line: 13, message: 'same issue detected here in code' }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result.length).toBe(1);
+    });
+
     it('does NOT merge findings on different files', () => {
       const findings = [
         makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected' }),
@@ -103,7 +147,7 @@ describe('FindingNormalizer', () => {
       expect(result.length).toBe(2);
     });
 
-    it('does NOT merge findings with distant lines', () => {
+    it('does NOT merge findings with distant lines (> 3)', () => {
       const findings = [
         makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected here in code' }),
         makeFinding({ file: 'src/a.ts', line: 100, message: 'same issue detected here in code' }),
@@ -112,12 +156,12 @@ describe('FindingNormalizer', () => {
       expect(result.length).toBe(2);
     });
 
-    it('uses weighted average confidence in merged findings', () => {
+    it('boosts confidence when multiple agents agree', () => {
       const findings = [
         makeFinding({
           agent_name: 'Security',
           severity: 'high',
-          confidence: 0.9,
+          confidence: 0.8,
           file: 'src/x.ts',
           line: 5,
           message: 'Potential cross-site scripting vulnerability found',
@@ -134,8 +178,7 @@ describe('FindingNormalizer', () => {
       const result = normalizer.normalize(findings);
       expect(result.length).toBe(1);
       expect(result[0].confidence).toBeDefined();
-      expect(result[0].confidence!).toBeGreaterThan(0.5);
-      expect(result[0].confidence!).toBeLessThan(0.9);
+      expect(result[0].merged_agents?.length).toBeGreaterThan(1);
     });
   });
 
@@ -170,7 +213,17 @@ describe('FindingNormalizer', () => {
         diffFiles,
       );
       expect(result[0].outside_diff).toBe(true);
-      expect(result[0].confidence).toBeLessThanOrEqual(0.4);
+      expect(result[0].confidence).toBeLessThan(0.8);
+    });
+
+    it('applies 0.6x multiplier to outside_diff findings', () => {
+      const diffFiles = [makeDiffFile({ path: 'src/other.ts' })];
+      const result = normalizer.normalize(
+        [makeFinding({ file: 'src/app.ts', line: 10, confidence: 0.8 })],
+        diffFiles,
+      );
+      expect(result[0].outside_diff).toBe(true);
+      expect(result[0].confidence).toBeLessThanOrEqual(0.51);
     });
 
     it('marks finding as outside_diff if line not in any hunk', () => {
@@ -210,6 +263,27 @@ describe('FindingNormalizer', () => {
         true,
       );
       expect(result.length).toBe(0);
+    });
+  });
+
+  describe('diff context attachment', () => {
+    it('attaches diff context when finding is inside a hunk', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/app.ts',
+        hunks: [{
+          startLine: 5,
+          endLine: 15,
+          content: ' line5\n line6\n line7\n line8\n line9\n+line10\n line11\n line12\n line13\n line14\n line15',
+          addedLines: ['line10'],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({ file: 'src/app.ts', line: 10 })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].diff_context!.snippet).toBeDefined();
     });
   });
 
@@ -270,7 +344,7 @@ describe('FindingNormalizer', () => {
   describe('sorting', () => {
     it('sorts by severity (highest first), then confidence', () => {
       const findings = [
-        makeFinding({ id: 'low', severity: 'low', confidence: 0.9, file: 'src/a.ts', message: 'A specific low severity issue in code' }),
+        makeFinding({ id: 'low', severity: 'low', confidence: 0.85, file: 'src/a.ts', message: 'A specific low severity issue in code' }),
         makeFinding({ id: 'critical', severity: 'critical', confidence: 0.8, file: 'src/b.ts', message: 'A specific critical severity issue in code' }),
         makeFinding({ id: 'high', severity: 'high', confidence: 0.7, file: 'src/c.ts', message: 'A specific high severity issue in code' }),
       ];

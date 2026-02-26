@@ -11,14 +11,6 @@ interface AggregatedResult {
   review_summary: ReviewSummary;
 }
 
-/**
- * Deterministic aggregator — merges findings from domain agents without LLM calls.
- *
- * Pipeline: merge → normalize (dedup + confidence/severity adjustments) → score → summarize.
- *
- * This module orchestrates FindingNormalizer and RiskEngine but contains no risk logic itself.
- * Business rules for scoring and false-positive control are in their respective modules.
- */
 @Injectable()
 export class DeterministicAggregator {
   constructor(
@@ -52,6 +44,7 @@ export class DeterministicAggregator {
       for (const finding of output.findings) {
         merged.push({
           ...finding,
+          confidence: finding.confidence ?? 0.5,
           agent_name: finding.agent_name ?? agentName,
         });
       }
@@ -69,7 +62,8 @@ export class DeterministicAggregator {
       counts[f.severity]++;
     }
 
-    const riskScore = this.riskEngine.calculateRiskScore(findings);
+    const riskBreakdown = this.riskEngine.calculateRiskBreakdown(findings);
+    const riskScore = riskBreakdown.final_score;
     const riskLevel = this.riskEngine.deriveRiskLevel(riskScore);
     const mergeDecision = this.riskEngine.deriveMergeDecision(
       riskScore,
@@ -97,6 +91,7 @@ export class DeterministicAggregator {
       primaryRiskCategory,
       mostSevereIssue,
       agentSummaries: agentSummaries as string[],
+      floorApplied: riskBreakdown.floor_applied,
     });
 
     return {
@@ -107,6 +102,7 @@ export class DeterministicAggregator {
       low_count: counts.low,
       risk_score: riskScore,
       risk_level: riskLevel,
+      risk_breakdown: riskBreakdown,
       merge_recommendation: mergeDecision.recommendation,
       merge_explanation: mergeDecision.explanation,
       primary_risk_category: primaryRiskCategory,
@@ -155,11 +151,13 @@ export class DeterministicAggregator {
     primaryRiskCategory?: string;
     mostSevereIssue?: string;
     agentSummaries: string[];
+    floorApplied?: string;
   }): string {
     const {
       findings, counts, riskScore, riskLevel,
       mergeRecommendation, mergeExplanation,
       primaryRiskCategory, mostSevereIssue, agentSummaries,
+      floorApplied,
     } = params;
 
     if (findings.length === 0) {
@@ -192,7 +190,12 @@ export class DeterministicAggregator {
     }
 
     parts.push(`Risk: ${riskScore}/100 (${riskLevel}).`);
-    parts.push(`${mergeExplanation}`);
+
+    if (floorApplied) {
+      parts.push(floorApplied);
+    }
+
+    parts.push(mergeExplanation);
 
     if (agentSummaries.length > 0) {
       parts.push(agentSummaries.join(' '));

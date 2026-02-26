@@ -10,6 +10,7 @@ import { DeterministicAggregator } from './deterministic-aggregator';
 import { FindingNormalizer } from './finding-normalizer';
 import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
+import { ReviewOrchestrator } from './engine/orchestrator';
 import { ReviewRunsRepository } from './review-runs.repository';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
@@ -25,6 +26,7 @@ import { ReviewsService } from './reviews.service';
     RiskEngine,
     DeterministicAggregator,
     ResultFormatter,
+    ReviewOrchestrator,
     CodeQualityAgent,
     ArchitectureAgent,
     PerformanceAgent,
@@ -32,6 +34,7 @@ import { ReviewsService } from './reviews.service';
   ],
   exports: [
     ReviewsService,
+    ReviewOrchestrator,
     CodeQualityAgent,
     ArchitectureAgent,
     PerformanceAgent,

@@ -102,7 +102,7 @@ export class ReviewsController {
       repo_full_name,
       prNum,
     );
-    if (result.status === 'completed') {
+    if (result.status === 'complete' || result.status === 'partial') {
       await this.billingService.incrementUsage(user.id, token);
     }
 

@@ -1,7 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import type { Finding } from "@/lib/types";
+import type { Finding, DiffContext } from "@/lib/types";
+
+function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffContext; file?: string; line?: number }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <svg
+          className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+        <span>View code context</span>
+        {file && (
+          <span className="font-mono text-zinc-400 dark:text-zinc-500 ml-auto">
+            {file}{line !== undefined ? `:${line}` : ""}
+          </span>
+        )}
+      </button>
+      {expanded && (
+        <div className="bg-zinc-900 dark:bg-zinc-950 p-3 font-mono text-xs leading-5 overflow-x-auto">
+          {diffContext.diff_context_before && (
+            <div className="text-zinc-500">
+              {diffContext.diff_context_before.split("\n").map((l, i) => (
+                <div key={`before-${i}`}>{l || "\u00A0"}</div>
+              ))}
+            </div>
+          )}
+          <div className="text-amber-300 bg-amber-900/20 -mx-3 px-3">
+            {diffContext.snippet || "\u00A0"}
+          </div>
+          {diffContext.diff_context_after && (
+            <div className="text-zinc-500">
+              {diffContext.diff_context_after.split("\n").map((l, i) => (
+                <div key={`after-${i}`}>{l || "\u00A0"}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ReviewFindingsListProps {
   findings: Finding[];
@@ -190,6 +244,15 @@ function FindingCard({ finding }: { finding: Finding }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Inline Diff Context */}
+          {finding.diff_context && (
+            <DiffContextPreview
+              diffContext={finding.diff_context}
+              file={finding.file}
+              line={finding.line}
+            />
           )}
 
           {/* Actions */}

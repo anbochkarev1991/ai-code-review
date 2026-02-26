@@ -44,7 +44,7 @@ describe('ReviewsController', () => {
 
       reviewsService.runReview.mockResolvedValue({
         id: 'review-1',
-        status: 'completed',
+        status: 'complete',
         result_snapshot: { summary: 'ok', findings: [] },
       });
 
@@ -64,7 +64,33 @@ describe('ReviewsController', () => {
       expect(billingService.getUsage).toHaveBeenCalledTimes(2);
     });
 
-    it('should return usage even when review fails (status !== completed)', async () => {
+    it('should increment usage for partial reviews too', async () => {
+      billingService.getUsage
+        .mockResolvedValueOnce({ review_count: 3, limit: 10, plan: 'free' })
+        .mockResolvedValueOnce({ review_count: 4, limit: 10, plan: 'free' });
+
+      reviewsService.runReview.mockResolvedValue({
+        id: 'review-partial',
+        status: 'partial',
+        result_snapshot: { summary: 'ok', findings: [] },
+      });
+
+      billingService.incrementUsage.mockResolvedValue(undefined);
+
+      const result = await controller.create(mockUser, mockReq, mockBody);
+
+      expect(result.usage).toEqual({
+        review_count: 4,
+        limit: 10,
+        plan: 'free',
+      });
+      expect(billingService.incrementUsage).toHaveBeenCalledWith(
+        'user-123',
+        'test-token',
+      );
+    });
+
+    it('should return usage even when review fails (status !== complete)', async () => {
       billingService.getUsage.mockResolvedValue({
         review_count: 3,
         limit: 10,

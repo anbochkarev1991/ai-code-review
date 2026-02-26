@@ -21,23 +21,20 @@ export interface MergeDecision {
  * Deterministic merge decision function.
  *
  * Priority order (first match wins):
- *   1. Any critical finding → Block merge
+ *   1. Any critical finding → Merge blocked
  *   2. 3+ high findings → Merge with caution
  *   3. risk_score >= 60 → Merge with caution
  *   4. Otherwise → Safe to merge
  *
- * Risk score must not contradict recommendation:
- * - "Block merge" only when criticals exist (regardless of score)
- * - "Merge with caution" when high count or score warrants it
- * - "Safe to merge" only when neither condition is met
+ * Invariant: "Merge blocked" always has risk_score >= 50 (enforced by risk engine floors).
  */
 export function decideMerge(input: MergeDecisionInput): MergeDecision {
   const { critical_count, high_count, risk_score } = input;
 
   if (critical_count > 0) {
     return {
-      recommendation: 'Block merge',
-      explanation: `Blocked because ${critical_count} critical issue${critical_count === 1 ? '' : 's'} detected.`,
+      recommendation: 'Merge blocked',
+      explanation: `Blocked: ${critical_count} critical issue${critical_count === 1 ? '' : 's'} detected. Risk score elevated due to presence of critical security finding.`,
     };
   }
 

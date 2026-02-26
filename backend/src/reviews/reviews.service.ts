@@ -1,34 +1,22 @@
 import {
-  HttpException,
-  HttpStatus,
   Injectable,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type {
-  AgentOutput,
-  AgentStatus,
   GetReviewResponse,
   GetReviewsResponse,
   PostReviewsResponse,
   PRMetadata,
   ReviewResult,
+  ReviewStatus,
   TraceStep,
 } from 'shared';
-import { ArchitectureAgent } from './agents/architecture.agent';
-import { CodeQualityAgent } from './agents/code-quality.agent';
-import { PerformanceAgent } from './agents/performance.agent';
-import { SecurityAgent } from './agents/security.agent';
-import type { CallWithValidationRetryResult } from './agents/agent-validation.utils';
 import { DiffParser } from './diff-parser';
-import { DeterministicAggregator } from './deterministic-aggregator';
-import { ResultFormatter } from './result-formatter';
+import { ReviewOrchestrator } from './engine/orchestrator';
 import { GitHubService } from '../github/github.service';
 import { ReviewRunsRepository } from './review-runs.repository';
-import { buildTraceStep, TRACE_AGENT_NAMES } from './trace.utils';
-import type { ParsedFile } from '../types';
 
-const AGENT_TIMEOUT_MS = 30_000;
 const LARGE_PR_LINE_THRESHOLD = 1000;
 const MARKDOWN_ONLY_EXTENSIONS = new Set(['markdown']);
 
@@ -44,68 +32,13 @@ export interface RunPipelineParams {
   prFiles: import('shared').DiffFile[];
 }
 
-interface DomainAgentResult {
-  output: AgentOutput;
-  status: 'ok';
-  tokensUsed?: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  promptSizeChars?: number;
-  rawContent?: string;
-}
-
-interface DomainAgentFailure {
-  error: string;
-  status: 'error' | 'timeout';
-}
-
-type DomainAgentOutcome = DomainAgentResult | DomainAgentFailure;
-
-/**
- * ReviewsService — pipeline orchestrator.
- *
- * Architecture:
- * ┌──────────────┐     ┌──────────────┐     ┌────────────────────┐
- * │ PR Metadata   │     │ Diff Extractor│     │ Agent Orchestrator  │
- * │ Fetcher       │────▶│ (DiffParser)  │────▶│ (4 agents parallel) │
- * └──────────────┘     └──────────────┘     └─────────┬──────────┘
- *                                                       │
- *                                                       ▼
- *                                           ┌────────────────────┐
- *                                           │ Finding Normalizer  │
- *                                           │ (dedup, confidence) │
- *                                           └─────────┬──────────┘
- *                                                       │
- *                                                       ▼
- *                                           ┌────────────────────┐
- *                                           │ Risk Engine         │
- *                                           │ (scoring, levels)   │
- *                                           └─────────┬──────────┘
- *                                                       │
- *                                                       ▼
- *                                           ┌────────────────────┐
- *                                           │ Result Formatter    │
- *                                           │ (UI-agnostic output)│
- *                                           └────────────────────┘
- *
- * Guarantees:
- * - Each agent runs with a timeout (AGENT_TIMEOUT_MS)
- * - One agent failure does NOT crash the entire review
- * - Partial results are returned when >= 1 agent succeeds
- * - Edge cases (empty diff, binary, markdown-only, large PR) degrade gracefully
- */
 @Injectable()
 export class ReviewsService {
   private readonly logger = new Logger(ReviewsService.name);
 
   constructor(
-    private readonly codeQualityAgent: CodeQualityAgent,
-    private readonly architectureAgent: ArchitectureAgent,
-    private readonly performanceAgent: PerformanceAgent,
-    private readonly securityAgent: SecurityAgent,
     private readonly diffParser: DiffParser,
-    private readonly aggregator: DeterministicAggregator,
-    private readonly resultFormatter: ResultFormatter,
+    private readonly orchestrator: ReviewOrchestrator,
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
   ) {}
@@ -163,11 +96,9 @@ export class ReviewsService {
   async runPipeline(params: RunPipelineParams): Promise<PostReviewsResponse> {
     const {
       userId, userJwt, repoFullName, prNumber,
-      prTitle, prAuthor, commitCount, prFiles,
+      prTitle, prAuthor, commitCount, prDiff, prFiles,
     } = params;
-    const trace: TraceStep[] = [];
 
-    // ── Stage 1: Diff extraction ──
     const parsedDiff = this.diffParser.parse(prFiles);
 
     const prMetadata: PRMetadata = {
@@ -181,12 +112,10 @@ export class ReviewsService {
       analysis_scope: 'diff-only',
     };
 
-    // ── Edge case: empty diff (no reviewable files after filtering) ──
     if (parsedDiff.files.length === 0) {
       return this.handleEmptyDiff(userId, userJwt, repoFullName, prNumber, prTitle, prMetadata);
     }
 
-    // ── Edge case: markdown-only changes ──
     const allMarkdown = parsedDiff.files.every(
       (f) => MARKDOWN_ONLY_EXTENSIONS.has(f.language),
     );
@@ -194,9 +123,7 @@ export class ReviewsService {
       return this.handleMarkdownOnly(userId, userJwt, repoFullName, prNumber, prTitle, prMetadata);
     }
 
-    // ── Edge case: large PR warning ──
-    const isLargePr = parsedDiff.stats.totalChangedLines > LARGE_PR_LINE_THRESHOLD;
-    if (isLargePr) {
+    if (parsedDiff.stats.totalChangedLines > LARGE_PR_LINE_THRESHOLD) {
       this.logger.warn(
         `Large PR detected: ${parsedDiff.stats.totalChangedLines} changed lines. ` +
         `Results may be less precise for PRs exceeding ${LARGE_PR_LINE_THRESHOLD} lines.`,
@@ -207,118 +134,13 @@ export class ReviewsService {
       `Reviewing ${parsedDiff.stats.filesChanged} files, ${parsedDiff.stats.totalChangedLines} changed lines`,
     );
 
-    const files = parsedDiff.files;
-
-    // ── Stage 2: Agent orchestration (parallel with timeout) ──
-    const domainAgents = [
-      {
-        name: TRACE_AGENT_NAMES[0],
-        run: () => this.codeQualityAgent.run(files),
-      },
-      {
-        name: TRACE_AGENT_NAMES[1],
-        run: () => this.architectureAgent.run(files),
-      },
-      {
-        name: TRACE_AGENT_NAMES[2],
-        run: () => this.performanceAgent.run(files),
-      },
-      {
-        name: TRACE_AGENT_NAMES[3],
-        run: () => this.securityAgent.run(files),
-      },
-    ] as const;
-
-    const agentPromises = domainAgents.map(async ({ name, run }) => {
-      const startedAt = new Date();
-      try {
-        const result: CallWithValidationRetryResult = await this.withTimeout(
-          run(),
-          AGENT_TIMEOUT_MS,
-          `${name} agent timed out after ${AGENT_TIMEOUT_MS}ms`,
-        );
-        const finishedAt = new Date();
-        return {
-          name,
-          startedAt,
-          finishedAt,
-          outcome: {
-            output: result.output,
-            status: 'ok' as const,
-            tokensUsed: result.tokensUsed,
-            promptTokens: result.promptTokens,
-            completionTokens: result.completionTokens,
-            rawContent: result.rawContent,
-          },
-        };
-      } catch (err) {
-        if (err instanceof HttpException) {
-          throw err;
-        }
-        const finishedAt = new Date();
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        const isTimeout = errorMessage.includes('timed out');
-        return {
-          name,
-          startedAt,
-          finishedAt,
-          outcome: {
-            error: errorMessage,
-            status: (isTimeout ? 'timeout' : 'error') as 'timeout' | 'error',
-          },
-        };
-      }
-    });
-
-    let agentResults: Awaited<typeof agentPromises[number]>[];
-    try {
-      agentResults = await Promise.all(agentPromises);
-    } catch (err) {
-      if (err instanceof HttpException) {
-        throw err;
-      }
-      throw err;
-    }
-
-    // ── Stage 3: Build trace with enriched telemetry ──
-    const outcomes: DomainAgentOutcome[] = [];
-    for (const result of agentResults) {
-      const isOk = result.outcome.status === 'ok';
-      const okOutcome = isOk ? result.outcome as DomainAgentResult : undefined;
-
-      const findingCount = okOutcome?.output.findings.length;
-      const avgConfidence = findingCount && findingCount > 0
-        ? okOutcome!.output.findings.reduce(
-            (sum, f) => sum + (f.confidence ?? 0.5),
-            0,
-          ) / findingCount
-        : undefined;
-
-      trace.push(
-        buildTraceStep({
-          agent: result.name,
-          startedAt: result.startedAt,
-          finishedAt: result.finishedAt,
-          status: result.outcome.status as 'ok' | 'timeout' | 'error',
-          tokensUsed: okOutcome?.tokensUsed,
-          promptTokens: okOutcome?.promptTokens,
-          completionTokens: okOutcome?.completionTokens,
-          parallel: true,
-          errorMessage: !isOk ? (result.outcome as DomainAgentFailure).error : undefined,
-          findingCount,
-          avgConfidence,
-        }),
-      );
-      outcomes.push(result.outcome);
-    }
-
-    // ── Graceful degradation: succeed with partial results ──
-    const validOutputs = outcomes.filter(
-      (o): o is DomainAgentResult => o.status === 'ok',
+    const engineResult = await this.orchestrator.runReview(
+      parsedDiff.files,
+      prMetadata,
+      prDiff,
     );
 
-    if (validOutputs.length === 0) {
-      const errorMessage = 'All domain agents failed or timed out';
+    if (engineResult.status === 'failed') {
       const id = await this.reviewRunsRepository.create(
         {
           userId,
@@ -326,39 +148,18 @@ export class ReviewsService {
           prNumber,
           prTitle: prTitle ?? null,
           status: 'failed',
-          trace,
-          errorMessage,
+          trace: engineResult.trace,
+          errorMessage: engineResult.error_message ?? 'All agents failed',
         },
         userJwt,
       );
-      return { id, status: 'failed', trace, error_message: errorMessage };
+      return {
+        id,
+        status: 'failed',
+        trace: engineResult.trace,
+        error_message: engineResult.error_message,
+      };
     }
-
-    if (validOutputs.length < 4) {
-      const failedNames = agentResults
-        .filter((r) => r.outcome.status !== 'ok')
-        .map((r) => r.name);
-      this.logger.warn(
-        `Partial analysis: ${failedNames.join(', ')} failed. Continuing with ${validOutputs.length} agents.`,
-      );
-    }
-
-    // ── Stage 4: Deterministic aggregation (no LLM call) ──
-    const agentOutputs: AgentOutput[] = validOutputs.map((o) => o.output);
-    const aggregated = this.aggregator.aggregate(
-      agentOutputs,
-      parsedDiff.files,
-    );
-
-    // ── Stage 5: Format final result ──
-    const resultSnapshot = this.resultFormatter.format({
-      findings: aggregated.findings,
-      reviewSummary: aggregated.review_summary,
-      trace,
-      prMetadata,
-    });
-
-    const status = validOutputs.length === 4 ? 'completed' : 'partial';
 
     const id = await this.reviewRunsRepository.create(
       {
@@ -366,39 +167,19 @@ export class ReviewsService {
         repoFullName,
         prNumber,
         prTitle: prTitle ?? null,
-        status,
-        resultSnapshot,
-        trace,
+        status: engineResult.status,
+        resultSnapshot: engineResult.result,
+        trace: engineResult.trace,
       },
       userJwt,
     );
 
     return {
       id,
-      status,
-      result_snapshot: resultSnapshot,
-      trace,
+      status: engineResult.status,
+      result_snapshot: engineResult.result,
+      trace: engineResult.trace,
     };
-  }
-
-  /** Promise.race-based timeout wrapper. */
-  private withTimeout<T>(
-    promise: Promise<T>,
-    ms: number,
-    message: string,
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(message)), ms);
-      promise
-        .then((val) => {
-          clearTimeout(timer);
-          resolve(val);
-        })
-        .catch((err) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-    });
   }
 
   private async handleEmptyDiff(
@@ -419,7 +200,7 @@ export class ReviewsService {
         medium_count: 0,
         low_count: 0,
         risk_score: 0,
-        risk_level: 'Low',
+        risk_level: 'Low risk',
         merge_recommendation: 'Safe to merge',
         merge_explanation: 'No reviewable code changes detected. All changed files were filtered out (lock files, build artifacts, binary files, etc.).',
         text: 'No reviewable changes found. All changed files were filtered out (lock files, build artifacts, etc.).',
@@ -439,13 +220,13 @@ export class ReviewsService {
         repoFullName,
         prNumber,
         prTitle: prTitle ?? null,
-        status: 'completed',
+        status: 'complete',
         resultSnapshot: emptyResult,
         trace: [],
       },
       userJwt,
     );
-    return { id, status: 'completed', result_snapshot: emptyResult, trace: [] };
+    return { id, status: 'complete', result_snapshot: emptyResult, trace: [] };
   }
 
   private async handleMarkdownOnly(
@@ -466,7 +247,7 @@ export class ReviewsService {
         medium_count: 0,
         low_count: 0,
         risk_score: 0,
-        risk_level: 'Low',
+        risk_level: 'Low risk',
         merge_recommendation: 'Safe to merge',
         merge_explanation: 'Documentation-only changes — no code to review.',
         text: 'Only documentation/markdown changes detected. No code review needed. Recommendation: Safe to merge.',
@@ -486,12 +267,12 @@ export class ReviewsService {
         repoFullName,
         prNumber,
         prTitle: prTitle ?? null,
-        status: 'completed',
+        status: 'complete',
         resultSnapshot: result,
         trace: [],
       },
       userJwt,
     );
-    return { id, status: 'completed', result_snapshot: result, trace: [] };
+    return { id, status: 'complete', result_snapshot: result, trace: [] };
   }
 }

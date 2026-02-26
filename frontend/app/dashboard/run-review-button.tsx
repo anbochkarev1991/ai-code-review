@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import type { PostReviewsResponse, ReviewResult, TraceStep } from "@/lib/types";
+import type { PostReviewsResponse, ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummary } from "./review-summary";
 import { ReviewTrace } from "./review-trace";
@@ -24,6 +24,7 @@ export function RunReviewButton({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTimer = () => {
@@ -43,6 +44,7 @@ export function RunReviewButton({
     setError(null);
     setResult(null);
     setTrace(null);
+    setReviewStatus(null);
     startTimer();
 
     const backendUrl =
@@ -78,6 +80,9 @@ export function RunReviewButton({
         return;
       }
 
+      if (data.status) {
+        setReviewStatus(data.status);
+      }
       if (data.result_snapshot) {
         setResult(data.result_snapshot);
       }
@@ -133,6 +138,9 @@ export function RunReviewButton({
                 executionMetadata={result.execution_metadata}
                 reviewSummary={result.review_summary}
                 prMetadata={result.pr_metadata}
+                performance={result.performance}
+                signature={result.signature}
+                reviewStatus={reviewStatus ?? undefined}
               />
               <ReviewFindingsList findings={result.findings} />
             </>

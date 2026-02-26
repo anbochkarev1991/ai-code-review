@@ -3,16 +3,10 @@ import type {
   Finding,
   FindingSeverity,
   RiskLevel,
+  RiskBreakdown,
 } from 'shared';
 import { decideMerge, type MergeDecision } from 'shared';
 
-/**
- * Severity weight: how much each severity level contributes to the risk score.
- *
- * Calibrated so that a single critical finding at full confidence scores 7.5
- * (5 × 1.0 × 1.5 for a security issue), while low-confidence medium findings
- * barely move the needle.
- */
 const SEVERITY_WEIGHT: Record<FindingSeverity, number> = {
   critical: 5,
   high: 3,
@@ -20,13 +14,6 @@ const SEVERITY_WEIGHT: Record<FindingSeverity, number> = {
   low: 1,
 };
 
-/**
- * Impact multiplier by finding category.
- *
- * Security issues receive the highest multiplier because their blast radius
- * is typically unbounded (data breach, auth bypass). Architecture issues get
- * a smaller boost because their damage accrues over time rather than at deploy.
- */
 const CATEGORY_IMPACT_WEIGHT: Record<string, number> = {
   security: 1.5,
   architecture: 1.2,
@@ -34,53 +21,96 @@ const CATEGORY_IMPACT_WEIGHT: Record<string, number> = {
   'code-quality': 1.0,
 };
 
+const RISK_FLOOR_CRITICAL = 70;
+const RISK_FLOOR_HIGH_3PLUS = 60;
+const RISK_FLOOR_BLOCK_MERGE = 50;
+const MULTI_CATEGORY_BOOST_PER = 2;
+
 /**
- * Risk engine — pure computation module for all risk quantification.
+ * Risk engine — deterministic scoring with floor enforcement and breakdown transparency.
  *
  * Guarantees:
- * - calculateRiskScore is a pure function: same findings → same integer score
- * - No randomness, no floating-point drift (truncated to integer via Math.trunc)
- * - deriveRiskLevel and deriveMergeDecision are deterministic lookups
- * - Merge decision uses shared/merge-decision.ts (single source of truth)
+ * - calculateRiskScore is pure: same findings → same integer score
+ * - Floors enforce semantic alignment between severity and score
+ * - Risk breakdown provides full auditability of the computation
  */
 @Injectable()
 export class RiskEngine {
-  /**
-   * Pure risk score computation.
-   *
-   * Formula:
-   *   raw = Σ(severity_weight × confidence × impact_weight) for each finding
-   *   risk_score = min(100, trunc(raw))
-   *
-   * Uses Math.trunc (not Math.round) to avoid rounding-induced drift at boundaries.
-   * A finding with confidence=0.999 and another with confidence=1.0 should not
-   * produce different integer scores when they shouldn't.
-   */
   calculateRiskScore(findings: Finding[]): number {
-    if (findings.length === 0) return 0;
+    return this.calculateRiskBreakdown(findings).final_score;
+  }
+
+  calculateRiskBreakdown(findings: Finding[]): RiskBreakdown {
+    if (findings.length === 0) {
+      return {
+        raw_score: 0,
+        severity_contribution: { critical: 0, high: 0, medium: 0, low: 0 },
+        category_contribution: {},
+        multi_category_boost: 0,
+        final_score: 0,
+      };
+    }
+
+    const severityContribution: Record<FindingSeverity, number> = {
+      critical: 0, high: 0, medium: 0, low: 0,
+    };
+    const categoryContribution: Record<string, number> = {};
 
     let rawScore = 0;
     for (const f of findings) {
       const severityW = SEVERITY_WEIGHT[f.severity] ?? 1;
-      const confidence = this.clampConfidence(f.confidence ?? 0.5);
+      const confidence = this.clampConfidence(f.confidence);
       const categoryW = CATEGORY_IMPACT_WEIGHT[f.category] ?? 1.0;
-      rawScore += severityW * confidence * categoryW;
+      const contribution = severityW * confidence * categoryW;
+
+      rawScore += contribution;
+      severityContribution[f.severity] += contribution;
+      categoryContribution[f.category] = (categoryContribution[f.category] ?? 0) + contribution;
     }
 
-    return Math.min(100, Math.trunc(rawScore));
+    const uniqueCategories = new Set(findings.map(f => f.category));
+    const multiCategoryBoost = uniqueCategories.size > 1
+      ? (uniqueCategories.size - 1) * MULTI_CATEGORY_BOOST_PER
+      : 0;
+
+    let score = Math.trunc(rawScore + multiCategoryBoost);
+
+    let floorApplied: string | undefined;
+    const criticalCount = findings.filter(f => f.severity === 'critical').length;
+    const highCount = findings.filter(f => f.severity === 'high').length;
+
+    if (criticalCount > 0 && score < RISK_FLOOR_CRITICAL) {
+      score = RISK_FLOOR_CRITICAL;
+      floorApplied = `Floor ${RISK_FLOOR_CRITICAL} applied: critical finding present.`;
+    } else if (highCount >= 3 && score < RISK_FLOOR_HIGH_3PLUS) {
+      score = RISK_FLOOR_HIGH_3PLUS;
+      floorApplied = `Floor ${RISK_FLOOR_HIGH_3PLUS} applied: ${highCount} high severity findings.`;
+    }
+
+    score = Math.min(100, score);
+
+    if (this.wouldBlockMerge(criticalCount) && score < RISK_FLOOR_BLOCK_MERGE) {
+      score = RISK_FLOOR_BLOCK_MERGE;
+      floorApplied = `Floor ${RISK_FLOOR_BLOCK_MERGE} applied: merge-blocking condition met.`;
+    }
+
+    return {
+      raw_score: Math.trunc(rawScore),
+      severity_contribution: severityContribution,
+      category_contribution: categoryContribution,
+      floor_applied: floorApplied,
+      multi_category_boost: multiCategoryBoost,
+      final_score: score,
+    };
   }
 
   deriveRiskLevel(riskScore: number): RiskLevel {
     if (riskScore >= 81) return 'Critical';
     if (riskScore >= 61) return 'High';
     if (riskScore >= 31) return 'Moderate';
-    return 'Low';
+    return 'Low risk';
   }
 
-  /**
-   * Uses the shared decideMerge function — single source of truth for merge rules.
-   * Backend and frontend import the same logic.
-   */
   deriveMergeDecision(
     riskScore: number,
     criticalCount: number,
@@ -91,6 +121,10 @@ export class RiskEngine {
       high_count: highCount,
       risk_score: riskScore,
     });
+  }
+
+  private wouldBlockMerge(criticalCount: number): boolean {
+    return criticalCount > 0;
   }
 
   private clampConfidence(value: number): number {

@@ -72,16 +72,6 @@ describe('RiskEngine', () => {
       expect(over).toBe(normal);
     });
 
-    it('uses default confidence 0.5 when undefined', () => {
-      const explicit = engine.calculateRiskScore([
-        makeFinding({ confidence: 0.5 }),
-      ]);
-      const implicit = engine.calculateRiskScore([
-        makeFinding({ confidence: undefined }),
-      ]);
-      expect(explicit).toBe(implicit);
-    });
-
     it('applies category weights correctly', () => {
       const security = engine.calculateRiskScore([
         makeFinding({ severity: 'high', confidence: 1.0, category: 'security' }),
@@ -93,10 +83,44 @@ describe('RiskEngine', () => {
     });
   });
 
+  describe('calculateRiskBreakdown', () => {
+    it('applies floor 70 when critical finding exists', () => {
+      const breakdown = engine.calculateRiskBreakdown([
+        makeFinding({ severity: 'critical', confidence: 0.3, category: 'security' }),
+      ]);
+      expect(breakdown.final_score).toBeGreaterThanOrEqual(70);
+      expect(breakdown.floor_applied).toBeDefined();
+    });
+
+    it('applies floor 60 when >= 3 high findings', () => {
+      const findings = Array.from({ length: 3 }, (_, i) =>
+        makeFinding({ id: `h-${i}`, severity: 'high', confidence: 0.3, category: 'code-quality' }),
+      );
+      const breakdown = engine.calculateRiskBreakdown(findings);
+      expect(breakdown.final_score).toBeGreaterThanOrEqual(60);
+    });
+
+    it('adds multi-category boost when multiple categories present', () => {
+      const breakdown = engine.calculateRiskBreakdown([
+        makeFinding({ category: 'security', severity: 'high', confidence: 0.8 }),
+        makeFinding({ category: 'performance', severity: 'medium', confidence: 0.7, id: 'p-1', file: 'other.ts' }),
+      ]);
+      expect(breakdown.multi_category_boost).toBeGreaterThan(0);
+    });
+
+    it('provides severity and category contribution breakdown', () => {
+      const breakdown = engine.calculateRiskBreakdown([
+        makeFinding({ severity: 'high', confidence: 0.8, category: 'security' }),
+      ]);
+      expect(breakdown.severity_contribution.high).toBeGreaterThan(0);
+      expect(breakdown.category_contribution['security']).toBeGreaterThan(0);
+    });
+  });
+
   describe('deriveRiskLevel', () => {
     it('maps score ranges correctly', () => {
-      expect(engine.deriveRiskLevel(0)).toBe('Low');
-      expect(engine.deriveRiskLevel(30)).toBe('Low');
+      expect(engine.deriveRiskLevel(0)).toBe('Low risk');
+      expect(engine.deriveRiskLevel(30)).toBe('Low risk');
       expect(engine.deriveRiskLevel(31)).toBe('Moderate');
       expect(engine.deriveRiskLevel(60)).toBe('Moderate');
       expect(engine.deriveRiskLevel(61)).toBe('High');
@@ -109,13 +133,13 @@ describe('RiskEngine', () => {
   describe('deriveMergeDecision', () => {
     it('blocks merge when critical findings exist', () => {
       const decision = engine.deriveMergeDecision(10, 1, 0);
-      expect(decision.recommendation).toBe('Block merge');
+      expect(decision.recommendation).toBe('Merge blocked');
       expect(decision.explanation).toContain('critical');
     });
 
     it('blocks merge with multiple criticals', () => {
       const decision = engine.deriveMergeDecision(90, 3, 2);
-      expect(decision.recommendation).toBe('Block merge');
+      expect(decision.recommendation).toBe('Merge blocked');
       expect(decision.explanation).toContain('3 critical issues');
     });
 
@@ -139,7 +163,7 @@ describe('RiskEngine', () => {
 
     it('critical count takes priority over score', () => {
       const decision = engine.deriveMergeDecision(5, 1, 0);
-      expect(decision.recommendation).toBe('Block merge');
+      expect(decision.recommendation).toBe('Merge blocked');
     });
 
     it('high count takes priority over score when >= 3', () => {
