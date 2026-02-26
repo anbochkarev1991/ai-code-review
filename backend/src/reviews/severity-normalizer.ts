@@ -8,22 +8,36 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   low: 1,
 };
 
-const MAX_HIGH_PER_CATEGORY = 3;
+const SEVERITY_UPGRADE: Record<FindingSeverity, FindingSeverity> = {
+  low: 'medium',
+  medium: 'high',
+  high: 'critical',
+  critical: 'critical',
+};
+
+const MAX_HIGH_PER_REVIEW = 3;
 const LOW_CONFIDENCE_THRESHOLD = 0.75;
-const TOTAL_FINDINGS_OVERFLOW = 6;
+const TOTAL_FINDINGS_OVERFLOW = 5;
 
 export interface SeverityNormalizationStats {
   before: Record<FindingSeverity, number>;
   after: Record<FindingSeverity, number>;
   downgradedCount: number;
+  upgradedCount: number;
   mergedRootCauseCount: number;
 }
 
 /**
- * Post-processing layer that tames LLM severity inflation.
+ * Post-processing layer that tames LLM severity inflation and boosts multi-agent consensus.
  *
- * All rules are deterministic — same input always produces the same output.
- * Applied AFTER deduplication and confidence adjustments but BEFORE final sorting.
+ * Rules (applied in order):
+ * 1. If confidence < 0.75 and severity HIGH → downgrade to MEDIUM
+ * 2. If consensus_level = multi-agent → boost severity by one level (MEDIUM → HIGH)
+ * 3. Cap max HIGH findings per category at 3
+ * 4. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (max 3 HIGH unless multi-agent agreed)
+ * 5. Merge root cause findings (same file + category + overlapping title words)
+ *
+ * All rules are deterministic.
  */
 @Injectable()
 export class SeverityNormalizer {
@@ -31,6 +45,7 @@ export class SeverityNormalizer {
     let result = [...findings];
 
     result = this.downgradeByLowConfidence(result);
+    result = this.boostMultiAgentConsensus(result);
     result = this.capHighPerCategory(result);
     result = this.downgradeOverflowFindings(result);
     result = this.mergeRootCauseFindings(result);
@@ -43,20 +58,32 @@ export class SeverityNormalizer {
     stats: SeverityNormalizationStats;
   } {
     const before = this.countSeverities(findings);
-    const normalized = this.normalize(findings);
-    const after = this.countSeverities(normalized);
+
+    let result = [...findings];
+    result = this.downgradeByLowConfidence(result);
+    const afterDowngrade = this.countSeverities(result);
+    result = this.boostMultiAgentConsensus(result);
+    const afterBoost = this.countSeverities(result);
+    result = this.capHighPerCategory(result);
+    result = this.downgradeOverflowFindings(result);
+    result = this.mergeRootCauseFindings(result);
+
+    const after = this.countSeverities(result);
 
     const downgradedCount =
-      (before.high - after.high) + (before.critical - after.critical);
-    const mergedRootCauseCount = findings.length - normalized.length;
+      Math.max(0, (before.high - afterDowngrade.high) + (before.critical - afterDowngrade.critical))
+      + Math.max(0, (afterBoost.high - after.high));
+    const upgradedCount = Math.max(0, (afterBoost.high - afterDowngrade.high));
+    const mergedRootCauseCount = Math.max(0, findings.length - result.length);
 
     return {
-      findings: normalized,
+      findings: result,
       stats: {
         before,
         after,
-        downgradedCount: Math.max(0, downgradedCount),
-        mergedRootCauseCount: Math.max(0, mergedRootCauseCount),
+        downgradedCount,
+        upgradedCount,
+        mergedRootCauseCount,
       },
     };
   }
@@ -74,8 +101,20 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 2: Max 3 HIGH findings per category.
-   * Keeps the 3 highest-confidence HIGHs per category, downgrades the rest.
+   * Rule 2: If consensus_level = multi-agent, boost severity by one level.
+   * (MEDIUM → HIGH, LOW → MEDIUM, etc.)
+   */
+  private boostMultiAgentConsensus(findings: Finding[]): Finding[] {
+    return findings.map((f) => {
+      if (f.consensus_level === 'multi-agent' && f.severity !== 'critical') {
+        return { ...f, severity: SEVERITY_UPGRADE[f.severity] };
+      }
+      return f;
+    });
+  }
+
+  /**
+   * Rule 3: Max 3 HIGH findings per category.
    */
   private capHighPerCategory(findings: Finding[]): Finding[] {
     const highByCategory = new Map<string, number>();
@@ -90,7 +129,7 @@ export class SeverityNormalizer {
     for (const item of highFindings) {
       const cat = item.finding.category || 'unknown';
       const count = highByCategory.get(cat) ?? 0;
-      if (count >= MAX_HIGH_PER_CATEGORY) {
+      if (count >= MAX_HIGH_PER_REVIEW) {
         downgradedIndices.add(item.index);
       } else {
         highByCategory.set(cat, count + 1);
@@ -106,29 +145,35 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 3: If total findings > 6, downgrade lowest-confidence HIGH findings to MEDIUM.
-   *
-   * Strategy: sort HIGH findings by confidence ascending, downgrade from bottom
-   * until HIGH count ≤ half of total (but at least cap at 3).
+   * Rule 4: If total findings > 5, enforce max 3 HIGH unless multi-agent agreed.
+   * Multi-agent consensus findings are exempt from overflow downgrade.
    */
   private downgradeOverflowFindings(findings: Finding[]): Finding[] {
     if (findings.length <= TOTAL_FINDINGS_OVERFLOW) return findings;
 
-    const maxHighAllowed = Math.min(
-      3,
-      Math.ceil(findings.length / 2),
+    const multiAgentHighCount = findings.filter(
+      (f) => f.severity === 'high' && f.consensus_level === 'multi-agent',
+    ).length;
+
+    const maxHighAllowed = Math.max(
+      MAX_HIGH_PER_REVIEW,
+      multiAgentHighCount,
     );
 
     const highIndices = findings
-      .map((f, i) => ({ confidence: f.confidence, index: i }))
-      .filter((_, i) => findings[i].severity === 'high')
-      .sort((a, b) => a.confidence - b.confidence);
+      .map((f, i) => ({ confidence: f.confidence, index: i, isMultiAgent: f.consensus_level === 'multi-agent' }))
+      .filter((item, i) => findings[i].severity === 'high')
+      .sort((a, b) => {
+        if (a.isMultiAgent !== b.isMultiAgent) return a.isMultiAgent ? 1 : -1;
+        return a.confidence - b.confidence;
+      });
 
     const excessCount = highIndices.length - maxHighAllowed;
     if (excessCount <= 0) return findings;
 
+    const singleAgentHighs = highIndices.filter((h) => !h.isMultiAgent);
     const toDowngrade = new Set(
-      highIndices.slice(0, excessCount).map((h) => h.index),
+      singleAgentHighs.slice(0, excessCount).map((h) => h.index),
     );
 
     return findings.map((f, i) => {
@@ -140,10 +185,7 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 4: If same root cause produces multiple HIGH issues, merge them.
-   *
-   * Root cause grouping: same file + same category + overlapping title words.
-   * Keeps the finding with highest severity (then confidence), discards duplicates.
+   * Rule 5: Merge root cause findings (same file + category + overlapping title).
    */
   private mergeRootCauseFindings(findings: Finding[]): Finding[] {
     const groups: Finding[][] = [];
@@ -232,6 +274,8 @@ export class SeverityNormalizer {
       .sort((a, b) => (b?.length ?? 0) - (a?.length ?? 0))[0];
 
     const agentList = [...agents];
+    const consensus: Finding['consensus_level'] =
+      agentList.length > 1 ? 'multi-agent' : primary.consensus_level;
 
     return {
       ...primary,
@@ -240,6 +284,7 @@ export class SeverityNormalizer {
       suggested_fix: bestFix ?? primary.suggested_fix,
       agent_name: agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
       merged_agents: agentList.length > 1 ? agentList : primary.merged_agents,
+      consensus_level: consensus,
     };
   }
 

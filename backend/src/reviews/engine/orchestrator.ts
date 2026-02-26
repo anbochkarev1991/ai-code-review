@@ -7,6 +7,7 @@ import type {
   PerformanceSummary,
   PRMetadata,
   ReviewEngineOptions,
+  ReviewMetadata,
   ReviewResult,
   ReviewSignature,
   ReviewStatus,
@@ -45,7 +46,7 @@ export interface EngineRunResult {
  * - Per-agent timeout with configurable override
  * - Single retry on transient failure per agent
  * - Deterministic review hash for reproducibility
- * - Performance summary for transparency
+ * - ReviewMetadata for trust/integrity signals
  */
 @Injectable()
 export class ReviewOrchestrator {
@@ -95,6 +96,8 @@ export class ReviewOrchestrator {
       };
     }
 
+    const status: ReviewStatus = validOutputs.length === agents.length ? 'complete' : 'partial';
+
     if (validOutputs.length < agents.length) {
       const failedNames = agentResults
         .filter((r) => r.status !== 'ok')
@@ -115,7 +118,8 @@ export class ReviewOrchestrator {
     const totalDurationMs = pipelineEnd - pipelineStart;
 
     const performance = this.buildPerformanceSummary(agentResults, totalDurationMs);
-    const signature = this.computeSignature(diff);
+    const signature = this.computeSignature(diff, status);
+    const reviewMetadata = this.buildReviewMetadata(diff, status);
 
     const result = this.resultFormatter.format({
       findings: aggregated.findings,
@@ -126,8 +130,7 @@ export class ReviewOrchestrator {
 
     result.signature = signature;
     result.performance = performance;
-
-    const status: ReviewStatus = validOutputs.length === agents.length ? 'complete' : 'partial';
+    result.review_metadata = reviewMetadata;
 
     return { status, result, trace };
   }
@@ -267,7 +270,7 @@ export class ReviewOrchestrator {
     };
   }
 
-  computeSignature(diff: string): ReviewSignature {
+  computeSignature(diff: string, status: ReviewStatus = 'complete'): ReviewSignature {
     const hashInput = JSON.stringify({
       diff,
       agent_versions: AGENT_VERSIONS,
@@ -282,6 +285,26 @@ export class ReviewOrchestrator {
       review_hash: reviewHash,
       engine_version: ENGINE_VERSION,
       agent_versions: { ...AGENT_VERSIONS },
+      review_status: status,
+    };
+  }
+
+  private buildReviewMetadata(diff: string, status: ReviewStatus): ReviewMetadata {
+    const hashInput = JSON.stringify({
+      diff,
+      agent_versions: AGENT_VERSIONS,
+      engine_version: ENGINE_VERSION,
+    });
+
+    const reviewHash = createHash('sha256')
+      .update(hashInput)
+      .digest('hex');
+
+    return {
+      review_hash: reviewHash,
+      engine_version: ENGINE_VERSION,
+      agent_versions: { ...AGENT_VERSIONS },
+      review_status: status,
     };
   }
 

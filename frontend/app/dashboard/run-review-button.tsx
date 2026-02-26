@@ -141,6 +141,7 @@ export function RunReviewButton({
                 performance={result.performance}
                 signature={result.signature}
                 reviewStatus={reviewStatus ?? undefined}
+                reviewMetadata={result.review_metadata}
               />
               <ReviewFindingsList findings={result.findings} />
             </>

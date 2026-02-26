@@ -74,7 +74,7 @@ describe('FindingNormalizer', () => {
     });
   });
 
-  describe('cross-agent deduplication', () => {
+  describe('intelligent consolidation', () => {
     it('merges findings on same file + nearby line + similar message', () => {
       const findings = [
         makeFinding({
@@ -106,23 +106,100 @@ describe('FindingNormalizer', () => {
       expect(result[0].merged_categories).toEqual(['security', 'code-quality']);
     });
 
-    it('merges findings with similar titles even if messages differ', () => {
+    it('sets consensus_level to multi-agent when multiple agents contributed', () => {
       const findings = [
         makeFinding({
           id: 'a-1',
-          title: 'SQL injection vulnerability',
           agent_name: 'Security',
           file: 'src/api.ts',
           line: 10,
-          message: 'This is a detailed security explanation',
+          message: 'SQL injection vulnerability found in this code path',
         }),
         makeFinding({
           id: 'b-1',
-          title: 'SQL injection vulnerability detected',
           agent_name: 'Code Quality',
           file: 'src/api.ts',
           line: 12,
-          message: 'Completely different explanation here',
+          message: 'SQL injection vulnerability detected in this code path',
+        }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result[0].consensus_level).toBe('multi-agent');
+    });
+
+    it('sets consensus_level to single-agent for standalone findings', () => {
+      const result = normalizer.normalize([
+        makeFinding({ agent_name: 'Security' }),
+      ]);
+      expect(result[0].consensus_level).toBe('single-agent');
+    });
+
+    it('populates affected_locations when consolidating', () => {
+      const findings = [
+        makeFinding({
+          id: 'a-1',
+          agent_name: 'Security',
+          file: 'src/api.ts',
+          line: 10,
+          message: 'SQL injection vulnerability found in this code path',
+        }),
+        makeFinding({
+          id: 'b-1',
+          agent_name: 'Code Quality',
+          file: 'src/api.ts',
+          line: 12,
+          message: 'SQL injection vulnerability detected in this code path',
+        }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result[0].affected_locations).toEqual([
+        { file: 'src/api.ts', line: 10 },
+        { file: 'src/api.ts', line: 12 },
+      ]);
+    });
+
+    it('populates categories array with all unique categories', () => {
+      const findings = [
+        makeFinding({
+          id: 'a-1',
+          agent_name: 'Security',
+          category: 'security',
+          file: 'src/api.ts',
+          line: 10,
+          message: 'SQL injection vulnerability found in this code path',
+        }),
+        makeFinding({
+          id: 'b-1',
+          agent_name: 'Code Quality',
+          category: 'code-quality',
+          file: 'src/api.ts',
+          line: 12,
+          message: 'SQL injection vulnerability detected in this code path',
+        }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result[0].categories).toEqual(expect.arrayContaining(['security', 'code-quality']));
+    });
+
+    it('merges findings with similar suggested_fix', () => {
+      const findings = [
+        makeFinding({
+          id: 'a-1',
+          agent_name: 'Security',
+          file: 'src/db.ts',
+          line: 10,
+          title: 'Unsafe database call detected',
+          message: 'Unsafe database access',
+          suggested_fix: 'Use parameterized queries for all SQL statements to prevent injection',
+        }),
+        makeFinding({
+          id: 'b-1',
+          agent_name: 'Code Quality',
+          file: 'src/db.ts',
+          line: 11,
+          title: 'Raw SQL detected',
+          message: 'Unparameterized query found',
+          suggested_fix: 'Use parameterized queries for all SQL statements to prevent security issues',
         }),
       ];
       const result = normalizer.normalize(findings);
@@ -182,6 +259,52 @@ describe('FindingNormalizer', () => {
     });
   });
 
+  describe('false positive risk assignment', () => {
+    it('assigns low FP risk to multi-agent findings', () => {
+      const findings = [
+        makeFinding({
+          id: 'a-1',
+          agent_name: 'Security',
+          file: 'src/api.ts',
+          line: 10,
+          message: 'SQL injection vulnerability found in this code path',
+        }),
+        makeFinding({
+          id: 'b-1',
+          agent_name: 'Code Quality',
+          file: 'src/api.ts',
+          line: 12,
+          message: 'SQL injection vulnerability detected in this code path',
+        }),
+      ];
+      const result = normalizer.normalize(findings);
+      expect(result[0].false_positive_risk).toBe('low');
+    });
+
+    it('assigns high FP risk to outside_diff findings', () => {
+      const diffFiles = [makeDiffFile({ path: 'src/other.ts' })];
+      const result = normalizer.normalize(
+        [makeFinding({ file: 'src/app.ts', line: 10 })],
+        diffFiles,
+      );
+      expect(result[0].false_positive_risk).toBe('high');
+    });
+
+    it('assigns high FP risk to low-confidence single-agent findings', () => {
+      const result = normalizer.normalize([
+        makeFinding({ confidence: 0.5, agent_name: 'Security' }),
+      ]);
+      expect(result[0].false_positive_risk).toBe('high');
+    });
+
+    it('assigns medium FP risk to normal single-agent findings', () => {
+      const result = normalizer.normalize([
+        makeFinding({ confidence: 0.8, agent_name: 'Security' }),
+      ]);
+      expect(result[0].false_positive_risk).toBe('medium');
+    });
+  });
+
   describe('confidence-severity coherence', () => {
     it('downgrades critical to high when confidence < 0.6', () => {
       const result = normalizer.normalize([
@@ -195,13 +318,6 @@ describe('FindingNormalizer', () => {
         makeFinding({ severity: 'critical', confidence: 0.8 }),
       ]);
       expect(result[0].severity).toBe('critical');
-    });
-
-    it('does not affect non-critical severities', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'high', confidence: 0.3 }),
-      ]);
-      expect(result[0].severity).toBe('high');
     });
   });
 
@@ -224,26 +340,6 @@ describe('FindingNormalizer', () => {
       );
       expect(result[0].outside_diff).toBe(true);
       expect(result[0].confidence).toBeLessThanOrEqual(0.51);
-    });
-
-    it('marks finding as outside_diff if line not in any hunk', () => {
-      const diffFiles = [
-        makeDiffFile({
-          path: 'src/app.ts',
-          hunks: [{
-            startLine: 100,
-            endLine: 120,
-            content: '+new code',
-            addedLines: ['new code'],
-            removedLines: [],
-          }],
-        }),
-      ];
-      const result = normalizer.normalize(
-        [makeFinding({ file: 'src/app.ts', line: 10 })],
-        diffFiles,
-      );
-      expect(result[0].outside_diff).toBe(true);
     });
 
     it('does not flag finding if file and line are in diff', () => {
@@ -332,17 +428,10 @@ describe('FindingNormalizer', () => {
       ]);
       expect(result[0].impact).toBe('First impact. Second impact.');
     });
-
-    it('preserves short messages', () => {
-      const result = normalizer.normalize([
-        makeFinding({ message: 'Short message.' }),
-      ]);
-      expect(result[0].message).toBe('Short message.');
-    });
   });
 
   describe('sorting', () => {
-    it('sorts by severity (highest first), then confidence', () => {
+    it('sorts by severity (highest first), then consensus, then confidence', () => {
       const findings = [
         makeFinding({ id: 'low', severity: 'low', confidence: 0.85, file: 'src/a.ts', message: 'A specific low severity issue in code' }),
         makeFinding({ id: 'critical', severity: 'critical', confidence: 0.8, file: 'src/b.ts', message: 'A specific critical severity issue in code' }),

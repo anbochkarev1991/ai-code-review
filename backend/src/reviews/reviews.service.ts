@@ -163,14 +163,14 @@ export class ReviewsService {
       };
     }
 
-    const normalizedResult: ReviewResult = engineResult.result
+    const normalizedResult: ReviewResult | undefined = engineResult.result
       ? {
           ...engineResult.result,
           findings: this.severityNormalizer.normalize(
             engineResult.result.findings,
           ),
         }
-      : engineResult.result;
+      : undefined;
 
     const id = await this.reviewRunsRepository.create(
       {

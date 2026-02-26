@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { Finding, FindingSeverity, ParsedFile, DiffContext } from 'shared';
+import type {
+  Finding,
+  FindingSeverity,
+  ParsedFile,
+  DiffContext,
+  AffectedLocation,
+  ConsensusLevel,
+  FalsePositiveRisk,
+} from 'shared';
 
 const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   critical: 4,
@@ -53,11 +61,13 @@ export class FindingNormalizer {
       ? result.map((f) => this.enforceDiffBoundary(f, diffFiles))
       : result;
 
-    result = this.deduplicateFindings(result);
+    result = this.consolidateFindings(result);
 
     result = result.map((f) => this.applyConfidenceSeverityCoherence(f));
     result = result.map((f) => this.applyUncertaintyDowngrade(f));
     result = result.map((f) => this.enforceQuality(f));
+
+    result = result.map((f) => this.assignFalsePositiveRisk(f));
 
     result = result.map((f) => this.finalConfidenceClamp(f));
 
@@ -87,7 +97,6 @@ export class FindingNormalizer {
     return finding;
   }
 
-  /** Per-agent confidence cap at 0.85 before any boosting */
   private capBaseConfidence(finding: Finding): Finding {
     if (finding.confidence > BASE_CONFIDENCE_CAP) {
       return { ...finding, confidence: BASE_CONFIDENCE_CAP };
@@ -95,7 +104,6 @@ export class FindingNormalizer {
     return finding;
   }
 
-  /** Final clamp to [0.3, 0.95] */
   private finalConfidenceClamp(finding: Finding): Finding {
     const clamped = Math.max(CONFIDENCE_MIN, Math.min(CONFIDENCE_MAX, finding.confidence));
     if (clamped !== finding.confidence) {
@@ -105,18 +113,21 @@ export class FindingNormalizer {
   }
 
   /**
-   * Deduplication with three matching signals:
-   * 1. Same file
-   * 2. Line delta <= 3
-   * 3. Title similarity OR message similarity above threshold
+   * Smart consolidation: merges findings that reference the same file,
+   * share similar explanation/fix, and are within 3 lines of each other.
+   *
+   * Produces consolidated findings with:
+   * - affected_locations: all unique file+line pairs
+   * - categories: all unique categories
+   * - consensus_level: multi-agent if >1 distinct agent contributed
    */
-  private deduplicateFindings(findings: Finding[]): Finding[] {
+  private consolidateFindings(findings: Finding[]): Finding[] {
     const groups: Finding[][] = [];
 
     for (const finding of findings) {
       let merged = false;
       for (const group of groups) {
-        if (this.isDuplicate(group[0], finding)) {
+        if (this.shouldConsolidate(group[0], finding)) {
           group.push(finding);
           merged = true;
           break;
@@ -130,7 +141,13 @@ export class FindingNormalizer {
     return groups.map((group) => this.mergeGroup(group));
   }
 
-  private isDuplicate(a: Finding, b: Finding): boolean {
+  /**
+   * Two findings should consolidate when they share:
+   * 1. Same file
+   * 2. Lines within proximity threshold
+   * 3. Similar title OR similar message OR similar suggested_fix
+   */
+  private shouldConsolidate(a: Finding, b: Finding): boolean {
     if (!a.file || !b.file || a.file !== b.file) return false;
 
     if (
@@ -141,14 +158,34 @@ export class FindingNormalizer {
       return false;
     }
 
-    const titleSim = this.textSimilarity(a.title, b.title);
-    if (titleSim > TITLE_SIMILARITY_THRESHOLD) return true;
+    if (this.textSimilarity(a.title, b.title) > TITLE_SIMILARITY_THRESHOLD) return true;
+    if (this.textSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD) return true;
 
-    return this.textSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD;
+    if (a.suggested_fix && b.suggested_fix) {
+      if (this.textSimilarity(a.suggested_fix, b.suggested_fix) > JACCARD_SIMILARITY_THRESHOLD) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private mergeGroup(group: Finding[]): Finding {
-    if (group.length === 1) return group[0];
+    if (group.length === 1) {
+      const single = group[0];
+      const agents = this.extractAgents(single);
+      const consensus: ConsensusLevel = agents.size > 1 ? 'multi-agent' : 'single-agent';
+      const categories = new Set<string>();
+      if (single.category) categories.add(single.category);
+      const locations = this.extractLocations(group);
+
+      return {
+        ...single,
+        consensus_level: consensus,
+        categories: categories.size > 0 ? [...categories] : undefined,
+        affected_locations: locations.length > 0 ? locations : undefined,
+      };
+    }
 
     group.sort(
       (a, b) =>
@@ -187,6 +224,8 @@ export class FindingNormalizer {
 
     const agentList = [...agents];
     const categoryList = [...categories];
+    const consensus: ConsensusLevel = agents.size > 1 ? 'multi-agent' : 'single-agent';
+    const locations = this.extractLocations(group);
 
     const bestImpact = group
       .map(f => f.impact)
@@ -206,7 +245,56 @@ export class FindingNormalizer {
       agent_name: agentList.join(', '),
       merged_agents: agentList.length > 1 ? agentList : undefined,
       merged_categories: categoryList.length > 1 ? categoryList : undefined,
+      categories: categoryList.length > 0 ? categoryList : undefined,
+      consensus_level: consensus,
+      affected_locations: locations.length > 0 ? locations : undefined,
     };
+  }
+
+  private extractAgents(finding: Finding): Set<string> {
+    const agents = new Set<string>();
+    if (finding.agent_name) {
+      for (const name of finding.agent_name.split(', ')) {
+        agents.add(name.trim());
+      }
+    }
+    if (finding.merged_agents) {
+      for (const name of finding.merged_agents) {
+        agents.add(name.trim());
+      }
+    }
+    return agents;
+  }
+
+  private extractLocations(group: Finding[]): AffectedLocation[] {
+    const seen = new Set<string>();
+    const locations: AffectedLocation[] = [];
+    for (const f of group) {
+      if (f.file) {
+        const key = `${f.file}:${f.line ?? '?'}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          locations.push({ file: f.file, line: f.line });
+        }
+      }
+    }
+    return locations;
+  }
+
+  private assignFalsePositiveRisk(finding: Finding): Finding {
+    let risk: FalsePositiveRisk;
+
+    if (finding.consensus_level === 'multi-agent') {
+      risk = 'low';
+    } else if (finding.outside_diff) {
+      risk = 'high';
+    } else if (finding.consensus_level === 'single-agent' && finding.confidence < 0.7) {
+      risk = 'high';
+    } else {
+      risk = 'medium';
+    }
+
+    return { ...finding, false_positive_risk: risk };
   }
 
   private textSimilarity(textA: string, textB: string): number {
@@ -300,7 +388,6 @@ export class FindingNormalizer {
     return { ...finding, ...updates };
   }
 
-  /** Attach surrounding diff context to a finding for inline code preview */
   private attachDiffContext(finding: Finding, diffFiles: ParsedFile[]): Finding {
     if (!finding.file || finding.line === undefined) return finding;
 
@@ -343,6 +430,12 @@ export class FindingNormalizer {
       const sevDiff =
         (SEVERITY_ORDER[b.severity] ?? 0) - (SEVERITY_ORDER[a.severity] ?? 0);
       if (sevDiff !== 0) return sevDiff;
+
+      const consensusDiff =
+        (a.consensus_level === 'multi-agent' ? 0 : 1) -
+        (b.consensus_level === 'multi-agent' ? 0 : 1);
+      if (consensusDiff !== 0) return consensusDiff;
+
       return b.confidence - a.confidence;
     });
   }

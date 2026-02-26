@@ -197,6 +197,7 @@ export default async function ReviewDetailPage({
                   performance={review.result_snapshot.performance}
                   signature={review.result_snapshot.signature}
                   reviewStatus={review.status}
+                  reviewMetadata={review.result_snapshot.review_metadata}
                 />
                 <ReviewFindingsList
                   findings={review.result_snapshot.findings}

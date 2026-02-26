@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { Finding, DiffContext } from "@/lib/types";
 
+const DEFAULT_VISIBLE_FINDINGS = 5;
+
 function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffContext; file?: string; line?: number }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -51,6 +53,48 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
               ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AffectedLocationsExpander({ locations }: { locations: { file: string; line?: number }[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (locations.length <= 1) return null;
+
+  return (
+    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <svg
+          className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+        <span>{locations.length} affected locations</span>
+      </button>
+      {expanded && (
+        <div className="px-3 py-2 flex flex-col gap-1">
+          {locations.map((loc, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+              <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="break-all">{loc.file}{loc.line !== undefined ? `:${loc.line}` : ""}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -112,31 +156,52 @@ function getConfidenceColor(confidence: number): string {
   return "bg-orange-500";
 }
 
+function getFPRiskStyle(risk: string): { bg: string; text: string } {
+  switch (risk) {
+    case "low":
+      return { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400" };
+    case "medium":
+      return { bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-400" };
+    case "high":
+      return { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400" };
+    default:
+      return { bg: "bg-zinc-100 dark:bg-zinc-800", text: "text-zinc-600 dark:text-zinc-400" };
+  }
+}
+
+function MultiAgentBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+      <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      Multi-agent confirmed
+    </span>
+  );
+}
+
 function FindingCard({ finding }: { finding: Finding }) {
   const [showReasoning, setShowReasoning] = useState(false);
   const severityStyles = getSeverityStyles(finding.severity);
   const hasAIMetadata =
     finding.agent_name || finding.confidence !== undefined || finding.reasoning_trace;
+  const isMultiAgent = finding.consensus_level === "multi-agent";
 
-  // Placeholder handlers for actions
   const handleMarkResolved = () => {
     console.log("Mark as resolved:", finding.id);
-    // TODO: Implement backend integration
   };
 
   const handleIgnore = () => {
     console.log("Ignore:", finding.id);
-    // TODO: Implement backend integration
   };
 
   const handleCreateTicket = () => {
     console.log("Create ticket:", finding.id);
-    // TODO: Implement backend integration
   };
 
   return (
     <div
-      className={`rounded-lg border border-zinc-200 dark:border-zinc-800 ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow`}
+      className={`rounded-lg border ${isMultiAgent ? "border-emerald-300 dark:border-emerald-800" : "border-zinc-200 dark:border-zinc-800"} ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow`}
     >
       <div className="p-4">
         <div className="flex flex-col gap-3">
@@ -148,11 +213,14 @@ function FindingCard({ finding }: { finding: Finding }) {
                 <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
                   {finding.title}
                 </h4>
-                {finding.category && (
-                  <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    {finding.category}
-                  </div>
-                )}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {finding.category && (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {finding.category}
+                    </span>
+                  )}
+                  {isMultiAgent && <MultiAgentBadge />}
+                </div>
               </div>
             </div>
             <span
@@ -162,8 +230,10 @@ function FindingCard({ finding }: { finding: Finding }) {
             </span>
           </div>
 
-          {/* Location */}
-          {(finding.file || finding.line !== undefined) && (
+          {/* Affected locations */}
+          {finding.affected_locations && finding.affected_locations.length > 1 ? (
+            <AffectedLocationsExpander locations={finding.affected_locations} />
+          ) : (finding.file || finding.line !== undefined) && (
             <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
               <svg
                 className="h-3.5 w-3.5 shrink-0"
@@ -338,8 +408,8 @@ function FindingCard({ finding }: { finding: Finding }) {
             </div>
           )}
 
-          {/* AI Metadata */}
-          {hasAIMetadata && (
+          {/* False Positive Risk + AI Metadata */}
+          {(hasAIMetadata || finding.false_positive_risk) && (
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
@@ -376,6 +446,14 @@ function FindingCard({ finding }: { finding: Finding }) {
                           {(finding.confidence * 100).toFixed(0)}%
                         </span>
                       </div>
+                    </div>
+                  )}
+                  {finding.false_positive_risk && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-zinc-500 dark:text-zinc-400">FP risk:</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${getFPRiskStyle(finding.false_positive_risk).bg} ${getFPRiskStyle(finding.false_positive_risk).text}`}>
+                        {finding.false_positive_risk}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -418,7 +496,17 @@ function FindingCard({ finding }: { finding: Finding }) {
   );
 }
 
+function classifyFinding(finding: Finding): "systemic" | "code-level" {
+  const systemicCategories = ["architecture"];
+  if (systemicCategories.includes(finding.category)) return "systemic";
+  if (finding.categories && finding.categories.length > 1) return "systemic";
+  if (finding.affected_locations && finding.affected_locations.length > 2) return "systemic";
+  return "code-level";
+}
+
 export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
+  const [showAll, setShowAll] = useState(false);
+
   if (findings.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
@@ -426,6 +514,14 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
       </div>
     );
   }
+
+  const systemic = findings.filter((f) => classifyFinding(f) === "systemic");
+  const codeLevelAll = findings.filter((f) => classifyFinding(f) === "code-level");
+
+  const visibleCodeLevel = showAll
+    ? codeLevelAll
+    : codeLevelAll.slice(0, DEFAULT_VISIBLE_FINDINGS);
+  const hiddenCount = codeLevelAll.length - visibleCodeLevel.length;
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -437,11 +533,55 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
           {findings.length} {findings.length === 1 ? "finding" : "findings"}
         </span>
       </div>
+
+      {/* Systemic issues group */}
+      {systemic.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Systemic Issues
+          </h4>
+          {systemic.map((finding) => (
+            <FindingCard key={finding.id} finding={finding} />
+          ))}
+        </div>
+      )}
+
+      {/* Code-level issues group */}
       <div className="flex flex-col gap-3">
-        {findings.map((finding) => (
+        {systemic.length > 0 && codeLevelAll.length > 0 && (
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Code-Level Issues
+          </h4>
+        )}
+        {visibleCodeLevel.map((finding) => (
           <FindingCard key={finding.id} finding={finding} />
         ))}
       </div>
+
+      {/* "+ X more" expandable */}
+      {hiddenCount > 0 && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="mx-auto flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          + {hiddenCount} more finding{hiddenCount === 1 ? "" : "s"}
+        </button>
+      )}
+
+      {showAll && codeLevelAll.length > DEFAULT_VISIBLE_FINDINGS && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="mx-auto flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
+        >
+          <svg className="h-4 w-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          Show fewer
+        </button>
+      )}
     </div>
   );
 }

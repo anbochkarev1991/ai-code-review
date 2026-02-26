@@ -16,15 +16,26 @@ export type AgentStatus = 'ok' | 'timeout' | 'error';
 
 export type MergeExplanation = string;
 
+// ── Consolidated finding types (production hardening) ──
+
+export type ConsensusLevel = 'single-agent' | 'multi-agent';
+
+export type FalsePositiveRisk = 'low' | 'medium' | 'high';
+
+export interface AffectedLocation {
+  file: string;
+  line?: number;
+}
+
 // ── Engine & version constants ──
 
-export const ENGINE_VERSION = '2.0.0';
+export const ENGINE_VERSION = '3.0.0';
 
 export const AGENT_VERSIONS: Record<string, string> = {
-  'code-quality': '2.0.0',
-  'architecture': '2.0.0',
-  'performance': '2.0.0',
-  'security': '2.0.0',
+  'code-quality': '3.0.0',
+  'architecture': '3.0.0',
+  'performance': '3.0.0',
+  'security': '3.0.0',
 };
 
 // ── Zod schema for agent output ──
@@ -70,8 +81,10 @@ export interface Finding {
   title: string;
   severity: FindingSeverity;
   category: string;
+  categories?: string[];
   file?: string;
   line?: number;
+  affected_locations?: AffectedLocation[];
   message: string;
   /** @deprecated Use suggested_fix instead */
   suggestion?: string;
@@ -82,6 +95,8 @@ export interface Finding {
   impact?: string;
   merged_agents?: string[];
   merged_categories?: string[];
+  consensus_level?: ConsensusLevel;
+  false_positive_risk?: FalsePositiveRisk;
   outside_diff?: boolean;
   diff_context?: DiffContext;
 }
@@ -89,11 +104,11 @@ export interface Finding {
 // ── Risk breakdown (PART 1) ──
 
 export interface RiskBreakdown {
-  raw_score: number;
+  raw_weighted_sum: number;
   severity_contribution: Record<FindingSeverity, number>;
   category_contribution: Record<string, number>;
   floor_applied?: string;
-  multi_category_boost: number;
+  diminishing_return_score: number;
   final_score: number;
 }
 
@@ -114,9 +129,11 @@ export interface AgentResult {
 // ── Review signature (PART 5) ──
 
 export interface ReviewSignature {
+  review_id?: string;
   review_hash: string;
   engine_version: string;
   agent_versions: Record<string, string>;
+  review_status: ReviewStatus;
 }
 
 // ── Performance summary (PART 9) ──
@@ -188,10 +205,20 @@ export interface ReviewSummary {
   merge_explanation: MergeExplanation;
   primary_risk_category?: string;
   most_severe_issue?: string;
+  systemic_patterns?: string[];
+  multi_agent_confirmed_count?: number;
   text: string;
 }
 
 // ── Review result ──
+
+export interface ReviewMetadata {
+  review_id?: string;
+  review_hash: string;
+  engine_version: string;
+  agent_versions: Record<string, string>;
+  review_status: ReviewStatus;
+}
 
 export interface ReviewResult {
   findings: Finding[];
@@ -201,6 +228,7 @@ export interface ReviewResult {
   execution_metadata?: ExecutionMetadata;
   pr_metadata?: PRMetadata;
   signature?: ReviewSignature;
+  review_metadata?: ReviewMetadata;
   performance?: PerformanceSummary;
 }
 

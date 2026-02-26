@@ -10,6 +10,7 @@ import type {
   PerformanceSummary as PerformanceSummaryType,
   ReviewSignature,
   ReviewStatus,
+  ReviewMetadata,
 } from "@/lib/types";
 
 interface ReviewSummaryProps {
@@ -21,6 +22,7 @@ interface ReviewSummaryProps {
   performance?: PerformanceSummaryType;
   signature?: ReviewSignature;
   reviewStatus?: ReviewStatus;
+  reviewMetadata?: ReviewMetadata;
 }
 
 function formatDuration(ms: number): string {
@@ -38,7 +40,7 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
-function FindingsStats({ findings }: { findings: Finding[] }) {
+function FindingsStats({ findings, multiAgentCount }: { findings: Finding[]; multiAgentCount?: number }) {
   const counts = {
     critical: findings.filter((f) => f.severity === "critical").length,
     high: findings.filter((f) => f.severity === "high").length,
@@ -88,6 +90,15 @@ function FindingsStats({ findings }: { findings: Finding[] }) {
             {counts.low}
           </span>
           <span className="text-xs text-zinc-600 dark:text-zinc-400">Low</span>
+        </div>
+      )}
+      {multiAgentCount !== undefined && multiAgentCount > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {multiAgentCount}
+          </span>
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent confirmed</span>
         </div>
       )}
     </div>
@@ -180,7 +191,7 @@ function PRMetadataBar({ prMetadata }: { prMetadata: PRMetadata }) {
           <span className="font-mono">
             <span className="text-green-600 dark:text-green-400">+{prMetadata.total_additions}</span>
             {" "}
-            <span className="text-red-600 dark:text-red-400">−{prMetadata.total_deletions}</span>
+            <span className="text-red-600 dark:text-red-400">-{prMetadata.total_deletions}</span>
             {" "}lines
           </span>
           <span>·</span>
@@ -255,8 +266,42 @@ function PartialReviewBanner() {
           Partial review:
         </span>{" "}
         <span className="text-xs text-amber-700 dark:text-amber-400">
-          Some analysis agents failed. Review may be incomplete.
+          Some analysis agents failed. Review may be incomplete — findings should be interpreted with caution.
         </span>
+      </div>
+    </div>
+  );
+}
+
+function SystemicPatternsBanner({ patterns }: { patterns: string[] }) {
+  if (patterns.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex items-start gap-2 rounded-md border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 px-3 py-2">
+      <svg
+        className="h-4 w-4 shrink-0 mt-0.5 text-violet-600 dark:text-violet-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+        />
+      </svg>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-semibold text-violet-800 dark:text-violet-300">
+          Systemic patterns detected:
+        </span>
+        <ul className="mt-1 list-disc list-inside">
+          {patterns.map((pattern, i) => (
+            <li key={i} className="text-xs text-violet-700 dark:text-violet-400">
+              {pattern}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -318,12 +363,13 @@ export function ReviewSummary({
   performance,
   signature,
   reviewStatus,
+  reviewMetadata,
 }: ReviewSummaryProps) {
   const displayText = reviewSummary?.text ?? summary;
   const hasSummary = displayText && displayText.trim() !== "";
   const mergeRec = reviewSummary?.merge_recommendation;
   const mergeStyle = mergeRec ? getMergeRecommendationStyle(mergeRec) : null;
-  const isPartial = reviewStatus === "partial";
+  const isPartial = reviewStatus === "partial" || reviewMetadata?.review_status === "partial";
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -357,7 +403,10 @@ export function ReviewSummary({
                 </div>
               )}
             </div>
-            <FindingsStats findings={findings} />
+            <FindingsStats
+              findings={findings}
+              multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
+            />
 
             {mergeRec && mergeStyle && (
               <div className={`mt-3 flex flex-col gap-1 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
@@ -392,6 +441,10 @@ export function ReviewSummary({
               </div>
             )}
 
+            {reviewSummary?.systemic_patterns && reviewSummary.systemic_patterns.length > 0 && (
+              <SystemicPatternsBanner patterns={reviewSummary.systemic_patterns} />
+            )}
+
             {executionMetadata?.agents_status && (
               <DegradedAnalysisBanner agentsStatus={executionMetadata.agents_status} />
             )}
@@ -406,14 +459,26 @@ export function ReviewSummary({
           {executionMetadata && (
             <ExecutionBar executionMetadata={executionMetadata} performance={performance} />
           )}
-          {signature && (
+          {(signature || reviewMetadata) && (
             <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
-                <span>Engine v{signature.engine_version}</span>
+                <span>Engine v{signature?.engine_version ?? reviewMetadata?.engine_version}</span>
                 <span>·</span>
-                <span title={signature.review_hash}>
-                  Hash: {signature.review_hash.slice(0, 12)}…
+                <span title={signature?.review_hash ?? reviewMetadata?.review_hash}>
+                  Hash: {(signature?.review_hash ?? reviewMetadata?.review_hash ?? "").slice(0, 12)}...
                 </span>
+                {(signature?.review_status ?? reviewMetadata?.review_status) && (
+                  <>
+                    <span>·</span>
+                    <span className={
+                      (signature?.review_status ?? reviewMetadata?.review_status) === "partial"
+                        ? "text-amber-500"
+                        : "text-zinc-400 dark:text-zinc-500"
+                    }>
+                      Status: {signature?.review_status ?? reviewMetadata?.review_status}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
