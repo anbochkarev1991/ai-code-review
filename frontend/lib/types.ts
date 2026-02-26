@@ -8,6 +8,7 @@ export type {
   PullsResponse,
   DiffResponse,
   ReviewResult,
+  ReviewSummary,
   ReviewRun,
   TraceStep,
   Finding,

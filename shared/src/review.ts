@@ -14,7 +14,7 @@ export const agentOutputSchema = z.object({
       line: z.number().optional(),
       message: z.string(),
       suggestion: z.string().optional(),
-      // AI transparency metadata (optional for backward compatibility)
+      suggested_fix: z.string().optional(),
       agent_name: z.string().optional(),
       confidence: z.number().min(0).max(1).optional(),
       reasoning_trace: z.string().optional(),
@@ -30,7 +30,7 @@ export type AgentOutput = z.infer<typeof agentOutputSchema>;
  * Kept in sync with agentOutputSchema.
  */
 export const AGENT_OUTPUT_SCHEMA_PROMPT =
-  `{ "findings": [{ "id": string (e.g. "cq-1"), "title": string, "severity": "critical"|"high"|"medium"|"low" (lowercase only), "category": string, "file"?: string, "line"?: number, "message": string, "suggestion"?: string, "agent_name"?: string, "confidence"?: number (0-1, e.g. 0.85), "reasoning_trace"?: string }], "summary": string }. IMPORTANT: "id" must be a string, "severity" must be lowercase, "confidence" must be a number not a string.`;
+  `{ "findings": [{ "id": string (e.g. "sec-1"), "title": string, "severity": "critical"|"high"|"medium"|"low" (lowercase only), "category": "security"|"performance"|"architecture"|"code-quality", "file": string (required — path from diff), "line": number (required — line number from diff), "message": string, "suggested_fix": string, "confidence": number (0-1, required, e.g. 0.85), "reasoning_trace"?: string }], "summary": string }. IMPORTANT: "id" must be a string, "severity" must be lowercase, "confidence" must be a number not a string. "file" and "line" are required — reference exact paths and lines from the diff. "suggested_fix" is the recommended code change.`;
 
 export interface Finding {
   id: string;
@@ -40,11 +40,12 @@ export interface Finding {
   file?: string;
   line?: number;
   message: string;
+  /** @deprecated Use suggested_fix instead */
   suggestion?: string;
-  // AI transparency metadata (optional for backward compatibility)
+  suggested_fix?: string;
   agent_name?: string;
-  confidence?: number; // 0-1 range
-  reasoning_trace?: string; // Short explanation of why this finding was made
+  confidence?: number;
+  reasoning_trace?: string;
 }
 
 export interface ExecutionMetadata {
@@ -53,10 +54,22 @@ export interface ExecutionMetadata {
   total_tokens: number;
 }
 
+export interface ReviewSummary {
+  total_findings: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  risk_score: number;
+  text: string;
+}
+
 export interface ReviewResult {
   findings: Finding[];
+  /** @deprecated Use review_summary.text instead */
   summary: string;
-  execution_metadata?: ExecutionMetadata; // Optional for backward compatibility
+  review_summary?: ReviewSummary;
+  execution_metadata?: ExecutionMetadata;
 }
 
 export interface TraceStep {

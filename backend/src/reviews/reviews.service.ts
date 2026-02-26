@@ -2,25 +2,28 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type {
   AgentOutput,
-  ExecutionMetadata,
   GetReviewResponse,
   GetReviewsResponse,
   PostReviewsResponse,
   ReviewResult,
   TraceStep,
 } from 'shared';
-import { AggregatorAgent } from './agents/aggregator.agent';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
 import { PerformanceAgent } from './agents/performance.agent';
 import { SecurityAgent } from './agents/security.agent';
+import { DiffParser } from './diff-parser';
+import { DeterministicAggregator } from './deterministic-aggregator';
+import { ResultFormatter } from './result-formatter';
 import { GitHubService } from '../github/github.service';
 import { ReviewRunsRepository } from './review-runs.repository';
 import { buildTraceStep, TRACE_AGENT_NAMES } from './trace.utils';
+import type { ParsedFile } from '../types';
 
 export interface RunPipelineParams {
   userId: string;
@@ -29,11 +32,14 @@ export interface RunPipelineParams {
   prNumber: number;
   prTitle?: string | null;
   prDiff: string;
+  prFiles: import('shared').DiffFile[];
 }
 
 interface DomainAgentResult {
   output: AgentOutput;
   status: 'ok';
+  tokensUsed?: number;
+  rawContent?: string;
 }
 
 interface DomainAgentFailure {
@@ -43,40 +49,29 @@ interface DomainAgentFailure {
 
 type DomainAgentOutcome = DomainAgentResult | DomainAgentFailure;
 
-/**
- * Max diff characters sent to each agent. gpt-4o-mini handles ~128K tokens,
- * but large prompts cause 30-40s responses. 15K chars ≈ 4K tokens keeps
- * individual calls under 15s, leaving room for retries + aggregator.
- */
-const MAX_DIFF_CHARS = 15_000;
-
-function truncateDiff(diff: string): string {
-  if (diff.length <= MAX_DIFF_CHARS) return diff;
-  return diff.slice(0, MAX_DIFF_CHARS) + '\n\n... (diff truncated for review — showing first 15,000 characters)';
-}
-
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
     private readonly codeQualityAgent: CodeQualityAgent,
     private readonly architectureAgent: ArchitectureAgent,
     private readonly performanceAgent: PerformanceAgent,
     private readonly securityAgent: SecurityAgent,
-    private readonly aggregatorAgent: AggregatorAgent,
+    private readonly diffParser: DiffParser,
+    private readonly aggregator: DeterministicAggregator,
+    private readonly resultFormatter: ResultFormatter,
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
   ) {}
 
-  /**
-   * Fetches one review run by id. Returns null if not found or not owned by user.
-   */
-  async findOne(id: string, userJwt: string): Promise<GetReviewResponse | null> {
+  async findOne(
+    id: string,
+    userJwt: string,
+  ): Promise<GetReviewResponse | null> {
     return this.reviewRunsRepository.findById(id, userJwt);
   }
 
-  /**
-   * Lists review runs for the current user with pagination.
-   */
   async findAll(
     limit: number,
     offset: number,
@@ -85,11 +80,6 @@ export class ReviewsService {
     return this.reviewRunsRepository.findAll(limit, offset, userJwt);
   }
 
-  /**
-   * Runs the full review pipeline: fetches PR diff, runs 4 domain agents,
-   * then Aggregator, builds trace, and saves to review_runs.
-   * No server-side timeout — let the work complete. The frontend can abort if the user navigates away.
-   */
   async runReview(
     userId: string,
     userJwt: string,
@@ -119,59 +109,79 @@ export class ReviewsService {
       prNumber,
       prTitle: diffResponse.pr_title ?? null,
       prDiff: diffResponse.diff,
+      prFiles: diffResponse.files,
     });
   }
 
-  /**
-   * Calculates execution metadata from trace: agent count, total duration, and total tokens.
-   */
-  private calculateExecutionMetadata(trace: TraceStep[]): ExecutionMetadata {
-    const successfulAgents = trace.filter((step) => step.status === 'ok');
-    const agentCount = successfulAgents.length;
-    
-    // Calculate total duration from first step start to last step finish
-    if (trace.length === 0) {
-      return { agent_count: 0, duration_ms: 0, total_tokens: 0 };
-    }
-    
-    const firstStart = new Date(trace[0].started_at);
-    const lastFinish = new Date(
-      Math.max(...trace.map((step) => new Date(step.finished_at).getTime()))
-    );
-    const durationMs = lastFinish.getTime() - firstStart.getTime();
-    
-    // Sum tokens from all successful steps
-    const totalTokens = trace
-      .filter((step) => step.status === 'ok' && step.tokens_used !== undefined)
-      .reduce((sum, step) => sum + (step.tokens_used ?? 0), 0);
-    
-    return {
-      agent_count: agentCount,
-      duration_ms: durationMs,
-      total_tokens: totalTokens,
-    };
-  }
-
-  /**
-   * Runs the review pipeline: Code, Arch, Perf, Sec (parallel), then Aggregator.
-   * Builds trace and saves result_snapshot + trace to review_runs.
-   */
   async runPipeline(params: RunPipelineParams): Promise<PostReviewsResponse> {
-    const { userId, userJwt, repoFullName, prNumber, prTitle, prDiff } = params;
-    const pipelineStartTime = new Date();
+    const { userId, userJwt, repoFullName, prNumber, prTitle, prFiles } =
+      params;
     const trace: TraceStep[] = [];
 
-    const agentDiff = truncateDiff(prDiff);
+    // Parse and filter diff into structured per-file data
+    const parsedDiff = this.diffParser.parse(prFiles);
 
-    // TODO: Remove repoFullName and prNumber parameters from agent.run() calls once correct OpenAI API key is configured
+    if (parsedDiff.files.length === 0) {
+      const emptyResult: ReviewResult = {
+        findings: [],
+        summary: 'No reviewable changes found in this Pull Request.',
+        review_summary: {
+          total_findings: 0,
+          critical_count: 0,
+          high_count: 0,
+          medium_count: 0,
+          low_count: 0,
+          risk_score: 0,
+          text: 'No reviewable changes found. All changed files were filtered out (lock files, build artifacts, etc.).',
+        },
+        execution_metadata: {
+          agent_count: 0,
+          duration_ms: 0,
+          total_tokens: 0,
+        },
+      };
+
+      const id = await this.reviewRunsRepository.create(
+        {
+          userId,
+          repoFullName,
+          prNumber,
+          prTitle: prTitle ?? null,
+          status: 'completed',
+          resultSnapshot: emptyResult,
+          trace: [],
+        },
+        userJwt,
+      );
+      return { id, status: 'completed', result_snapshot: emptyResult, trace: [] };
+    }
+
+    this.logger.log(
+      `Reviewing ${parsedDiff.stats.filesChanged} files, ${parsedDiff.stats.totalChangedLines} changed lines`,
+    );
+
+    const files = parsedDiff.files;
+
+    // Run 4 domain agents in parallel
     const domainAgents = [
-      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(agentDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(agentDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(agentDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(agentDiff, repoFullName, prNumber) },
+      {
+        name: TRACE_AGENT_NAMES[0],
+        run: () => this.codeQualityAgent.run(files),
+      },
+      {
+        name: TRACE_AGENT_NAMES[1],
+        run: () => this.architectureAgent.run(files),
+      },
+      {
+        name: TRACE_AGENT_NAMES[2],
+        run: () => this.performanceAgent.run(files),
+      },
+      {
+        name: TRACE_AGENT_NAMES[3],
+        run: () => this.securityAgent.run(files),
+      },
     ] as const;
 
-    // Run all domain agents in parallel for better performance
     const agentPromises = domainAgents.map(async ({ name, run }) => {
       const startedAt = new Date();
       try {
@@ -184,7 +194,6 @@ export class ReviewsService {
           outcome: { output, status: 'ok' as const },
         };
       } catch (err) {
-        // If it's an HttpException (e.g., OpenAI quota error), propagate it immediately
         if (err instanceof HttpException) {
           throw err;
         }
@@ -203,26 +212,25 @@ export class ReviewsService {
     try {
       agentResults = await Promise.all(agentPromises);
     } catch (err) {
-      // If any agent threw an HttpException, propagate it immediately
       if (err instanceof HttpException) {
         throw err;
       }
-      // Re-throw unexpected errors
       throw err;
     }
-    
-    // Build trace and outcomes from parallel results
+
+    // Build trace and check for failures
     const outcomes: DomainAgentOutcome[] = [];
     for (const result of agentResults) {
-      trace.push(buildTraceStep({
-        agent: result.name,
-        startedAt: result.startedAt,
-        finishedAt: result.finishedAt,
-        status: result.outcome.status,
-      }));
+      trace.push(
+        buildTraceStep({
+          agent: result.name,
+          startedAt: result.startedAt,
+          finishedAt: result.finishedAt,
+          status: result.outcome.status,
+        }),
+      );
       outcomes.push(result.outcome);
-      
-      // If any agent failed, save and return early
+
       if (result.outcome.status === 'failed') {
         const id = await this.reviewRunsRepository.create(
           {
@@ -236,7 +244,12 @@ export class ReviewsService {
           },
           userJwt,
         );
-        return { id, status: 'failed', trace, error_message: result.outcome.error };
+        return {
+          id,
+          status: 'failed',
+          trace,
+          error_message: result.outcome.error,
+        };
       }
     }
 
@@ -260,53 +273,16 @@ export class ReviewsService {
       return { id, status: 'failed', trace, error_message: errorMessage };
     }
 
+    // Deterministic aggregation (no LLM call)
     const agentOutputs: AgentOutput[] = validOutputs.map((o) => o.output);
-    const aggregatorName = TRACE_AGENT_NAMES[4];
-    const aggregatorStartedAt = new Date();
-    let aggregatorOutput: AgentOutput;
-    try {
-      // TODO: Remove repoFullName and prNumber parameters from aggregator.run() call once correct OpenAI API key is configured
-      aggregatorOutput = await this.aggregatorAgent.run(agentOutputs, repoFullName, prNumber);
-      trace.push(buildTraceStep({
-        agent: aggregatorName,
-        startedAt: aggregatorStartedAt,
-        finishedAt: new Date(),
-        status: 'ok',
-      }));
-    } catch (err) {
-      // If it's an HttpException (e.g., OpenAI quota error), propagate it immediately
-      if (err instanceof HttpException) {
-        throw err;
-      }
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      trace.push(buildTraceStep({
-        agent: aggregatorName,
-        startedAt: aggregatorStartedAt,
-        finishedAt: new Date(),
-        status: 'failed',
-      }));
-      const id = await this.reviewRunsRepository.create(
-        {
-          userId,
-          repoFullName,
-          prNumber,
-          prTitle: prTitle ?? null,
-          status: 'failed',
-          trace,
-          errorMessage,
-        },
-        userJwt,
-      );
-      return { id, status: 'failed', trace, error_message: errorMessage };
-    }
+    const aggregated = this.aggregator.aggregate(agentOutputs);
 
-    const executionMetadata = this.calculateExecutionMetadata(trace);
-    
-    const resultSnapshot: ReviewResult = {
-      findings: aggregatorOutput.findings,
-      summary: aggregatorOutput.summary,
-      execution_metadata: executionMetadata,
-    };
+    // Build final result
+    const resultSnapshot = this.resultFormatter.format({
+      findings: aggregated.findings,
+      reviewSummary: aggregated.review_summary,
+      trace,
+    });
 
     const id = await this.reviewRunsRepository.create(
       {

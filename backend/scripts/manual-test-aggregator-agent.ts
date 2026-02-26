@@ -1,13 +1,11 @@
 /**
- * Manual test for Aggregator Agent (task 4.7).
+ * Manual test for Deterministic Aggregator (replaces LLM-based AggregatorAgent).
  * Run with: npx ts-node -r tsconfig-paths/register scripts/manual-test-aggregator-agent.ts
- * Requires OPENAI_API_KEY in env.
- *
- * Given 4 mock outputs, returns single findings + summary.
+ * No OPENAI_API_KEY needed — aggregation is deterministic.
  */
 
 import { type AgentOutput } from 'shared';
-import { AggregatorAgent } from '../src/reviews/agents/aggregator.agent';
+import { DeterministicAggregator } from '../src/reviews/deterministic-aggregator';
 
 const MOCK_OUTPUTS: AgentOutput[] = [
   {
@@ -20,7 +18,8 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         file: 'src/api.ts',
         line: 42,
         message: 'No try/catch around async call',
-        suggestion: 'Wrap in try/catch and handle errors',
+        suggested_fix: 'Wrap in try/catch and handle errors',
+        confidence: 0.85,
       },
     ],
     summary: 'Code quality: one medium finding.',
@@ -35,7 +34,8 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         file: 'src/api.ts',
         line: 15,
         message: 'Service directly depends on database',
-        suggestion: 'Introduce repository layer',
+        suggested_fix: 'Introduce repository layer',
+        confidence: 0.9,
       },
     ],
     summary: 'Architecture: coupling issue found.',
@@ -50,7 +50,8 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         file: 'src/api.ts',
         line: 42,
         message: 'Loop may cause N+1 queries',
-        suggestion: 'Use batch fetch',
+        suggested_fix: 'Use batch fetch',
+        confidence: 0.8,
       },
     ],
     summary: 'Performance: potential N+1.',
@@ -65,28 +66,23 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         file: 'src/api.ts',
         line: 42,
         message: 'Raw query concat with user input',
-        suggestion: 'Use parameterized queries',
+        suggested_fix: 'Use parameterized queries',
+        confidence: 0.95,
       },
     ],
     summary: 'Security: critical vulnerability.',
   },
 ];
 
-async function main() {
-  if (!process.env.OPENAI_API_KEY) {
-    console.error('OPENAI_API_KEY is required. Set it and rerun.');
-    process.exit(1);
-  }
-
-  const agent = new AggregatorAgent();
-  console.log('Running Aggregator Agent on 4 mock outputs...');
-  const result = await agent.run(MOCK_OUTPUTS);
-  console.log('Result (merged, deduped, prioritized):');
-  console.log(JSON.stringify(result, null, 2));
-  console.log('\nManual test passed: returned single findings + summary.');
+function main() {
+  const aggregator = new DeterministicAggregator();
+  console.log('Running Deterministic Aggregator on 4 mock outputs...');
+  const result = aggregator.aggregate(MOCK_OUTPUTS);
+  console.log('Findings (merged, deduped, sorted):');
+  console.log(JSON.stringify(result.findings, null, 2));
+  console.log('\nReview Summary:');
+  console.log(JSON.stringify(result.review_summary, null, 2));
+  console.log('\nManual test passed: deterministic aggregation complete.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main();

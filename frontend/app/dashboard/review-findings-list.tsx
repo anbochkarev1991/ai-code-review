@@ -136,8 +136,8 @@ function FindingCard({ finding }: { finding: Finding }) {
             {finding.message}
           </div>
 
-          {/* Suggestion - more subtle */}
-          {finding.suggestion && (
+          {/* Suggested Fix */}
+          {(finding.suggested_fix || finding.suggestion) && (
             <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30 p-3">
               <div className="flex items-start gap-2">
                 <svg
@@ -155,10 +155,10 @@ function FindingCard({ finding }: { finding: Finding }) {
                 </svg>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Suggestion
+                    Suggested Fix
                   </div>
                   <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
-                    {finding.suggestion}
+                    {finding.suggested_fix || finding.suggestion}
                   </div>
                 </div>
               </div>

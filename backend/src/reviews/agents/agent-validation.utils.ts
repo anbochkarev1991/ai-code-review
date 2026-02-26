@@ -50,6 +50,11 @@ function normalizeLlmOutput(parsed: unknown): unknown {
       }
     }
 
+    // Normalize suggestion -> suggested_fix for backward compatibility
+    if (f.suggestion && !f.suggested_fix) {
+      f.suggested_fix = f.suggestion;
+    }
+
     return f;
   });
 

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CodeQualityAgent } from './code-quality.agent';
+import { DiffParser } from '../diff-parser';
+import type { ParsedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -14,6 +16,23 @@ jest.mock('openai', () => ({
   },
 }));
 
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/utils.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 40,
+        endLine: 45,
+        content: '+const x = 42;\n+console.log("hello");',
+        addedLines: ['const x = 42;', 'console.log("hello");'],
+        removedLines: [],
+      },
+    ],
+  },
+];
+
 describe('CodeQualityAgent', () => {
   let agent: CodeQualityAgent;
   const originalEnv = process.env;
@@ -23,7 +42,7 @@ describe('CodeQualityAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CodeQualityAgent],
+      providers: [CodeQualityAgent, DiffParser],
     }).compile();
 
     agent = module.get(CodeQualityAgent);
@@ -36,8 +55,9 @@ describe('CodeQualityAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const freshAgent = new CodeQualityAgent();
-      await expect(freshAgent.run('diff')).rejects.toThrow(
+      const diffParser = new DiffParser();
+      const freshAgent = new CodeQualityAgent(diffParser);
+      await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );
     });
@@ -53,7 +73,7 @@ describe('CodeQualityAgent', () => {
             file: 'src/utils.ts',
             line: 42,
             message: 'Variable x is declared but never used.',
-            suggestion: 'Remove the unused variable.',
+            suggested_fix: 'Remove the unused variable.',
           },
         ],
         summary: 'One code quality issue found.',
@@ -63,7 +83,7 @@ describe('CodeQualityAgent', () => {
         choices: [{ message: { content: JSON.stringify(validJson) } }],
       });
 
-      const result = await agent.run('diff --git a/file b/file');
+      const result = await agent.run(SAMPLE_FILES);
 
       expect(result).toEqual(validJson);
       expect(result.findings).toHaveLength(1);
@@ -87,7 +107,7 @@ describe('CodeQualityAgent', () => {
         ],
       });
 
-      const result = await agent.run('diff');
+      const result = await agent.run(SAMPLE_FILES);
 
       expect(result).toEqual(validJson);
     });
@@ -106,7 +126,7 @@ describe('CodeQualityAgent', () => {
         ],
       });
 
-      await expect(agent.run('diff')).rejects.toThrow('invalid JSON');
+      await expect(agent.run(SAMPLE_FILES)).rejects.toThrow('invalid JSON');
     });
   });
 });

@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import type {
   DiffFile,
+  DiffFileStatus,
   DiffResponse,
   Pull,
   PullsResponse,
@@ -302,15 +303,16 @@ export class GitHubService {
       }>;
     };
 
-    const patches = (compare.files ?? [])
-      .map((f) => f.patch)
-      .filter((p): p is string => !!p);
-    const diff = patches.join('\n');
-
     const files: DiffFile[] = (compare.files ?? []).map((f) => ({
       filename: f.filename,
       patch: f.patch ?? '',
+      status: (f.status ?? 'modified') as DiffFileStatus,
     }));
+
+    const diff = files
+      .map((f) => f.patch)
+      .filter((p) => !!p)
+      .join('\n');
 
     return { diff, files, pr_title: pull.title };
   }

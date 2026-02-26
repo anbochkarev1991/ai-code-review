@@ -189,6 +189,7 @@ export default async function ReviewDetailPage({
                   summary={review.result_snapshot.summary}
                   findings={review.result_snapshot.findings}
                   executionMetadata={review.result_snapshot.execution_metadata}
+                  reviewSummary={review.result_snapshot.review_summary}
                 />
                 <ReviewFindingsList
                   findings={review.result_snapshot.findings}

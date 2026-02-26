@@ -1,11 +1,16 @@
 "use client";
 
-import type { ExecutionMetadata, Finding } from "@/lib/types";
+import type {
+  ExecutionMetadata,
+  Finding,
+  ReviewSummary as ReviewSummaryType,
+} from "@/lib/types";
 
 interface ReviewSummaryProps {
   summary: string;
   findings?: Finding[];
   executionMetadata?: ExecutionMetadata;
+  reviewSummary?: ReviewSummaryType;
 }
 
 function formatDuration(ms: number): string {
@@ -79,12 +84,28 @@ function FindingsStats({ findings }: { findings: Finding[] }) {
   );
 }
 
+function getRiskScoreColor(score: number): string {
+  if (score >= 70) return "text-red-600 dark:text-red-400";
+  if (score >= 40) return "text-orange-600 dark:text-orange-400";
+  if (score >= 15) return "text-yellow-600 dark:text-yellow-400";
+  return "text-green-600 dark:text-green-400";
+}
+
+function getRiskScoreLabel(score: number): string {
+  if (score >= 70) return "High Risk";
+  if (score >= 40) return "Moderate Risk";
+  if (score >= 15) return "Low Risk";
+  return "Minimal Risk";
+}
+
 export function ReviewSummary({
   summary,
   findings,
   executionMetadata,
+  reviewSummary,
 }: ReviewSummaryProps) {
-  const hasSummary = summary && summary.trim() !== "";
+  const displayText = reviewSummary?.text ?? summary;
+  const hasSummary = displayText && displayText.trim() !== "";
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -92,15 +113,31 @@ export function ReviewSummary({
       {findings && findings.length > 0 && (
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
           <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
-              Overview
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Overview
+              </h3>
+              {reviewSummary && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-bold ${getRiskScoreColor(reviewSummary.risk_score)}`}
+                  >
+                    {reviewSummary.risk_score}/100
+                  </span>
+                  <span
+                    className={`text-xs font-medium ${getRiskScoreColor(reviewSummary.risk_score)}`}
+                  >
+                    {getRiskScoreLabel(reviewSummary.risk_score)}
+                  </span>
+                </div>
+              )}
+            </div>
             <FindingsStats findings={findings} />
           </div>
           {hasSummary && (
             <div className="px-4 py-3">
               <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
-                {summary}
+                {displayText}
               </p>
             </div>
           )}
@@ -134,7 +171,7 @@ export function ReviewSummary({
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
             <div className="p-4">
               <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
-                {summary}
+                {displayText}
               </p>
             </div>
             {executionMetadata && (

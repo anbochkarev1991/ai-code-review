@@ -10,14 +10,13 @@ describe('trace.utils', () => {
   const baseFinished = new Date('2025-01-15T10:00:05.000Z');
 
   describe('TRACE_AGENT_NAMES', () => {
-    it('has exactly 5 agent names: Code, Arch, Perf, Sec, Agg', () => {
-      expect(TRACE_AGENT_NAMES).toHaveLength(5);
+    it('has exactly 4 domain agent names', () => {
+      expect(TRACE_AGENT_NAMES).toHaveLength(4);
       expect(TRACE_AGENT_NAMES).toEqual([
         'Code Quality',
         'Architecture',
         'Performance',
         'Security',
-        'Aggregator',
       ]);
     });
   });
@@ -84,7 +83,7 @@ describe('trace.utils', () => {
 
     it('omits raw_output when empty string', () => {
       const step = buildTraceStep({
-        agent: 'Aggregator',
+        agent: 'Code Quality',
         startedAt: baseStarted,
         finishedAt: baseFinished,
         status: 'ok',
@@ -106,8 +105,8 @@ describe('trace.utils', () => {
     });
   });
 
-  describe('trace array with 5 entries (Code, Arch, Perf, Sec, Agg)', () => {
-    it('produces trace array with all 5 agent entries', () => {
+  describe('trace array with 4 entries (Code, Arch, Perf, Sec)', () => {
+    it('produces trace array with all 4 domain agent entries', () => {
       let offset = 0;
       const trace = TRACE_AGENT_NAMES.map((agent, i) => {
         const started = new Date(baseStarted.getTime() + offset);
@@ -122,13 +121,12 @@ describe('trace.utils', () => {
         });
       });
 
-      expect(trace).toHaveLength(5);
+      expect(trace).toHaveLength(4);
       expect(trace.map((s) => s.agent)).toEqual([
         'Code Quality',
         'Architecture',
         'Performance',
         'Security',
-        'Aggregator',
       ]);
       trace.forEach((step, i) => {
         expect(step.agent).toBe(TRACE_AGENT_NAMES[i] as TraceAgentName);

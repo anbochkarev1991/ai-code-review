@@ -4,15 +4,14 @@ import {
 } from 'shared';
 
 /**
- * Agent names for trace steps. Order: Code Quality, Architecture, Performance, Security, Aggregator.
- * Trace array must have these 5 entries when pipeline completes.
+ * Agent names for trace steps. Order: Code Quality, Architecture, Performance, Security.
+ * Aggregation is now deterministic and not traced as an LLM step.
  */
 export const TRACE_AGENT_NAMES = [
   'Code Quality',
   'Architecture',
   'Performance',
   'Security',
-  'Aggregator',
 ] as const;
 
 export type TraceAgentName = (typeof TRACE_AGENT_NAMES)[number];

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PerformanceAgent } from './performance.agent';
+import { DiffParser } from '../diff-parser';
+import type { ParsedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -14,6 +16,27 @@ jest.mock('openai', () => ({
   },
 }));
 
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/api.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 10,
+        endLine: 20,
+        content: '+for (const user of users) {\n+  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);\n+}',
+        addedLines: [
+          'for (const user of users) {',
+          '  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',
+          '}',
+        ],
+        removedLines: [],
+      },
+    ],
+  },
+];
+
 describe('PerformanceAgent', () => {
   let agent: PerformanceAgent;
   const originalEnv = process.env;
@@ -23,7 +46,7 @@ describe('PerformanceAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PerformanceAgent],
+      providers: [PerformanceAgent, DiffParser],
     }).compile();
 
     agent = module.get(PerformanceAgent);
@@ -36,8 +59,9 @@ describe('PerformanceAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const freshAgent = new PerformanceAgent();
-      await expect(freshAgent.run('diff')).rejects.toThrow(
+      const diffParser = new DiffParser();
+      const freshAgent = new PerformanceAgent(diffParser);
+      await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );
     });
@@ -53,7 +77,7 @@ describe('PerformanceAgent', () => {
             file: 'src/api.ts',
             line: 12,
             message: 'Loop fetches users one by one causing N+1 queries.',
-            suggestion: 'Use batch fetch or eager loading.',
+            suggested_fix: 'Use batch fetch or eager loading.',
           },
         ],
         summary: 'One performance issue found.',
@@ -63,7 +87,7 @@ describe('PerformanceAgent', () => {
         choices: [{ message: { content: JSON.stringify(validJson) } }],
       });
 
-      const result = await agent.run('diff --git a/file b/file');
+      const result = await agent.run(SAMPLE_FILES);
 
       expect(result).toEqual(validJson);
       expect(result.findings).toHaveLength(1);
@@ -88,7 +112,7 @@ describe('PerformanceAgent', () => {
         ],
       });
 
-      const result = await agent.run('diff');
+      const result = await agent.run(SAMPLE_FILES);
 
       expect(result).toEqual(validJson);
     });
@@ -107,7 +131,7 @@ describe('PerformanceAgent', () => {
         ],
       });
 
-      await expect(agent.run('diff')).rejects.toThrow('invalid JSON');
+      await expect(agent.run(SAMPLE_FILES)).rejects.toThrow('invalid JSON');
     });
   });
 });
