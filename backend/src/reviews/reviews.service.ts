@@ -16,6 +16,7 @@ import { DiffParser } from './diff-parser';
 import { ReviewOrchestrator } from './engine/orchestrator';
 import { GitHubService } from '../github/github.service';
 import { ReviewRunsRepository } from './review-runs.repository';
+import { SeverityNormalizer } from './severity-normalizer';
 
 const LARGE_PR_LINE_THRESHOLD = 1000;
 const MARKDOWN_ONLY_EXTENSIONS = new Set(['markdown']);
@@ -41,6 +42,7 @@ export class ReviewsService {
     private readonly orchestrator: ReviewOrchestrator,
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
+    private readonly severityNormalizer: SeverityNormalizer,
   ) {}
 
   async findOne(
@@ -161,6 +163,15 @@ export class ReviewsService {
       };
     }
 
+    const normalizedResult: ReviewResult = engineResult.result
+      ? {
+          ...engineResult.result,
+          findings: this.severityNormalizer.normalize(
+            engineResult.result.findings,
+          ),
+        }
+      : engineResult.result;
+
     const id = await this.reviewRunsRepository.create(
       {
         userId,
@@ -168,7 +179,7 @@ export class ReviewsService {
         prNumber,
         prTitle: prTitle ?? null,
         status: engineResult.status,
-        resultSnapshot: engineResult.result,
+        resultSnapshot: normalizedResult,
         trace: engineResult.trace,
       },
       userJwt,
@@ -177,7 +188,7 @@ export class ReviewsService {
     return {
       id,
       status: engineResult.status,
-      result_snapshot: engineResult.result,
+      result_snapshot: normalizedResult,
       trace: engineResult.trace,
     };
   }
