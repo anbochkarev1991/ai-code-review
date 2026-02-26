@@ -121,6 +121,7 @@ export interface PostReviewsResponse {
   result_snapshot?: ReviewResult;
   trace?: TraceStep[];
   error_message?: string;
+  usage?: import('./billing').UsageResponse;
 }
 
 export interface GetReviewResponse {

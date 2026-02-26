@@ -5,6 +5,7 @@ import type { PostReviewsResponse, ReviewResult, TraceStep } from "@/lib/types";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummary } from "./review-summary";
 import { ReviewTrace } from "./review-trace";
+import { useUsage } from "./usage-context";
 
 interface RunReviewButtonProps {
   repoFullName: string;
@@ -17,6 +18,7 @@ export function RunReviewButton({
   prNumber,
   accessToken,
 }: RunReviewButtonProps) {
+  const { pushUsage } = useUsage();
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,10 @@ export function RunReviewButton({
       }
       if (data.trace) {
         setTrace(data.trace);
+      }
+      if (data.usage) {
+        console.debug("[RunReviewButton] Pushing usage from review response", data.usage);
+        pushUsage(data.usage);
       }
     } catch (err) {
       if (err instanceof Error) {

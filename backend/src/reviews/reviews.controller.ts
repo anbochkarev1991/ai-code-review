@@ -105,6 +105,8 @@ export class ReviewsController {
     if (result.status === 'completed') {
       await this.billingService.incrementUsage(user.id, token);
     }
-    return result;
+
+    const updatedUsage = await this.billingService.getUsage(user.id, token);
+    return { ...result, usage: updatedUsage };
   }
 }
