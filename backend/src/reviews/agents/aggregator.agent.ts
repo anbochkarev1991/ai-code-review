@@ -1,10 +1,7 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import {
-  agentOutputSchema,
-  AGENT_OUTPUT_SCHEMA_PROMPT,
-  type AgentOutput,
-} from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { callWithValidationRetry } from './agent-validation.utils';
 // TODO: Remove mock import once correct OpenAI API key is configured
 import {
   MOCK_AGGREGATOR_RESPONSE,
@@ -17,7 +14,8 @@ Your task:
 1. Merge all findings from the four agent outputs into a single list.
 2. Remove duplicates: findings with similar message, file, and line should be merged (keep the highest severity).
 3. Prioritize by severity: critical > high > medium > low.
-4. Produce one concise summary that synthesizes the key findings across all categories.
+4. Preserve agent attribution: When merging findings, set agent_name to the source agent name (Code Quality, Architecture, Performance, or Security) so users know which agent identified each finding.
+5. Produce one concise summary that synthesizes the key findings across all categories.
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
@@ -40,6 +38,7 @@ export class AggregatorAgent {
    * Runs the Aggregator Agent on outputs from the four domain agents.
    * Merges, deduplicates, and prioritizes findings; produces a single summary.
    * Returns AgentOutput matching the same schema.
+   * On validation failure, retries up to 2 times with "invalid JSON" message before throwing.
    */
   async run(agentOutputs: AgentOutput[], repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
     if (agentOutputs.length !== 4) {
@@ -72,68 +71,17 @@ Four agent outputs to merge:
 ${outputsJson}
 \`\`\`
 
-Merge findings, remove duplicates (by similar message/file/line), assign priority (critical/high/medium/low), and produce a single summary. Return one JSON object.`;
+Merge findings, remove duplicates (by similar message/file/line), assign priority (critical/high/medium/low), and preserve agent attribution (set agent_name to the source agent: Code Quality, Architecture, Performance, or Security). Produce a single summary. Return one JSON object.`;
 
-    let completion: OpenAI.Chat.ChatCompletion;
-    try {
-      completion = await client.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: AGGREGATOR_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-      });
-    } catch (err) {
-      // Handle OpenAI API errors
-      if (err instanceof OpenAI.APIError) {
-        if (err.status === 429) {
-          throw new HttpException(
-            `OpenAI API quota exceeded. ${err.message || 'Please check your OpenAI plan and billing details.'}`,
-            HttpStatus.TOO_MANY_REQUESTS,
-          );
-        }
-        if (err.status === 401) {
-          throw new HttpException(
-            `OpenAI API authentication failed: ${err.message || 'Invalid API key'}`,
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-        if (err.status === 500 || err.status === 503) {
-          throw new HttpException(
-            `OpenAI API service unavailable: ${err.message || 'Please try again later'}`,
-            HttpStatus.SERVICE_UNAVAILABLE,
-          );
-        }
-        // Other OpenAI API errors
-        throw new HttpException(
-          `OpenAI API error (${err.status}): ${err.message || 'Unknown error'}`,
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-      // Re-throw non-OpenAI errors
-      throw err;
-    }
-
-    const raw = completion.choices[0]?.message?.content?.trim();
-    if (!raw) {
-      throw new Error('Empty response from OpenAI');
-    }
-
-    const parsed = this.parseJson(raw);
-    const result = agentOutputSchema.safeParse(parsed);
-    if (!result.success) {
-      throw new Error(
-        `Aggregator Agent returned invalid JSON: ${result.error.message}`,
-      );
-    }
-
-    return result.data;
-  }
-
-  private parseJson(raw: string): unknown {
-    const stripped = raw
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```$/i, '');
-    return JSON.parse(stripped) as unknown;
+    const result = await callWithValidationRetry({
+      client,
+      model,
+      messages: [
+        { role: 'system', content: AGGREGATOR_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      agentName: 'Aggregator',
+    });
+    return result.output;
   }
 }

@@ -11,6 +11,7 @@ export type {
   ReviewRun,
   TraceStep,
   Finding,
+  ExecutionMetadata,
   UsageResponse,
   CheckoutBody,
   CheckoutResponse,

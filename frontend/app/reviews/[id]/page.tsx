@@ -11,14 +11,20 @@ async function fetchReview(
 ): Promise<GetReviewResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-  const res = await fetch(`${backendUrl}/reviews/${id}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${backendUrl}/reviews/${id}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (error) {
+    // Handle network errors, DNS failures, etc.
+    console.error("Failed to fetch review:", error);
+    return null;
+  }
 }
 
 function formatDate(dateString: string): string {
@@ -179,9 +185,11 @@ export default async function ReviewDetailPage({
 
             {review.result_snapshot && (
               <div className="flex flex-col gap-4">
-                {review.result_snapshot.summary && (
-                  <ReviewSummary summary={review.result_snapshot.summary} />
-                )}
+                <ReviewSummary
+                  summary={review.result_snapshot.summary}
+                  findings={review.result_snapshot.findings}
+                  executionMetadata={review.result_snapshot.execution_metadata}
+                />
                 <ReviewFindingsList
                   findings={review.result_snapshot.findings}
                 />

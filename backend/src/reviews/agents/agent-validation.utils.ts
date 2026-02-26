@@ -14,12 +14,55 @@ function parseJson(raw: string): unknown {
   return JSON.parse(stripped) as unknown;
 }
 
+const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low']);
+
+/**
+ * Normalizes common LLM output quirks before Zod validation:
+ * - Coerces numeric `id` to string
+ * - Lowercases `severity` enum values
+ * - Coerces string `confidence` to number
+ */
+function normalizeLlmOutput(parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null) return parsed;
+  const obj = parsed as Record<string, unknown>;
+  if (!Array.isArray(obj.findings)) return parsed;
+
+  obj.findings = obj.findings.map((finding: unknown) => {
+    if (typeof finding !== 'object' || finding === null) return finding;
+    const f = finding as Record<string, unknown>;
+
+    if (typeof f.id === 'number') {
+      f.id = String(f.id);
+    }
+
+    if (typeof f.severity === 'string' && !VALID_SEVERITIES.has(f.severity)) {
+      f.severity = f.severity.toLowerCase();
+    }
+
+    if (f.confidence === null) {
+      delete f.confidence;
+    } else if (typeof f.confidence === 'string') {
+      const num = parseFloat(f.confidence);
+      if (!isNaN(num)) {
+        f.confidence = num;
+      } else {
+        delete f.confidence;
+      }
+    }
+
+    return f;
+  });
+
+  return obj;
+}
+
 export function parseAndValidate(
   raw: string,
 ): { success: true; data: AgentOutput } | { success: false; error: string } {
   try {
     const parsed = parseJson(raw);
-    const result = agentOutputSchema.safeParse(parsed);
+    const normalized = normalizeLlmOutput(parsed);
+    const result = agentOutputSchema.safeParse(normalized);
     if (result.success) {
       return { success: true, data: result.data };
     }

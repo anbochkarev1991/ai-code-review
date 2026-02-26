@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import {
-  agentOutputSchema,
-  AGENT_OUTPUT_SCHEMA_PROMPT,
-  type AgentOutput,
-} from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { callWithValidationRetry } from './agent-validation.utils';
 // TODO: Remove mock import once correct OpenAI API key is configured
 import {
   MOCK_SECURITY_RESPONSE,
@@ -33,6 +30,7 @@ export class SecurityAgent {
   /**
    * Runs the Security Agent on a PR diff.
    * Returns structured findings and summary matching the agent output schema.
+   * On validation failure, retries up to 2 times with "invalid JSON" message before throwing.
    */
   async run(prDiff: string, repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
     // TODO: Remove mock response check once correct OpenAI API key is configured
@@ -52,34 +50,15 @@ ${prDiff}
 
 Analyze the diff for security issues and return one JSON object.`;
 
-    const completion = await client.chat.completions.create({
+    const result = await callWithValidationRetry({
+      client,
       model,
       messages: [
         { role: 'system', content: SECURITY_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
+      agentName: 'Security',
     });
-
-    const raw = completion.choices[0]?.message?.content?.trim();
-    if (!raw) {
-      throw new Error('Empty response from OpenAI');
-    }
-
-    const parsed = this.parseJson(raw);
-    const result = agentOutputSchema.safeParse(parsed);
-    if (!result.success) {
-      throw new Error(
-        `Security Agent returned invalid JSON: ${result.error.message}`,
-      );
-    }
-
-    return result.data;
-  }
-
-  private parseJson(raw: string): unknown {
-    const stripped = raw
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```$/i, '');
-    return JSON.parse(stripped) as unknown;
+    return result.output;
   }
 }

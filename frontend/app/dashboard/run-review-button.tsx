@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { PostReviewsResponse, ReviewResult, TraceStep } from "@/lib/types";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummary } from "./review-summary";
@@ -12,32 +12,39 @@ interface RunReviewButtonProps {
   accessToken: string;
 }
 
-const REVIEW_TIMEOUT_MS = 60000; // 60 seconds
-
 export function RunReviewButton({
   repoFullName,
   prNumber,
   accessToken,
 }: RunReviewButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTimer = () => {
+    setElapsed(0);
+    intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+  };
+
+  const stopTimer = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
 
   const handleRunReview = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
     setTrace(null);
+    startTimer();
 
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-
-    // Create AbortController for timeout handling
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => {
-      abortController.abort();
-    }, REVIEW_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${backendUrl}/reviews`, {
@@ -50,10 +57,7 @@ export function RunReviewButton({
           repo_full_name: repoFullName,
           pr_number: prNumber,
         }),
-        signal: abortController.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -64,7 +68,6 @@ export function RunReviewButton({
 
       const data = (await response.json()) as PostReviewsResponse;
 
-      // Display error_message from response if present
       if (data.error_message) {
         setError(data.error_message);
         setLoading(false);
@@ -73,7 +76,6 @@ export function RunReviewButton({
         return;
       }
 
-      // Store result and trace for display
       if (data.result_snapshot) {
         setResult(data.result_snapshot);
       }
@@ -81,18 +83,13 @@ export function RunReviewButton({
         setTrace(data.trace);
       }
     } catch (err) {
-      clearTimeout(timeoutId);
-
       if (err instanceof Error) {
-        if (err.name === "AbortError") {
-          setError("Review request timed out after 60 seconds. Please try again.");
-        } else {
-          setError(err.message);
-        }
+        setError(err.message);
       } else {
         setError("Failed to run review");
       }
     } finally {
+      stopTimer();
       setLoading(false);
     }
   };
@@ -108,7 +105,7 @@ export function RunReviewButton({
           {loading ? (
             <>
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
-              Running review...
+              Running review... {elapsed > 0 && `(${elapsed}s)`}
             </>
           ) : (
             "Run review"
@@ -124,7 +121,11 @@ export function RunReviewButton({
         <div className="flex w-full flex-col gap-4">
           {result && (
             <>
-              {result.summary && <ReviewSummary summary={result.summary} />}
+              <ReviewSummary
+                summary={result.summary}
+                findings={result.findings}
+                executionMetadata={result.execution_metadata}
+              />
               <ReviewFindingsList findings={result.findings} />
             </>
           )}

@@ -9,17 +9,23 @@ async function fetchReviews(
 ): Promise<GetReviewsResponse | null> {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-  const res = await fetch(
-    `${backendUrl}/reviews?limit=${limit}&offset=${offset}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    }
-  );
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(
+      `${backendUrl}/reviews?limit=${limit}&offset=${offset}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) return null;
+    return res.json();
+  } catch (error) {
+    // Handle network errors, DNS failures, etc.
+    console.error("Failed to fetch reviews:", error);
+    return null;
+  }
 }
 
 function formatDate(dateString: string): string {

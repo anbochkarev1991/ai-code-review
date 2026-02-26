@@ -14,6 +14,10 @@ export const agentOutputSchema = z.object({
       line: z.number().optional(),
       message: z.string(),
       suggestion: z.string().optional(),
+      // AI transparency metadata (optional for backward compatibility)
+      agent_name: z.string().optional(),
+      confidence: z.number().min(0).max(1).optional(),
+      reasoning_trace: z.string().optional(),
     })
   ),
   summary: z.string(),
@@ -26,7 +30,7 @@ export type AgentOutput = z.infer<typeof agentOutputSchema>;
  * Kept in sync with agentOutputSchema.
  */
 export const AGENT_OUTPUT_SCHEMA_PROMPT =
-  'findings: array of { id, title, severity, category, file?, line?, message, suggestion? }; summary: string';
+  `{ "findings": [{ "id": string (e.g. "cq-1"), "title": string, "severity": "critical"|"high"|"medium"|"low" (lowercase only), "category": string, "file"?: string, "line"?: number, "message": string, "suggestion"?: string, "agent_name"?: string, "confidence"?: number (0-1, e.g. 0.85), "reasoning_trace"?: string }], "summary": string }. IMPORTANT: "id" must be a string, "severity" must be lowercase, "confidence" must be a number not a string.`;
 
 export interface Finding {
   id: string;
@@ -37,11 +41,22 @@ export interface Finding {
   line?: number;
   message: string;
   suggestion?: string;
+  // AI transparency metadata (optional for backward compatibility)
+  agent_name?: string;
+  confidence?: number; // 0-1 range
+  reasoning_trace?: string; // Short explanation of why this finding was made
+}
+
+export interface ExecutionMetadata {
+  agent_count: number;
+  duration_ms: number;
+  total_tokens: number;
 }
 
 export interface ReviewResult {
   findings: Finding[];
   summary: string;
+  execution_metadata?: ExecutionMetadata; // Optional for backward compatibility
 }
 
 export interface TraceStep {

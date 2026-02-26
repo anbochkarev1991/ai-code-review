@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type {
   AgentOutput,
+  ExecutionMetadata,
   GetReviewResponse,
   GetReviewsResponse,
   PostReviewsResponse,
@@ -42,15 +43,17 @@ interface DomainAgentFailure {
 
 type DomainAgentOutcome = DomainAgentResult | DomainAgentFailure;
 
-/** Thrown when the review pipeline exceeds the timeout (e.g. 60s). */
-export class ReviewTimeoutError extends Error {
-  constructor() {
-    super('Request timeout (60s)');
-    this.name = 'ReviewTimeoutError';
-  }
-}
+/**
+ * Max diff characters sent to each agent. gpt-4o-mini handles ~128K tokens,
+ * but large prompts cause 30-40s responses. 15K chars ≈ 4K tokens keeps
+ * individual calls under 15s, leaving room for retries + aggregator.
+ */
+const MAX_DIFF_CHARS = 15_000;
 
-const REVIEW_TIMEOUT_MS = 60_000;
+function truncateDiff(diff: string): string {
+  if (diff.length <= MAX_DIFF_CHARS) return diff;
+  return diff.slice(0, MAX_DIFF_CHARS) + '\n\n... (diff truncated for review — showing first 15,000 characters)';
+}
 
 @Injectable()
 export class ReviewsService {
@@ -85,53 +88,9 @@ export class ReviewsService {
   /**
    * Runs the full review pipeline: fetches PR diff, runs 4 domain agents,
    * then Aggregator, builds trace, and saves to review_runs.
-   * Times out after REVIEW_TIMEOUT_MS (60s); on timeout saves failed run and returns.
+   * No server-side timeout — let the work complete. The frontend can abort if the user navigates away.
    */
   async runReview(
-    userId: string,
-    userJwt: string,
-    repoFullName: string,
-    prNumber: number,
-  ): Promise<PostReviewsResponse> {
-    const work = this.runReviewWork(userId, userJwt, repoFullName, prNumber);
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new ReviewTimeoutError()), REVIEW_TIMEOUT_MS);
-    });
-
-    try {
-      return await Promise.race([work, timeoutPromise]);
-    } catch (err) {
-      if (err instanceof ReviewTimeoutError) {
-        try {
-          const id = await this.reviewRunsRepository.create(
-            {
-              userId,
-              repoFullName,
-              prNumber,
-              prTitle: null,
-              status: 'failed',
-              trace: [],
-              errorMessage: err.message,
-            },
-            userJwt,
-          );
-          return {
-            id,
-            status: 'failed',
-            trace: [],
-            error_message: err.message,
-          };
-        } catch (repoErr) {
-          // If repository fails, still throw the original timeout error
-          throw err;
-        }
-      }
-      // Re-throw HttpExceptions as-is, they'll be handled by NestJS
-      throw err;
-    }
-  }
-
-  private async runReviewWork(
     userId: string,
     userJwt: string,
     repoFullName: string,
@@ -164,35 +123,107 @@ export class ReviewsService {
   }
 
   /**
+   * Calculates execution metadata from trace: agent count, total duration, and total tokens.
+   */
+  private calculateExecutionMetadata(trace: TraceStep[]): ExecutionMetadata {
+    const successfulAgents = trace.filter((step) => step.status === 'ok');
+    const agentCount = successfulAgents.length;
+    
+    // Calculate total duration from first step start to last step finish
+    if (trace.length === 0) {
+      return { agent_count: 0, duration_ms: 0, total_tokens: 0 };
+    }
+    
+    const firstStart = new Date(trace[0].started_at);
+    const lastFinish = new Date(
+      Math.max(...trace.map((step) => new Date(step.finished_at).getTime()))
+    );
+    const durationMs = lastFinish.getTime() - firstStart.getTime();
+    
+    // Sum tokens from all successful steps
+    const totalTokens = trace
+      .filter((step) => step.status === 'ok' && step.tokens_used !== undefined)
+      .reduce((sum, step) => sum + (step.tokens_used ?? 0), 0);
+    
+    return {
+      agent_count: agentCount,
+      duration_ms: durationMs,
+      total_tokens: totalTokens,
+    };
+  }
+
+  /**
    * Runs the review pipeline: Code, Arch, Perf, Sec (parallel), then Aggregator.
    * Builds trace and saves result_snapshot + trace to review_runs.
    */
   async runPipeline(params: RunPipelineParams): Promise<PostReviewsResponse> {
     const { userId, userJwt, repoFullName, prNumber, prTitle, prDiff } = params;
+    const pipelineStartTime = new Date();
     const trace: TraceStep[] = [];
+
+    const agentDiff = truncateDiff(prDiff);
 
     // TODO: Remove repoFullName and prNumber parameters from agent.run() calls once correct OpenAI API key is configured
     const domainAgents = [
-      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(prDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(prDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(prDiff, repoFullName, prNumber) },
-      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(prDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(agentDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(agentDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(agentDiff, repoFullName, prNumber) },
+      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(agentDiff, repoFullName, prNumber) },
     ] as const;
 
-    const outcomes: DomainAgentOutcome[] = [];
-    for (const { name, run } of domainAgents) {
+    // Run all domain agents in parallel for better performance
+    const agentPromises = domainAgents.map(async ({ name, run }) => {
       const startedAt = new Date();
       try {
         const output = await run();
-        trace.push(buildTraceStep({ agent: name, startedAt, finishedAt: new Date(), status: 'ok' }));
-        outcomes.push({ output, status: 'ok' });
+        const finishedAt = new Date();
+        return {
+          name,
+          startedAt,
+          finishedAt,
+          outcome: { output, status: 'ok' as const },
+        };
       } catch (err) {
         // If it's an HttpException (e.g., OpenAI quota error), propagate it immediately
         if (err instanceof HttpException) {
           throw err;
         }
+        const finishedAt = new Date();
         const errorMessage = err instanceof Error ? err.message : String(err);
-        trace.push(buildTraceStep({ agent: name, startedAt, finishedAt: new Date(), status: 'failed' }));
+        return {
+          name,
+          startedAt,
+          finishedAt,
+          outcome: { error: errorMessage, status: 'failed' as const },
+        };
+      }
+    });
+
+    let agentResults;
+    try {
+      agentResults = await Promise.all(agentPromises);
+    } catch (err) {
+      // If any agent threw an HttpException, propagate it immediately
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      // Re-throw unexpected errors
+      throw err;
+    }
+    
+    // Build trace and outcomes from parallel results
+    const outcomes: DomainAgentOutcome[] = [];
+    for (const result of agentResults) {
+      trace.push(buildTraceStep({
+        agent: result.name,
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        status: result.outcome.status,
+      }));
+      outcomes.push(result.outcome);
+      
+      // If any agent failed, save and return early
+      if (result.outcome.status === 'failed') {
         const id = await this.reviewRunsRepository.create(
           {
             userId,
@@ -201,11 +232,11 @@ export class ReviewsService {
             prTitle: prTitle ?? null,
             status: 'failed',
             trace,
-            errorMessage,
+            errorMessage: result.outcome.error,
           },
           userJwt,
         );
-        return { id, status: 'failed', trace, error_message: errorMessage };
+        return { id, status: 'failed', trace, error_message: result.outcome.error };
       }
     }
 
@@ -269,9 +300,12 @@ export class ReviewsService {
       return { id, status: 'failed', trace, error_message: errorMessage };
     }
 
+    const executionMetadata = this.calculateExecutionMetadata(trace);
+    
     const resultSnapshot: ReviewResult = {
       findings: aggregatorOutput.findings,
       summary: aggregatorOutput.summary,
+      execution_metadata: executionMetadata,
     };
 
     const id = await this.reviewRunsRepository.create(
