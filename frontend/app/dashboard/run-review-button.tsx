@@ -132,6 +132,7 @@ export function RunReviewButton({
                 findings={result.findings}
                 executionMetadata={result.execution_metadata}
                 reviewSummary={result.review_summary}
+                prMetadata={result.pr_metadata}
               />
               <ReviewFindingsList findings={result.findings} />
             </>

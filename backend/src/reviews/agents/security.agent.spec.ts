@@ -86,12 +86,12 @@ describe('SecurityAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
-      expect(result.findings).toHaveLength(1);
-      expect(result.findings[0].id).toBe('s1');
-      expect(result.findings[0].severity).toBe('high');
-      expect(result.findings[0].category).toBe('security');
-      expect(result.summary).toBe('One security issue found.');
+      expect(result.output).toEqual(validJson);
+      expect(result.output.findings).toHaveLength(1);
+      expect(result.output.findings[0].id).toBe('s1');
+      expect(result.output.findings[0].severity).toBe('high');
+      expect(result.output.findings[0].category).toBe('security');
+      expect(result.output.summary).toBe('One security issue found.');
     });
 
     it('strips markdown code fences from response before parsing', async () => {
@@ -111,7 +111,7 @@ describe('SecurityAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
+      expect(result.output).toEqual(validJson);
     });
 
     it('throws when OpenAI returns invalid schema', async () => {

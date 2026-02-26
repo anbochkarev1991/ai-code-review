@@ -6,6 +6,8 @@
 
 import { type AgentOutput } from 'shared';
 import { DeterministicAggregator } from '../src/reviews/deterministic-aggregator';
+import { RiskEngine } from '../src/reviews/risk-engine';
+import { FindingNormalizer } from '../src/reviews/finding-normalizer';
 
 const MOCK_OUTPUTS: AgentOutput[] = [
   {
@@ -20,6 +22,7 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         message: 'No try/catch around async call',
         suggested_fix: 'Wrap in try/catch and handle errors',
         confidence: 0.85,
+        impact: 'Unhandled promise rejection could crash the process.',
       },
     ],
     summary: 'Code quality: one medium finding.',
@@ -36,6 +39,7 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         message: 'Service directly depends on database',
         suggested_fix: 'Introduce repository layer',
         confidence: 0.9,
+        impact: 'Direct database dependency prevents independent testing and deployment.',
       },
     ],
     summary: 'Architecture: coupling issue found.',
@@ -52,6 +56,7 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         message: 'Loop may cause N+1 queries',
         suggested_fix: 'Use batch fetch',
         confidence: 0.8,
+        impact: 'Could cause N+1 queries resulting in degraded performance under load.',
       },
     ],
     summary: 'Performance: potential N+1.',
@@ -68,6 +73,7 @@ const MOCK_OUTPUTS: AgentOutput[] = [
         message: 'Raw query concat with user input',
         suggested_fix: 'Use parameterized queries',
         confidence: 0.95,
+        impact: 'May allow remote SQL injection leading to full database compromise.',
       },
     ],
     summary: 'Security: critical vulnerability.',
@@ -75,7 +81,10 @@ const MOCK_OUTPUTS: AgentOutput[] = [
 ];
 
 function main() {
-  const aggregator = new DeterministicAggregator();
+  const riskEngine = new RiskEngine();
+  const findingNormalizer = new FindingNormalizer();
+  const aggregator = new DeterministicAggregator(riskEngine, findingNormalizer);
+
   console.log('Running Deterministic Aggregator on 4 mock outputs...');
   const result = aggregator.aggregate(MOCK_OUTPUTS);
   console.log('Findings (merged, deduped, sorted):');

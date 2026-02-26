@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
 import type { ParsedFile } from '../../types';
-import { callWithValidationRetry } from './agent-validation.utils';
+import {
+  callWithValidationRetry,
+  type CallWithValidationRetryResult,
+} from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
 const ARCHITECTURE_SYSTEM_PROMPT = `You are a senior software architect performing a diff-based code review.
@@ -36,6 +39,9 @@ FALSE POSITIVE REDUCTION:
 - If you cannot see the full module structure, lower confidence and note the assumption.
 - Prefer fewer, high-confidence findings over many speculative ones.
 
+IMPACT FIELD:
+For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "Tight coupling between auth and billing modules will make independent deployment impossible."
+
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
@@ -55,7 +61,7 @@ export class ArchitectureAgent {
     return this.client;
   }
 
-  async run(files: ParsedFile[]): Promise<AgentOutput> {
+  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -68,7 +74,7 @@ ${diffContent}
 
 Analyze ONLY the changed code for architecture and structural issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "architecture" for all findings. If no architecture issues exist, return empty findings array.`;
 
-    const result = await callWithValidationRetry({
+    return callWithValidationRetry({
       client,
       model,
       messages: [
@@ -76,7 +82,7 @@ Analyze ONLY the changed code for architecture and structural issues. For each f
         { role: 'user', content: userPrompt },
       ],
       agentName: 'Architecture',
+      promptSizeChars: ARCHITECTURE_SYSTEM_PROMPT.length + userPrompt.length,
     });
-    return result.output;
   }
 }

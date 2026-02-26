@@ -279,6 +279,8 @@ export class GitHubService {
       base: { sha: string; ref: string };
       head: { sha: string; ref: string };
       title?: string;
+      user?: { login: string };
+      commits?: number;
     };
     const baseSha = pull.base.sha;
     const headSha = pull.head.sha;
@@ -314,6 +316,12 @@ export class GitHubService {
       .filter((p) => !!p)
       .join('\n');
 
-    return { diff, files, pr_title: pull.title };
+    return {
+      diff,
+      files,
+      pr_title: pull.title,
+      pr_author: pull.user?.login,
+      commit_count: pull.commits,
+    };
   }
 }

@@ -85,11 +85,11 @@ describe('CodeQualityAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
-      expect(result.findings).toHaveLength(1);
-      expect(result.findings[0].id).toBe('f1');
-      expect(result.findings[0].severity).toBe('medium');
-      expect(result.summary).toBe('One code quality issue found.');
+      expect(result.output).toEqual(validJson);
+      expect(result.output.findings).toHaveLength(1);
+      expect(result.output.findings[0].id).toBe('f1');
+      expect(result.output.findings[0].severity).toBe('medium');
+      expect(result.output.summary).toBe('One code quality issue found.');
     });
 
     it('strips markdown code fences from response before parsing', async () => {
@@ -109,7 +109,7 @@ describe('CodeQualityAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
+      expect(result.output).toEqual(validJson);
     });
 
     it('throws when OpenAI returns invalid schema', async () => {

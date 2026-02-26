@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type {
   ExecutionMetadata,
   Finding,
+  PRMetadata,
   ReviewResult,
   TraceStep,
 } from 'shared';
@@ -11,12 +12,21 @@ interface FormatResultParams {
   findings: Finding[];
   reviewSummary: ReviewSummary;
   trace: TraceStep[];
+  prMetadata?: PRMetadata;
 }
 
+/**
+ * Result formatter — transforms internal aggregated data into the ReviewResult
+ * structure consumed by the API layer and persisted in the database.
+ *
+ * This module has no business logic. It is a pure structural mapping layer.
+ * Agents do not know about this format; the aggregator produces normalized
+ * internal structures that are mapped here to the API contract.
+ */
 @Injectable()
 export class ResultFormatter {
   format(params: FormatResultParams): ReviewResult {
-    const { findings, reviewSummary, trace } = params;
+    const { findings, reviewSummary, trace, prMetadata } = params;
     const executionMetadata = this.calculateExecutionMetadata(trace);
 
     return {
@@ -24,6 +34,7 @@ export class ResultFormatter {
       summary: reviewSummary.text,
       review_summary: reviewSummary,
       execution_metadata: executionMetadata,
+      pr_metadata: prMetadata,
     };
   }
 

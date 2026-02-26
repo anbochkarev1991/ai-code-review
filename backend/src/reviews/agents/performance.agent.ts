@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
 import type { ParsedFile } from '../../types';
-import { callWithValidationRetry } from './agent-validation.utils';
+import {
+  callWithValidationRetry,
+  type CallWithValidationRetryResult,
+} from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
 const PERFORMANCE_SYSTEM_PROMPT = `You are a senior performance engineer performing a diff-based code review.
@@ -35,6 +38,9 @@ FALSE POSITIVE REDUCTION:
 - Do NOT flag one-time initialization code as a hot-path performance issue.
 - If you cannot determine data size or call frequency, set confidence below 0.6.
 
+IMPACT FIELD:
+For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "N+1 query pattern will cause O(n) database calls, degrading response time linearly with collection size."
+
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
@@ -54,7 +60,7 @@ export class PerformanceAgent {
     return this.client;
   }
 
-  async run(files: ParsedFile[]): Promise<AgentOutput> {
+  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -67,7 +73,7 @@ ${diffContent}
 
 Analyze ONLY the changed lines for performance issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "performance" for all findings. If no performance issues exist, return empty findings array.`;
 
-    const result = await callWithValidationRetry({
+    return callWithValidationRetry({
       client,
       model,
       messages: [
@@ -75,7 +81,7 @@ Analyze ONLY the changed lines for performance issues. For each finding, referen
         { role: 'user', content: userPrompt },
       ],
       agentName: 'Performance',
+      promptSizeChars: PERFORMANCE_SYSTEM_PROMPT.length + userPrompt.length,
     });
-    return result.output;
   }
 }

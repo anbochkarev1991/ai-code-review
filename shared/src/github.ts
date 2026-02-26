@@ -36,6 +36,8 @@ export interface DiffResponse {
   diff: string;
   files: DiffFile[];
   pr_title?: string;
+  pr_author?: string;
+  commit_count?: number;
 }
 
 // ── Structured diff types for agent consumption ──

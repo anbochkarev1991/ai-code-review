@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
 import type { ParsedFile } from '../../types';
-import { callWithValidationRetry } from './agent-validation.utils';
+import {
+  callWithValidationRetry,
+  type CallWithValidationRetryResult,
+} from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
 const SECURITY_SYSTEM_PROMPT = `You are a senior security engineer performing a diff-based code review.
@@ -37,6 +40,9 @@ FALSE POSITIVE REDUCTION:
 - Do NOT flag test files for secrets unless they contain real credentials.
 - If you cannot determine the full context, lower your confidence and state the assumption.
 
+IMPACT FIELD:
+For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "Unsanitized user input in SQL query allows remote SQL injection leading to full database compromise."
+
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
@@ -56,7 +62,7 @@ export class SecurityAgent {
     return this.client;
   }
 
-  async run(files: ParsedFile[]): Promise<AgentOutput> {
+  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -69,7 +75,7 @@ ${diffContent}
 
 Analyze ONLY the changed lines for security vulnerabilities. For each finding, reference the exact file path and line number from the diff. Set "category" to "security" for all findings. If no security issues exist, return empty findings array.`;
 
-    const result = await callWithValidationRetry({
+    return callWithValidationRetry({
       client,
       model,
       messages: [
@@ -77,7 +83,7 @@ Analyze ONLY the changed lines for security vulnerabilities. For each finding, r
         { role: 'user', content: userPrompt },
       ],
       agentName: 'Security',
+      promptSizeChars: SECURITY_SYSTEM_PROMPT.length + userPrompt.length,
     });
-    return result.output;
   }
 }

@@ -28,6 +28,7 @@ describe('trace.utils', () => {
         startedAt: baseStarted,
         finishedAt: baseFinished,
         status: 'ok',
+        parallel: true,
       });
 
       expect(step).toMatchObject({
@@ -35,11 +36,9 @@ describe('trace.utils', () => {
         started_at: '2025-01-15T10:00:00.000Z',
         finished_at: '2025-01-15T10:00:05.000Z',
         status: 'ok',
+        parallel: true,
+        duration_ms: 5000,
       });
-      expect(step.agent).toBeDefined();
-      expect(step.started_at).toBeDefined();
-      expect(step.finished_at).toBeDefined();
-      expect(step.status).toBeDefined();
     });
 
     it('includes tokens_used when provided', () => {
@@ -49,6 +48,7 @@ describe('trace.utils', () => {
         finishedAt: baseFinished,
         status: 'ok',
         tokensUsed: 1200,
+        parallel: true,
       });
 
       expect(step.tokens_used).toBe(1200);
@@ -62,6 +62,7 @@ describe('trace.utils', () => {
         finishedAt: baseFinished,
         status: 'ok',
         rawOutput: smallRaw,
+        parallel: true,
       });
 
       expect(step.raw_output).toBe(smallRaw);
@@ -75,6 +76,7 @@ describe('trace.utils', () => {
         finishedAt: baseFinished,
         status: 'ok',
         rawOutput: longRaw,
+        parallel: true,
       });
 
       expect(step.raw_output).toHaveLength(TRACE_RAW_OUTPUT_MAX_LENGTH);
@@ -88,6 +90,7 @@ describe('trace.utils', () => {
         finishedAt: baseFinished,
         status: 'ok',
         rawOutput: '',
+        parallel: true,
       });
 
       expect(step.raw_output).toBeUndefined();
@@ -99,9 +102,33 @@ describe('trace.utils', () => {
         startedAt: baseStarted,
         finishedAt: baseFinished,
         status: 'failed',
+        parallel: true,
       });
 
       expect(step.status).toBe('failed');
+    });
+
+    it('includes telemetry fields when provided', () => {
+      const step = buildTraceStep({
+        agent: 'Security',
+        startedAt: baseStarted,
+        finishedAt: baseFinished,
+        status: 'ok',
+        parallel: true,
+        tokensUsed: 2134,
+        promptTokens: 1800,
+        completionTokens: 334,
+        promptSizeChars: 5200,
+        findingCount: 3,
+        avgConfidence: 0.813,
+      });
+
+      expect(step.tokens_used).toBe(2134);
+      expect(step.prompt_tokens).toBe(1800);
+      expect(step.completion_tokens).toBe(334);
+      expect(step.prompt_size_chars).toBe(5200);
+      expect(step.finding_count).toBe(3);
+      expect(step.avg_confidence).toBe(0.81);
     });
   });
 
@@ -118,6 +145,7 @@ describe('trace.utils', () => {
           finishedAt: finished,
           status: 'ok',
           tokensUsed: 100 + i * 10,
+          parallel: true,
         });
       });
 
@@ -134,6 +162,7 @@ describe('trace.utils', () => {
         expect(step.finished_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
         expect(step.status).toBe('ok');
         expect(step.tokens_used).toBe(100 + i * 10);
+        expect(step.parallel).toBe(true);
       });
     });
   });

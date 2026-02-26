@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
 
+export type FindingCategory = 'security' | 'performance' | 'architecture' | 'code-quality';
+
+export type RiskLevel = 'Low' | 'Moderate' | 'High' | 'Critical';
+
+export type MergeRecommendation = 'Safe to merge' | 'Merge with caution' | 'Block merge';
+
 /** Zod schema for agent output — validates findings + summary from code review agents */
 export const agentOutputSchema = z.object({
   findings: z.array(
@@ -18,6 +24,7 @@ export const agentOutputSchema = z.object({
       agent_name: z.string().optional(),
       confidence: z.number().min(0).max(1).optional(),
       reasoning_trace: z.string().optional(),
+      impact: z.string().optional(),
     })
   ),
   summary: z.string(),
@@ -30,7 +37,7 @@ export type AgentOutput = z.infer<typeof agentOutputSchema>;
  * Kept in sync with agentOutputSchema.
  */
 export const AGENT_OUTPUT_SCHEMA_PROMPT =
-  `{ "findings": [{ "id": string (e.g. "sec-1"), "title": string, "severity": "critical"|"high"|"medium"|"low" (lowercase only), "category": "security"|"performance"|"architecture"|"code-quality", "file": string (required — path from diff), "line": number (required — line number from diff), "message": string, "suggested_fix": string, "confidence": number (0-1, required, e.g. 0.85), "reasoning_trace"?: string }], "summary": string }. IMPORTANT: "id" must be a string, "severity" must be lowercase, "confidence" must be a number not a string. "file" and "line" are required — reference exact paths and lines from the diff. "suggested_fix" is the recommended code change.`;
+  `{ "findings": [{ "id": string (e.g. "sec-1"), "title": string, "severity": "critical"|"high"|"medium"|"low" (lowercase only), "category": "security"|"performance"|"architecture"|"code-quality", "file": string (required — path from diff), "line": number (required — line number from diff), "message": string, "suggested_fix": string, "confidence": number (0-1, required, e.g. 0.85), "impact": string (required — describe the business/system consequence, e.g. "May allow SQL injection leading to database compromise"), "reasoning_trace"?: string }], "summary": string }. IMPORTANT: "id" must be a string, "severity" must be lowercase, "confidence" must be a number not a string. "file" and "line" are required — reference exact paths and lines from the diff. "suggested_fix" is the recommended code change. "impact" describes business/system consequences of the issue.`;
 
 export interface Finding {
   id: string;
@@ -46,6 +53,19 @@ export interface Finding {
   agent_name?: string;
   confidence?: number;
   reasoning_trace?: string;
+  impact?: string;
+}
+
+/** PR metadata collected during diff analysis for transparency */
+export interface PRMetadata {
+  pr_number: number;
+  pr_title: string;
+  pr_author?: string;
+  commit_count?: number;
+  total_files_changed: number;
+  total_additions: number;
+  total_deletions: number;
+  analysis_scope: 'diff-only';
 }
 
 export interface ExecutionMetadata {
@@ -61,6 +81,10 @@ export interface ReviewSummary {
   medium_count: number;
   low_count: number;
   risk_score: number;
+  risk_level: RiskLevel;
+  merge_recommendation: MergeRecommendation;
+  primary_risk_category?: string;
+  most_severe_issue?: string;
   text: string;
 }
 
@@ -70,14 +94,23 @@ export interface ReviewResult {
   summary: string;
   review_summary?: ReviewSummary;
   execution_metadata?: ExecutionMetadata;
+  pr_metadata?: PRMetadata;
 }
 
 export interface TraceStep {
   agent: string;
   started_at: string;
   finished_at: string;
+  duration_ms?: number;
   tokens_used?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_size_chars?: number;
+  parallel: boolean;
   status: 'ok' | 'failed';
+  error_message?: string;
+  finding_count?: number;
+  avg_confidence?: number;
   /** Optional per-agent raw output; truncated if larger than TRACE_RAW_OUTPUT_MAX_LENGTH */
   raw_output?: string;
 }

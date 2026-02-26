@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
+import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
 import type { ParsedFile } from '../../types';
-import { callWithValidationRetry } from './agent-validation.utils';
+import {
+  callWithValidationRetry,
+  type CallWithValidationRetryResult,
+} from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
 const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior software engineer performing a diff-based code quality review.
@@ -36,6 +39,9 @@ FALSE POSITIVE REDUCTION:
 - If a pattern might be intentional (e.g., empty catch block with a comment), lower confidence.
 - Prefer fewer, actionable findings over comprehensive style nitpicks.
 
+IMPACT FIELD:
+For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "Missing null check could cause runtime TypeError crashing the request handler."
+
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
@@ -55,7 +61,7 @@ export class CodeQualityAgent {
     return this.client;
   }
 
-  async run(files: ParsedFile[]): Promise<AgentOutput> {
+  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -68,7 +74,7 @@ ${diffContent}
 
 Analyze ONLY the changed lines for code quality issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
 
-    const result = await callWithValidationRetry({
+    return callWithValidationRetry({
       client,
       model,
       messages: [
@@ -76,7 +82,7 @@ Analyze ONLY the changed lines for code quality issues. For each finding, refere
         { role: 'user', content: userPrompt },
       ],
       agentName: 'Code Quality',
+      promptSizeChars: CODE_QUALITY_SYSTEM_PROMPT.length + userPrompt.length,
     });
-    return result.output;
   }
 }

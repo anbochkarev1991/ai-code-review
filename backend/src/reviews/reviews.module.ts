@@ -7,6 +7,8 @@ import { PerformanceAgent } from './agents/performance.agent';
 import { SecurityAgent } from './agents/security.agent';
 import { DiffParser } from './diff-parser';
 import { DeterministicAggregator } from './deterministic-aggregator';
+import { FindingNormalizer } from './finding-normalizer';
+import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
 import { ReviewRunsRepository } from './review-runs.repository';
 import { ReviewsController } from './reviews.controller';
@@ -19,6 +21,8 @@ import { ReviewsService } from './reviews.service';
     ReviewsService,
     ReviewRunsRepository,
     DiffParser,
+    FindingNormalizer,
+    RiskEngine,
     DeterministicAggregator,
     ResultFormatter,
     CodeQualityAgent,

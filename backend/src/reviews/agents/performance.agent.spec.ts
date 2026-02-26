@@ -89,12 +89,12 @@ describe('PerformanceAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
-      expect(result.findings).toHaveLength(1);
-      expect(result.findings[0].id).toBe('p1');
-      expect(result.findings[0].severity).toBe('high');
-      expect(result.findings[0].category).toBe('performance');
-      expect(result.summary).toBe('One performance issue found.');
+      expect(result.output).toEqual(validJson);
+      expect(result.output.findings).toHaveLength(1);
+      expect(result.output.findings[0].id).toBe('p1');
+      expect(result.output.findings[0].severity).toBe('high');
+      expect(result.output.findings[0].category).toBe('performance');
+      expect(result.output.summary).toBe('One performance issue found.');
     });
 
     it('strips markdown code fences from response before parsing', async () => {
@@ -114,7 +114,7 @@ describe('PerformanceAgent', () => {
 
       const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
+      expect(result.output).toEqual(validJson);
     });
 
     it('throws when OpenAI returns invalid schema', async () => {

@@ -136,6 +136,33 @@ function FindingCard({ finding }: { finding: Finding }) {
             {finding.message}
           </div>
 
+          {/* Impact */}
+          {finding.impact && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+              <svg
+                className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  Impact:
+                </span>{" "}
+                <span className="text-xs text-amber-700 dark:text-amber-400">
+                  {finding.impact}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Suggested Fix */}
           {(finding.suggested_fix || finding.suggestion) && (
             <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30 p-3">

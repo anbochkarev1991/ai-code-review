@@ -22,12 +22,19 @@ export interface BuildTraceStepOptions {
   finishedAt: Date;
   status: 'ok' | 'failed';
   tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  promptSizeChars?: number;
+  parallel: boolean;
+  errorMessage?: string;
+  findingCount?: number;
+  avgConfidence?: number;
   rawOutput?: string;
 }
 
 /**
- * Builds a trace step for pipeline recording.
- * Per-agent raw output is truncated if larger than TRACE_RAW_OUTPUT_MAX_LENGTH.
+ * Builds an enriched trace step for pipeline recording.
+ * Includes latency, token breakdown, prompt size, and per-agent finding statistics.
  */
 export function buildTraceStep(options: BuildTraceStepOptions): TraceStep {
   const {
@@ -36,18 +43,47 @@ export function buildTraceStep(options: BuildTraceStepOptions): TraceStep {
     finishedAt,
     status,
     tokensUsed,
+    promptTokens,
+    completionTokens,
+    promptSizeChars,
+    parallel,
+    errorMessage,
+    findingCount,
+    avgConfidence,
     rawOutput,
   } = options;
+
+  const durationMs = finishedAt.getTime() - startedAt.getTime();
 
   const step: TraceStep = {
     agent,
     started_at: startedAt.toISOString(),
     finished_at: finishedAt.toISOString(),
+    duration_ms: durationMs,
+    parallel,
     status,
   };
 
   if (tokensUsed !== undefined) {
     step.tokens_used = tokensUsed;
+  }
+  if (promptTokens !== undefined) {
+    step.prompt_tokens = promptTokens;
+  }
+  if (completionTokens !== undefined) {
+    step.completion_tokens = completionTokens;
+  }
+  if (promptSizeChars !== undefined) {
+    step.prompt_size_chars = promptSizeChars;
+  }
+  if (errorMessage) {
+    step.error_message = errorMessage;
+  }
+  if (findingCount !== undefined) {
+    step.finding_count = findingCount;
+  }
+  if (avgConfidence !== undefined) {
+    step.avg_confidence = Math.round(avgConfidence * 100) / 100;
   }
 
   if (rawOutput !== undefined && rawOutput !== '') {
