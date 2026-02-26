@@ -20,6 +20,7 @@ import { PerformanceAgent } from './agents/performance.agent';
 import { SecurityAgent } from './agents/security.agent';
 import { GitHubService } from '../github/github.service';
 import { ReviewRunsRepository } from './review-runs.repository';
+import { SeverityNormalizer } from './severity-normalizer';
 import { buildTraceStep, TRACE_AGENT_NAMES } from './trace.utils';
 
 export interface RunPipelineParams {
@@ -65,6 +66,7 @@ export class ReviewsService {
     private readonly aggregatorAgent: AggregatorAgent,
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
+    private readonly severityNormalizer: SeverityNormalizer,
   ) {}
 
   /**
@@ -301,9 +303,12 @@ export class ReviewsService {
     }
 
     const executionMetadata = this.calculateExecutionMetadata(trace);
-    
+    const normalizedFindings = this.severityNormalizer.normalize(
+      aggregatorOutput.findings,
+    );
+
     const resultSnapshot: ReviewResult = {
-      findings: aggregatorOutput.findings,
+      findings: normalizedFindings,
       summary: aggregatorOutput.summary,
       execution_metadata: executionMetadata,
     };

@@ -9,6 +9,7 @@ import { SecurityAgent } from './agents/security.agent';
 import { ReviewRunsRepository } from './review-runs.repository';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
+import { SeverityNormalizer } from './severity-normalizer';
 
 @Module({
   imports: [BillingModule, GitHubModule],
@@ -21,6 +22,7 @@ import { ReviewsService } from './reviews.service';
     PerformanceAgent,
     SecurityAgent,
     AggregatorAgent,
+    SeverityNormalizer,
   ],
   exports: [
     ReviewsService,
