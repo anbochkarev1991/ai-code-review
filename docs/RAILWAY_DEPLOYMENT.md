@@ -27,20 +27,16 @@ Configure Railway to build `shared` first, then the backend. The backend `packag
 
 ---
 
-## Step 1: Update Backend Build Script
+## Step 1: Root-Level Build Configuration
 
-**Important:** Ensure `backend/package.json` has the updated build script:
+**Important:** A root-level `package.json` and `railway.json` have been created to handle Railway builds:
 
-```json
-{
-  "scripts": {
-    "build": "cd ../shared && npm install && npm run build && cd ../backend && npm install && nest build",
-    ...
-  }
-}
-```
+- **`package.json`** (root): Contains build scripts that Railway can use
+- **`railway.json`**: Railway configuration file (optional, Railway may auto-detect)
 
-This ensures `shared` is built before the backend.
+These files ensure `shared` is built before `backend` when deploying to Railway.
+
+**Note:** The `backend/package.json` build script remains unchanged for local development.
 
 ---
 
@@ -61,31 +57,50 @@ This ensures `shared` is built before the backend.
 ### 3.1 Set Root Directory
 
 1. In your Railway project, go to **Settings**
-2. Under **Root Directory**, set: `backend`
-   - This tells Railway to run commands from the `backend/` directory
-   - Railway will look for `package.json` in the `backend/` folder
+2. **Leave Root Directory empty** (or set to `/`)
+   - **Important:** Do NOT set Root Directory to `backend`
+   - Railway needs access to both `shared/` and `backend/` directories
+   - Railway will detect the root `package.json` and `railway.json` automatically
 
 ### 3.2 Configure Build Command
+
+**Option A: Using railway.json (Recommended)**
+
+If Railway detects `railway.json`, it will use:
+- **Build Command:** `npm run build` (from root `package.json`)
+- This automatically builds `shared` first, then `backend`
+
+**Option B: Manual Configuration**
+
+If Railway doesn't auto-detect, manually set:
 
 1. Go to **Settings** → **Build & Deploy**
 2. Set **Build Command** to:
    ```bash
    npm run build
    ```
-   - This uses the updated build script in `package.json` that builds `shared` first
+   - This uses the root `package.json` script that builds `shared` first, then `backend`
 
-**Alternative:** If you prefer to set it explicitly in Railway:
+**Alternative:** If you prefer explicit commands:
    ```bash
-   cd ../shared && npm install && npm run build && cd ../backend && npm install && npm run build
+   cd shared && npm install && npm run build && cd ../backend && npm install && npm run build
    ```
 
 ### 3.3 Configure Start Command
 
+**Option A: Using railway.json (Recommended)**
+
+If Railway detects `railway.json`, it will use:
+- **Start Command:** `npm run start:backend` (from root `package.json`)
+
+**Option B: Manual Configuration**
+
 1. Under **Start Command**, set:
    ```bash
-   npm run start:prod
+   npm run start:backend
    ```
-   - This runs `node dist/main` (production mode)
+   - Or explicitly: `cd backend && npm run start:prod`
+   - This navigates to `backend/` directory and runs `node dist/main` (production mode)
 
 ### 3.4 Set Node Version (Optional)
 
@@ -265,13 +280,33 @@ TS2307: Cannot find module 'shared' or its corresponding type declarations.
 ```
 
 **Solution:** 
-1. Verify `backend/package.json` has the updated build script:
-   ```json
-   "build": "cd ../shared && npm install && npm run build && cd ../backend && npm install && nest build"
+1. **Ensure Root Directory is NOT set to `backend`** - leave it empty or set to `/`
+2. Verify the build command builds `shared` first:
+   ```bash
+   cd shared && npm install && npm run build && cd ../backend && npm install && npm run build
    ```
-2. Check Railway build logs to ensure `shared` builds before `backend`
-3. Verify `shared/package.json` exists and has a `build` script
-4. Ensure Root Directory is set to `backend` in Railway settings
+3. Check Railway build logs to ensure `shared` builds before `backend`
+4. Verify `shared/package.json` exists and has a `build` script
+5. Ensure both `shared/` and `backend/` directories are accessible in the build context
+
+### Build Fails: "can't cd to ../shared"
+
+**Symptoms:**
+```
+sh: 1: cd: can't cd to ../shared
+```
+
+**Solution:**
+1. **Root Directory must be empty** (repo root), NOT set to `backend`
+2. Update Build Command to use relative paths from root:
+   ```bash
+   cd shared && npm install && npm run build && cd ../backend && npm install && npm run build
+   ```
+3. Do NOT use `../shared` - use `shared` since you're starting from repo root
+4. Verify Start Command navigates to backend:
+   ```bash
+   cd backend && npm run start:prod
+   ```
 
 ### TypeScript Errors During Build
 
@@ -369,9 +404,9 @@ Error: listen EADDRINUSE: address already in use :::3001
 Before going live, verify:
 
 - [ ] Railway project created and connected to GitHub
-- [ ] Root directory set to `backend`
-- [ ] Build command configured correctly
-- [ ] Start command set to `npm run start:prod`
+- [ ] Root directory left empty (repo root) - **NOT set to `backend`**
+- [ ] Build command configured to build `shared` first, then `backend`
+- [ ] Start command set to `cd backend && npm run start:prod`
 - [ ] All environment variables added
 - [ ] `FRONTEND_URL` set to production frontend URL
 - [ ] `GITHUB_OAUTH_REDIRECT_URI` updated to production URL
