@@ -29,14 +29,15 @@ Configure Railway to build `shared` first, then the backend. The backend `packag
 
 ## Step 1: Root-Level Build Configuration
 
-**Important:** A root-level `package.json` and `railway.json` have been created to handle Railway builds:
+**Important:** Configuration files have been created to handle Railway builds:
 
 - **`package.json`** (root): Contains build scripts that Railway can use
-- **`railway.json`**: Railway configuration file (optional, Railway may auto-detect)
+- **`railway.json`**: Railway configuration file
+- **`nixpacks.toml`**: Nixpacks build configuration (Railway's default builder)
 
 These files ensure `shared` is built before `backend` when deploying to Railway.
 
-**Note:** The `backend/package.json` build script remains unchanged for local development.
+**Note:** The `backend/package.json` build script is simplified to just `nest build` - the root-level scripts handle building `shared` first.
 
 ---
 
@@ -64,13 +65,19 @@ These files ensure `shared` is built before `backend` when deploying to Railway.
 
 ### 3.2 Configure Build Command
 
-**Option A: Using railway.json (Recommended)**
+**Option A: Using nixpacks.toml (Recommended - Auto-detected)**
+
+Railway will automatically detect `nixpacks.toml` and use it:
+- Builds `shared` first, then `backend`
+- No manual configuration needed if Root Directory is empty
+
+**Option B: Using railway.json**
 
 If Railway detects `railway.json`, it will use:
 - **Build Command:** `npm run build` (from root `package.json`)
 - This automatically builds `shared` first, then `backend`
 
-**Option B: Manual Configuration**
+**Option C: Manual Configuration**
 
 If Railway doesn't auto-detect, manually set:
 
@@ -83,17 +90,23 @@ If Railway doesn't auto-detect, manually set:
 
 **Alternative:** If you prefer explicit commands:
    ```bash
-   cd shared && npm install && npm run build && cd ../backend && npm install && npm run build
+   cd shared && npm install && npm run build && cd ../backend && npm install && npx nest build
    ```
 
 ### 3.3 Configure Start Command
 
-**Option A: Using railway.json (Recommended)**
+**Option A: Using nixpacks.toml (Recommended - Auto-detected)**
+
+Railway will automatically detect `nixpacks.toml` and use:
+- **Start Command:** `cd backend && npm run start:prod`
+- No manual configuration needed
+
+**Option B: Using railway.json**
 
 If Railway detects `railway.json`, it will use:
 - **Start Command:** `npm run start:backend` (from root `package.json`)
 
-**Option B: Manual Configuration**
+**Option C: Manual Configuration**
 
 1. Under **Start Command**, set:
    ```bash
