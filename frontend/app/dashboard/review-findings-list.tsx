@@ -504,6 +504,17 @@ function classifyFinding(finding: Finding): "systemic" | "code-level" {
   return "code-level";
 }
 
+function deduplicateIds(findings: Finding[]): Finding[] {
+  const seen = new Set<string>();
+  return findings.map((f, i) => {
+    if (seen.has(f.id)) {
+      return { ...f, id: `${f.id}-${i}` };
+    }
+    seen.add(f.id);
+    return f;
+  });
+}
+
 export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
   const [showAll, setShowAll] = useState(false);
 
@@ -515,8 +526,10 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
     );
   }
 
-  const systemic = findings.filter((f) => classifyFinding(f) === "systemic");
-  const codeLevelAll = findings.filter((f) => classifyFinding(f) === "code-level");
+  const uniqueFindings = deduplicateIds(findings);
+
+  const systemic = uniqueFindings.filter((f) => classifyFinding(f) === "systemic");
+  const codeLevelAll = uniqueFindings.filter((f) => classifyFinding(f) === "code-level");
 
   const visibleCodeLevel = showAll
     ? codeLevelAll

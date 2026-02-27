@@ -82,6 +82,8 @@ export class FindingNormalizer {
       result = result.filter((f) => f.confidence >= 0.6);
     }
 
+    result = this.deduplicateIds(result);
+
     return result;
   }
 
@@ -437,6 +439,22 @@ export class FindingNormalizer {
       if (consensusDiff !== 0) return consensusDiff;
 
       return b.confidence - a.confidence;
+    });
+  }
+
+  /**
+   * Re-assigns IDs to guarantee uniqueness. LLM-generated IDs (e.g. "sec-1")
+   * can collide across agents or diff chunks.
+   */
+  private deduplicateIds(findings: Finding[]): Finding[] {
+    const seen = new Set<string>();
+    return findings.map((f, index) => {
+      if (seen.has(f.id)) {
+        const prefix = f.category ?? 'f';
+        return { ...f, id: `${prefix}-${index + 1}` };
+      }
+      seen.add(f.id);
+      return f;
     });
   }
 }
