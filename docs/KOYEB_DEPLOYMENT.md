@@ -69,7 +69,7 @@ Configure Koyeb to build `shared` first, then the backend. A `Procfile` has been
    - The build process:
      1. Installs `shared` dependencies and builds it
      2. Installs `backend` dependencies and builds it
-     3. Creates `backend/dist/main.js` which is required to start the app
+     3. Creates `backend/dist/src/main.js` which is required to start the app
 
 **Alternative:** If you prefer explicit commands:
    ```bash
@@ -78,7 +78,7 @@ Configure Koyeb to build `shared` first, then the backend. A `Procfile` has been
 
 **Important:** 
 - The Build Command runs during the build phase and creates the `dist/` directory
-- Without this command, `backend/dist/main.js` won't exist and the app will fail to start
+- Without this command, `backend/dist/src/main.js` won't exist and the app will fail to start
 - Check the build logs to verify the build completed successfully before the app starts
 - **Note:** The `Procfile` has been updated to auto-build if the build artifacts don't exist, but it's still recommended to set the Build Command in Koyeb for faster deployments
 
@@ -97,7 +97,7 @@ Koyeb will automatically detect the `Procfile` and use:
    cd backend && npm run start:prod
    ```
    - Or use: `npm run start:backend` (from root `package.json`)
-   - This navigates to `backend/` directory and runs `node dist/main` (production mode)
+   - This navigates to `backend/` directory and runs `node dist/src/main.js` (production mode)
 
 ### 3.4 Configure Health Check
 
@@ -300,7 +300,7 @@ Error: Cannot find module '/workspace/backend/dist/main'
    npm run build
    ```
 2. Check Koyeb build logs to verify the build ran successfully
-3. Verify `backend/dist/main.js` exists after build (check build logs)
+3. Verify `backend/dist/src/main.js` exists after build (check build logs)
 4. The build must complete before the run command executes
 5. If build logs show errors, fix them before the app can start
 6. Ensure Root Directory is empty (repo root), not set to `backend`
@@ -448,7 +448,7 @@ Application exited with code 255
 - Check application logs for startup errors
 - Verify `/health` endpoint is accessible: `curl http://localhost:8000/health` (from within container)
 - Ensure all required environment variables are set
-- Verify build completed successfully (`backend/dist/main.js` exists)
+- Verify build completed successfully (`backend/dist/src/main.js` exists)
 
 ### Application Exits with Code 255
 
@@ -468,7 +468,7 @@ Application exited with code 255
    - `STRIPE_SECRET_KEY`
    - `OPENAI_API_KEY` (or set `USE_MOCK_OPENAI_RESPONSES=true` for testing)
 3. **Ensure app listens on `0.0.0.0`** - Updated `main.ts` to bind to `0.0.0.0` (required for containers)
-4. **Verify build completed** - Check that `backend/dist/main.js` exists after build
+4. **Verify build completed** - Check that `backend/dist/src/main.js` exists after build
 5. **Check for unhandled promise rejections** - Add error handling in `main.ts` (already added)
 
 ### Port Binding Error

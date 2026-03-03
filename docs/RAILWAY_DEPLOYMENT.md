@@ -113,7 +113,7 @@ If Railway detects `railway.json`, it will use:
    npm run start:backend
    ```
    - Or explicitly: `cd backend && npm run start:prod`
-   - This navigates to `backend/` directory and runs `node dist/main` (production mode)
+   - This navigates to `backend/` directory and runs `node dist/src/main.js` (production mode)
 
 ### 3.4 Set Node Version (Optional)
 
