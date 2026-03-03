@@ -1,0 +1,5 @@
+[build]
+command = "npm run build"
+
+[run]
+command = "cd backend && npm run start:prod"

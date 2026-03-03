@@ -59,6 +59,8 @@ Configure Koyeb to build `shared` first, then the backend. A `Procfile` has been
 
 ### 3.2 Configure Build Command
 
+**CRITICAL:** You MUST set the Build Command in Koyeb, otherwise the application will fail to start.
+
 1. In the **Build** section, set **Build Command** to:
    ```bash
    npm run build
@@ -67,11 +69,17 @@ Configure Koyeb to build `shared` first, then the backend. A `Procfile` has been
    - The build process:
      1. Installs `shared` dependencies and builds it
      2. Installs `backend` dependencies and builds it
+     3. Creates `backend/dist/main.js` which is required to start the app
 
 **Alternative:** If you prefer explicit commands:
    ```bash
    cd shared && npm install && npm run build && cd ../backend && npm install && npx nest build
    ```
+
+**Important:** 
+- The Build Command runs during the build phase and creates the `dist/` directory
+- Without this command, `backend/dist/main.js` won't exist and the app will fail to start
+- Check the build logs to verify the build completed successfully before the app starts
 
 ### 3.3 Configure Run Command
 
@@ -261,6 +269,24 @@ curl -H "Origin: https://your-frontend.vercel.app" \
 
 ## Troubleshooting
 
+### Error: "Cannot find module '/workspace/backend/dist/main'"
+
+**Symptoms:**
+```
+Error: Cannot find module '/workspace/backend/dist/main'
+```
+
+**Solution:**
+1. **CRITICAL:** Ensure **Build Command** is set in Koyeb dashboard:
+   ```
+   npm run build
+   ```
+2. Check Koyeb build logs to verify the build ran successfully
+3. Verify `backend/dist/main.js` exists after build (check build logs)
+4. The build must complete before the run command executes
+5. If build logs show errors, fix them before the app can start
+6. Ensure Root Directory is empty (repo root), not set to `backend`
+
 ### Error: "no command to run your application"
 
 **Symptoms:**
@@ -278,6 +304,7 @@ ERROR: no command to run your application: add a run command in your Service con
    cd backend && npm run start:prod
    ```
 3. Verify the Procfile is committed to git and pushed to your repository
+4. **Also ensure Build Command is set** - the app needs to be built before it can run
 
 ### Build Fails: "Cannot find module 'shared'"
 
