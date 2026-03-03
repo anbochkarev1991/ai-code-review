@@ -114,7 +114,9 @@ Go to **Variables** tab and add all required environment variables:
 
 ### Server
 - `PORT` - Koyeb will set this automatically, but you can override if needed
-  - Default: Koyeb assigns a port automatically (usually `8080`)
+  - **Important:** Do NOT set this manually - let Koyeb set it automatically
+  - Koyeb assigns a port automatically (usually `8000` or `8080`)
+  - The app will bind to `0.0.0.0` to accept connections from any interface
 
 ### Supabase
 - `SUPABASE_URL` - Your Supabase project URL
@@ -398,6 +400,29 @@ Access to fetch at 'https://your-backend.koyeb.app/...' from origin 'https://you
 4. Check backend logs for CORS configuration
 5. Verify `main.ts` has CORS enabled (should be enabled by default)
 
+### Application Exits with Code 255
+
+**Symptoms:**
+```
+Application exited with code 255
+TCP health check failed on port 8000
+```
+
+**Solution:**
+1. **Check application logs** - The app is crashing on startup, check logs for the actual error
+2. **Verify all required environment variables are set** - Missing env vars can cause startup failures:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GITHUB_CLIENT_ID`
+   - `GITHUB_CLIENT_SECRET`
+   - `STRIPE_SECRET_KEY`
+   - `OPENAI_API_KEY` (or set `USE_MOCK_OPENAI_RESPONSES=true` for testing)
+3. **Ensure app listens on `0.0.0.0`** - Updated `main.ts` to bind to `0.0.0.0` (required for containers)
+4. **Check health check configuration** - Koyeb health checks on port 8000 by default, ensure `PORT` env var is set by Koyeb
+5. **Verify build completed** - Check that `backend/dist/main.js` exists after build
+6. **Check for unhandled promise rejections** - Add error handling in `main.ts` (already added)
+
 ### Port Binding Error
 
 **Symptoms:**
@@ -407,9 +432,9 @@ Error: listen EADDRINUSE: address already in use :::3001
 
 **Solution:**
 1. Remove `PORT` from Koyeb variables (Koyeb sets it automatically)
-2. Or set `PORT` to Koyeb's `$PORT` environment variable
-3. Ensure backend uses `process.env.PORT ?? 3001` (should be default)
-4. Koyeb typically uses port `8080` by default
+2. Ensure backend uses `process.env.PORT ?? 3001` (should be default)
+3. The app now binds to `0.0.0.0` which is required for containerized deployments
+4. Koyeb typically uses port `8000` or `8080` by default
 
 ### Stripe Webhook Not Receiving Events
 
