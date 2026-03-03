@@ -99,7 +99,21 @@ Koyeb will automatically detect the `Procfile` and use:
    - Or use: `npm run start:backend` (from root `package.json`)
    - This navigates to `backend/` directory and runs `node dist/main` (production mode)
 
-### 3.4 Set Node Version (Optional)
+### 3.4 Configure Health Check
+
+1. In the **Health Check** section (or **Settings** → **Health Check**):
+   - **Type**: HTTP (or TCP if HTTP not available)
+   - **Path**: `/health` (if HTTP)
+   - **Port**: Leave empty or set to match Koyeb's assigned PORT
+   - **Interval**: 10 seconds (default)
+   - **Timeout**: 5 seconds (default)
+   
+   **Important:** 
+   - If using TCP health check, ensure the port matches what Koyeb assigns
+   - If using HTTP health check, use path `/health` which returns `{"status":"ok"}`
+   - The health check port should match the PORT environment variable Koyeb sets
+
+### 3.5 Set Node Version (Optional)
 
 1. In the **Build** section, you can specify Node version
 2. Set **Node Version** to `22` (or your preferred version)
@@ -113,10 +127,11 @@ Koyeb will automatically detect the `Procfile` and use:
 Go to **Variables** tab and add all required environment variables:
 
 ### Server
-- `PORT` - Koyeb will set this automatically, but you can override if needed
-  - **Important:** Do NOT set this manually - let Koyeb set it automatically
-  - Koyeb assigns a port automatically (usually `8000` or `8080`)
+- `PORT` - **Set to `8000`** if your health check port is fixed at 8000
+  - **Important:** If Koyeb's health check port is fixed and cannot be changed, set `PORT=8000` to match
+  - Check your Health Check configuration - if the port is locked to 8000, you MUST set `PORT=8000`
   - The app will bind to `0.0.0.0` to accept connections from any interface
+  - If health check port can be changed, leave PORT empty and let Koyeb set it automatically
 
 ### Supabase
 - `SUPABASE_URL` - Your Supabase project URL
@@ -400,12 +415,46 @@ Access to fetch at 'https://your-backend.koyeb.app/...' from origin 'https://you
 4. Check backend logs for CORS configuration
 5. Verify `main.ts` has CORS enabled (should be enabled by default)
 
+### TCP/HTTP Health Check Failed on Port 8000
+
+**Symptoms:**
+```
+TCP health check failed on port 8000
+HTTP health check failed on port 8000
+Application exited with code 255
+```
+
+**Solution:**
+
+**If Health Check Port is Fixed (Cannot Be Changed):**
+1. **Set `PORT=8000` in Koyeb Variables** - Match the fixed health check port
+2. **Verify health check configuration**:
+   - Type: HTTP (recommended) or TCP
+   - Path: `/health` (if HTTP)
+   - Port: 8000 (fixed, cannot be changed)
+3. **Verify app is listening on port 8000** - Check logs for: `Application is running on: http://0.0.0.0:8000`
+4. **Ensure app binds to `0.0.0.0`** - Already configured in `main.ts`
+
+**If Health Check Port Can Be Changed:**
+1. **Remove PORT environment variable** - Let Koyeb set it automatically
+2. **Update Health Check port** to match Koyeb's assigned PORT
+3. **Use HTTP health check** (recommended):
+   - Type: HTTP
+   - Path: `/health`
+   - Port: Match Koyeb's assigned PORT or leave empty
+4. **Verify app is listening** - Check logs for the actual port
+
+**General Troubleshooting:**
+- Check application logs for startup errors
+- Verify `/health` endpoint is accessible: `curl http://localhost:8000/health` (from within container)
+- Ensure all required environment variables are set
+- Verify build completed successfully (`backend/dist/main.js` exists)
+
 ### Application Exits with Code 255
 
 **Symptoms:**
 ```
 Application exited with code 255
-TCP health check failed on port 8000
 ```
 
 **Solution:**
@@ -419,9 +468,8 @@ TCP health check failed on port 8000
    - `STRIPE_SECRET_KEY`
    - `OPENAI_API_KEY` (or set `USE_MOCK_OPENAI_RESPONSES=true` for testing)
 3. **Ensure app listens on `0.0.0.0`** - Updated `main.ts` to bind to `0.0.0.0` (required for containers)
-4. **Check health check configuration** - Koyeb health checks on port 8000 by default, ensure `PORT` env var is set by Koyeb
-5. **Verify build completed** - Check that `backend/dist/main.js` exists after build
-6. **Check for unhandled promise rejections** - Add error handling in `main.ts` (already added)
+4. **Verify build completed** - Check that `backend/dist/main.js` exists after build
+5. **Check for unhandled promise rejections** - Add error handling in `main.ts` (already added)
 
 ### Port Binding Error
 
