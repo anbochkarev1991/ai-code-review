@@ -25,6 +25,7 @@ WORKDIR /app
 # shared runtime artifacts (backend depends on file:../shared)
 COPY shared/package*.json ./shared/
 COPY --from=builder /app/shared/dist ./shared/dist
+RUN cd shared && npm ci --omit=dev
 
 # backend runtime deps
 COPY backend/package*.json ./backend/
