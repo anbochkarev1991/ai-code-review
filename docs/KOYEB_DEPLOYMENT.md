@@ -80,6 +80,7 @@ Configure Koyeb to build `shared` first, then the backend. A `Procfile` has been
 - The Build Command runs during the build phase and creates the `dist/` directory
 - Without this command, `backend/dist/main.js` won't exist and the app will fail to start
 - Check the build logs to verify the build completed successfully before the app starts
+- **Note:** The `Procfile` has been updated to auto-build if the build artifacts don't exist, but it's still recommended to set the Build Command in Koyeb for faster deployments
 
 ### 3.3 Configure Run Command
 
