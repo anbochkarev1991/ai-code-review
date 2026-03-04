@@ -313,7 +313,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-amber-800 dark:text-amber-200">
               Failed to load profile from backend. Make sure the backend is running and NEXT_PUBLIC_BACKEND_URL is set.
             </p>
-            <p className="mt-2 font-mono text-xs text-zinc-500">
+            <p className="mt-3 rounded bg-zinc-800 px-2 py-1.5 font-mono text-sm text-zinc-100">
               Backend URL: {getBackendUrl()}
             </p>
           </div>
