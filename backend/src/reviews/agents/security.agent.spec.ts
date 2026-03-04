@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SecurityAgent } from './security.agent';
+import { DiffParser } from '../diff-parser';
+import type { ParsedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -14,6 +16,23 @@ jest.mock('openai', () => ({
   },
 }));
 
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/login.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 1,
+        endLine: 5,
+        content: '+const password = "hardcoded123";',
+        addedLines: ['const password = "hardcoded123";'],
+        removedLines: [],
+      },
+    ],
+  },
+];
+
 describe('SecurityAgent', () => {
   let agent: SecurityAgent;
   const originalEnv = process.env;
@@ -23,7 +42,7 @@ describe('SecurityAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SecurityAgent],
+      providers: [SecurityAgent, DiffParser],
     }).compile();
 
     agent = module.get(SecurityAgent);
@@ -36,8 +55,9 @@ describe('SecurityAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const freshAgent = new SecurityAgent();
-      await expect(freshAgent.run('diff')).rejects.toThrow(
+      const diffParser = new DiffParser();
+      const freshAgent = new SecurityAgent(diffParser);
+      await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );
     });
@@ -54,7 +74,7 @@ describe('SecurityAgent', () => {
             line: 4,
             message:
               'Username is interpolated directly into SQL query allowing injection.',
-            suggestion: 'Use parameterized queries or prepared statements.',
+            suggested_fix: 'Use parameterized queries or prepared statements.',
           },
         ],
         summary: 'One security issue found.',
@@ -64,14 +84,14 @@ describe('SecurityAgent', () => {
         choices: [{ message: { content: JSON.stringify(validJson) } }],
       });
 
-      const result = await agent.run('diff --git a/file b/file');
+      const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
-      expect(result.findings).toHaveLength(1);
-      expect(result.findings[0].id).toBe('s1');
-      expect(result.findings[0].severity).toBe('high');
-      expect(result.findings[0].category).toBe('security');
-      expect(result.summary).toBe('One security issue found.');
+      expect(result.output).toEqual(validJson);
+      expect(result.output.findings).toHaveLength(1);
+      expect(result.output.findings[0].id).toBe('s1');
+      expect(result.output.findings[0].severity).toBe('high');
+      expect(result.output.findings[0].category).toBe('security');
+      expect(result.output.summary).toBe('One security issue found.');
     });
 
     it('strips markdown code fences from response before parsing', async () => {
@@ -89,9 +109,9 @@ describe('SecurityAgent', () => {
         ],
       });
 
-      const result = await agent.run('diff');
+      const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
+      expect(result.output).toEqual(validJson);
     });
 
     it('throws when OpenAI returns invalid schema', async () => {
@@ -108,7 +128,7 @@ describe('SecurityAgent', () => {
         ],
       });
 
-      await expect(agent.run('diff')).rejects.toThrow('invalid JSON');
+      await expect(agent.run(SAMPLE_FILES)).rejects.toThrow('invalid JSON');
     });
   });
 });

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ArchitectureAgent } from './architecture.agent';
+import { DiffParser } from '../diff-parser';
+import type { ParsedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -14,6 +16,23 @@ jest.mock('openai', () => ({
   },
 }));
 
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/api.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 1,
+        endLine: 10,
+        content: '+import { db } from "./database";\n+const users = db.query("SELECT * FROM users");',
+        addedLines: ['import { db } from "./database";', 'const users = db.query("SELECT * FROM users");'],
+        removedLines: [],
+      },
+    ],
+  },
+];
+
 describe('ArchitectureAgent', () => {
   let agent: ArchitectureAgent;
   const originalEnv = process.env;
@@ -23,7 +42,7 @@ describe('ArchitectureAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ArchitectureAgent],
+      providers: [ArchitectureAgent, DiffParser],
     }).compile();
 
     agent = module.get(ArchitectureAgent);
@@ -36,8 +55,9 @@ describe('ArchitectureAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const freshAgent = new ArchitectureAgent();
-      await expect(freshAgent.run('diff')).rejects.toThrow(
+      const diffParser = new DiffParser();
+      const freshAgent = new ArchitectureAgent(diffParser);
+      await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );
     });
@@ -53,7 +73,7 @@ describe('ArchitectureAgent', () => {
             file: 'src/api.ts',
             line: 5,
             message: 'API layer directly imports and queries database.',
-            suggestion: 'Use a service layer to abstract data access.',
+            suggested_fix: 'Use a service layer to abstract data access.',
           },
         ],
         summary: 'One architecture issue found.',
@@ -63,14 +83,14 @@ describe('ArchitectureAgent', () => {
         choices: [{ message: { content: JSON.stringify(validJson) } }],
       });
 
-      const result = await agent.run('diff --git a/file b/file');
+      const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
-      expect(result.findings).toHaveLength(1);
-      expect(result.findings[0].id).toBe('a1');
-      expect(result.findings[0].severity).toBe('high');
-      expect(result.findings[0].category).toBe('architecture');
-      expect(result.summary).toBe('One architecture issue found.');
+      expect(result.output).toEqual(validJson);
+      expect(result.output.findings).toHaveLength(1);
+      expect(result.output.findings[0].id).toBe('a1');
+      expect(result.output.findings[0].severity).toBe('high');
+      expect(result.output.findings[0].category).toBe('architecture');
+      expect(result.output.summary).toBe('One architecture issue found.');
     });
 
     it('strips markdown code fences from response before parsing', async () => {
@@ -88,9 +108,9 @@ describe('ArchitectureAgent', () => {
         ],
       });
 
-      const result = await agent.run('diff');
+      const result = await agent.run(SAMPLE_FILES);
 
-      expect(result).toEqual(validJson);
+      expect(result.output).toEqual(validJson);
     });
 
     it('throws when OpenAI returns invalid schema', async () => {
@@ -107,7 +127,7 @@ describe('ArchitectureAgent', () => {
         ],
       });
 
-      await expect(agent.run('diff')).rejects.toThrow('invalid JSON');
+      await expect(agent.run(SAMPLE_FILES)).rejects.toThrow('invalid JSON');
     });
   });
 });

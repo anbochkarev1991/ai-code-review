@@ -50,6 +50,11 @@ function normalizeLlmOutput(parsed: unknown): unknown {
       }
     }
 
+    // Normalize suggestion -> suggested_fix for backward compatibility
+    if (f.suggestion && !f.suggested_fix) {
+      f.suggested_fix = f.suggestion;
+    }
+
     return f;
   });
 
@@ -78,12 +83,15 @@ export interface CallWithValidationRetryOptions {
   model: string;
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   agentName: string;
+  promptSizeChars?: number;
 }
 
 export interface CallWithValidationRetryResult {
   output: AgentOutput;
   rawContent: string;
   tokensUsed?: number;
+  promptTokens?: number;
+  completionTokens?: number;
 }
 
 /**
@@ -145,10 +153,14 @@ export async function callWithValidationRetry(
     const validated = parseAndValidate(raw);
     if (validated.success) {
       const tokensUsed = completion.usage?.total_tokens;
+      const promptTokens = completion.usage?.prompt_tokens;
+      const completionTokens = completion.usage?.completion_tokens;
       return {
         output: validated.data,
         rawContent: raw,
         tokensUsed,
+        promptTokens,
+        completionTokens,
       };
     }
 

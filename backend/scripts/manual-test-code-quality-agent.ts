@@ -1,20 +1,45 @@
 /**
- * Manual test for Code Quality Agent (task 4.3).
+ * Manual test for Code Quality Agent.
  * Run with: npx ts-node -r tsconfig-paths/register scripts/manual-test-code-quality-agent.ts
  * Requires OPENAI_API_KEY in env.
  */
 
+import type { ParsedFile } from '../src/types';
 import { CodeQualityAgent } from '../src/reviews/agents/code-quality.agent';
+import { DiffParser } from '../src/reviews/diff-parser';
 
-const SAMPLE_DIFF = `diff --git a/src/utils.ts b/src/utils.ts
-index 1234567..abcdefg 100644
---- a/src/utils.ts
-+++ b/src/utils.ts
-@@ -10,6 +10,7 @@ export function process(data: unknown) {
-   const x = 1;
-+  const unused = 42;
-   return data;
- }`;
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/utils.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 1,
+        endLine: 10,
+        content: `+export function processData(data: any) {
++  const x = 42;
++  let result;
++  for (let i = 0; i < data.length; i++) {
++    result = data[i];
++  }
++  return result;
++}`,
+        addedLines: [
+          'export function processData(data: any) {',
+          '  const x = 42;',
+          '  let result;',
+          '  for (let i = 0; i < data.length; i++) {',
+          '    result = data[i];',
+          '  }',
+          '  return result;',
+          '}',
+        ],
+        removedLines: [],
+      },
+    ],
+  },
+];
 
 async function main() {
   if (!process.env.OPENAI_API_KEY) {
@@ -22,9 +47,10 @@ async function main() {
     process.exit(1);
   }
 
-  const agent = new CodeQualityAgent();
-  console.log('Running Code Quality Agent on sample diff...');
-  const result = await agent.run(SAMPLE_DIFF);
+  const diffParser = new DiffParser();
+  const agent = new CodeQualityAgent(diffParser);
+  console.log('Running Code Quality Agent on sample parsed files...');
+  const result = await agent.run(SAMPLE_FILES);
   console.log('Result (JSON matching schema):');
   console.log(JSON.stringify(result, null, 2));
   console.log('\nManual test passed: returned JSON matches schema.');

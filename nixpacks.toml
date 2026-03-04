@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["nodejs-22_x"]
+
+[phases.install]
+cmds = [
+  "cd shared && npm install",
+  "cd ../backend && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd shared && npm run build",
+  "cd ../backend && npx nest build"
+]
+
+[start]
+cmd = "cd backend && npm run start:prod"

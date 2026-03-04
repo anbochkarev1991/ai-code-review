@@ -6,6 +6,8 @@ import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
 import { GitHubCallbackHandler } from "./github-callback-handler";
 import { Tooltip } from "./tooltip";
+import { UsageProvider } from "./usage-context";
+import { UsageCounter } from "./usage-counter";
 
 async function fetchBillingUsage(
   accessToken: string
@@ -136,6 +138,7 @@ export default async function DashboardPage() {
         </div>
 
         {me ? (
+          <UsageProvider initialUsage={usage} accessToken={session.access_token}>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Left Sidebar - Profile & Stats */}
             <div className="flex flex-col gap-6 lg:col-span-1">
@@ -173,24 +176,7 @@ export default async function DashboardPage() {
                   Usage
                 </h2>
                 <div className="space-y-4">
-                  <div>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="text-zinc-600 dark:text-zinc-400">Reviews this month</span>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {usage ? `${usage.review_count} / ${usage.limit}` : "—"}
-                      </span>
-                    </div>
-                    {usage && (
-                      <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                        <div
-                          className="h-full bg-zinc-900 transition-all dark:bg-zinc-100"
-                          style={{
-                            width: `${Math.min((usage.review_count / usage.limit) * 100, 100)}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <UsageCounter />
                   <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
                     <span className="text-sm text-zinc-600 dark:text-zinc-400">Plan</span>
                     <span className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-100">
@@ -316,6 +302,7 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+          </UsageProvider>
         ) : (
           <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-800 dark:bg-zinc-900">
             <p className="text-sm text-amber-800 dark:text-amber-200">

@@ -1,0 +1,13 @@
+[build]
+command = "npm run build"
+
+[run]
+command = "npm run build && cd backend && npm run start:prod"
+
+[healthcheck]
+path = "/health"
+port = 8000
+interval = 10
+timeout = 5
+success_threshold = 1
+failure_threshold = 3

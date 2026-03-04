@@ -1,24 +1,47 @@
 /**
- * Manual test for Performance Agent (task 4.5).
+ * Manual test for Performance Agent.
  * Run with: npx ts-node -r tsconfig-paths/register scripts/manual-test-performance-agent.ts
  * Requires OPENAI_API_KEY in env.
  */
 
+import type { ParsedFile } from '../src/types';
 import { PerformanceAgent } from '../src/reviews/agents/performance.agent';
+import { DiffParser } from '../src/reviews/diff-parser';
 
-const SAMPLE_DIFF = `diff --git a/src/api.ts b/src/api.ts
-index 1234567..abcdefg 100644
---- a/src/api.ts
-+++ b/src/api.ts
-@@ -1,5 +1,12 @@
- export function getUsers(ids: string[]) {
+const SAMPLE_FILES: ParsedFile[] = [
+  {
+    path: 'src/api.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [
+      {
+        startLine: 10,
+        endLine: 25,
+        content: `+async function loadUsers() {
++  const users = await db.query('SELECT * FROM users');
 +  const results = [];
-+  for (const id of ids) {
-+    results.push(db.query('SELECT * FROM users WHERE id = ?', [id]));
++  for (const user of users) {
++    const profile = await db.query(\`SELECT * FROM profiles WHERE user_id = \${user.id}\`);
++    results.push({ ...user, profile });
 +  }
-+  return Promise.all(results);
-   return processData(ids);
- }`;
++  return results;
++}`,
+        addedLines: [
+          'async function loadUsers() {',
+          "  const users = await db.query('SELECT * FROM users');",
+          '  const results = [];',
+          '  for (const user of users) {',
+          '    const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',
+          '    results.push({ ...user, profile });',
+          '  }',
+          '  return results;',
+          '}',
+        ],
+        removedLines: [],
+      },
+    ],
+  },
+];
 
 async function main() {
   if (!process.env.OPENAI_API_KEY) {
@@ -26,9 +49,10 @@ async function main() {
     process.exit(1);
   }
 
-  const agent = new PerformanceAgent();
-  console.log('Running Performance Agent on sample diff...');
-  const result = await agent.run(SAMPLE_DIFF);
+  const diffParser = new DiffParser();
+  const agent = new PerformanceAgent(diffParser);
+  console.log('Running Performance Agent on sample parsed files...');
+  const result = await agent.run(SAMPLE_FILES);
   console.log('Result (JSON matching schema):');
   console.log(JSON.stringify(result, null, 2));
   console.log('\nManual test passed: returned JSON matches schema.');

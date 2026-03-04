@@ -1,20 +1,54 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import { AGENT_OUTPUT_SCHEMA_PROMPT, type AgentOutput } from 'shared';
-import { callWithValidationRetry } from './agent-validation.utils';
-// TODO: Remove mock import once correct OpenAI API key is configured
+import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
+import type { ParsedFile } from '../../types';
 import {
-  MOCK_CODE_QUALITY_RESPONSE,
-  shouldUseMockResponses,
-} from './mock-responses';
+  callWithValidationRetry,
+  type CallWithValidationRetryResult,
+} from './agent-validation.utils';
+import { DiffParser } from '../diff-parser';
 
-const CODE_QUALITY_SYSTEM_PROMPT = `You are a code quality reviewer. Analyze pull request diffs for style issues, readability, maintainability, potential bugs, and adherence to best practices.
+const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior software engineer performing a diff-based code quality review.
+You are given ONLY the changed hunks from a Pull Request — do NOT assume anything about code outside these hunks.
+
+ANALYSIS SCOPE — Diff-Aware Rules:
+- Focus on NEWLY ADDED code (lines prefixed with "+").
+- Note removed error handling, tests, or type safety (lines prefixed with "-").
+- Context lines show surrounding code for reference only.
+- Do NOT hallucinate types, variables, or functions that are not shown in the diff.
+
+WHAT TO DETECT:
+1. Bugs: null/undefined dereferences, off-by-one errors, incorrect logic, race conditions
+2. Error handling: missing try/catch, swallowed errors, generic catch-all without logging
+3. Type safety: unsafe casts, missing type guards, any types where specific types are possible
+4. Code duplication: repeated patterns that should be extracted
+5. Readability: overly complex expressions, misleading names, deeply nested logic
+6. Dead code: unused variables, unreachable branches, leftover debug statements
+7. Missing edge cases: empty arrays, null values, concurrent access
+8. Test quality: if test files are in the diff, check for meaningful assertions and coverage
+
+SEVERITY CALIBRATION — Be conservative:
+- critical: (rare for code quality) Definite bugs that will cause crashes or data corruption in production
+- high: Missing error handling on critical paths, race conditions, type-unsafe casts on user data
+- medium: Poor error handling, code duplication, missing null checks on non-critical paths
+- low: Readability improvements, naming suggestions, minor style issues
+
+FALSE POSITIVE REDUCTION:
+- Do NOT flag style preferences (e.g., arrow functions vs function declarations) unless they impact readability.
+- Do NOT flag TODO comments as findings.
+- If a pattern might be intentional (e.g., empty catch block with a comment), lower confidence.
+- Prefer fewer, actionable findings over comprehensive style nitpicks.
+
+IMPACT FIELD:
+For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "Missing null check could cause runtime TypeError crashing the request handler."
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
 export class CodeQualityAgent {
   private client: OpenAI | null = null;
+
+  constructor(private readonly diffParser: DiffParser) {}
 
   private getClient(): OpenAI {
     if (!this.client) {
@@ -27,30 +61,20 @@ export class CodeQualityAgent {
     return this.client;
   }
 
-  /**
-   * Runs the Code Quality Agent on a PR diff.
-   * Returns structured findings and summary matching the agent output schema.
-   * On validation failure, retries up to 2 times with "invalid JSON" message before throwing.
-   */
-  async run(prDiff: string, repoFullName?: string, prNumber?: number): Promise<AgentOutput> {
-    // TODO: Remove mock response check once correct OpenAI API key is configured
-    if (shouldUseMockResponses(repoFullName, prNumber)) {
-      return MOCK_CODE_QUALITY_RESPONSE;
-    }
-
+  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
-    const userPrompt = `Schema (respond with a single JSON object only): ${AGENT_OUTPUT_SCHEMA_PROMPT}
+    const diffContent = this.diffParser.formatForPrompt(files, 3500);
 
-PR diff:
-\`\`\`diff
-${prDiff}
-\`\`\`
+    const userPrompt = `Respond with a single JSON object matching this schema: ${AGENT_OUTPUT_SCHEMA_PROMPT}
 
-Analyze the diff for code quality issues and return one JSON object.`;
+Changed files in this Pull Request:
+${diffContent}
 
-    const result = await callWithValidationRetry({
+Analyze ONLY the changed lines for code quality issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
+
+    return callWithValidationRetry({
       client,
       model,
       messages: [
@@ -58,7 +82,7 @@ Analyze the diff for code quality issues and return one JSON object.`;
         { role: 'user', content: userPrompt },
       ],
       agentName: 'Code Quality',
+      promptSizeChars: CODE_QUALITY_SYSTEM_PROMPT.length + userPrompt.length,
     });
-    return result.output;
   }
 }

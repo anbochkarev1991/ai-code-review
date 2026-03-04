@@ -8,6 +8,7 @@ import type {
   GetReviewsResponse,
   ReviewResult,
   ReviewRun,
+  ReviewStatus,
   TraceStep,
 } from 'shared';
 
@@ -16,7 +17,7 @@ export interface CreateReviewRunParams {
   repoFullName: string;
   prNumber: number;
   prTitle: string | null;
-  status: 'completed' | 'failed';
+  status: ReviewStatus;
   resultSnapshot?: ReviewResult;
   trace?: TraceStep[];
   errorMessage?: string | null;
@@ -123,7 +124,7 @@ export class ReviewRunsRepository {
     };
     return {
       id: row.id,
-      status: row.status,
+      status: row.status as ReviewStatus,
       result_snapshot: row.result_snapshot as ReviewResult | undefined,
       trace: (row.trace as TraceStep[] | undefined) ?? undefined,
       error_message: row.error_message ?? undefined,
@@ -183,7 +184,7 @@ export class ReviewRunsRepository {
       repo_full_name: row.repo_full_name,
       pr_number: row.pr_number,
       pr_title: row.pr_title ?? '',
-      status: row.status,
+      status: row.status as ReviewStatus,
       result_snapshot: row.result_snapshot as ReviewRun['result_snapshot'],
       trace: row.trace as ReviewRun['trace'],
       error_message: row.error_message,
