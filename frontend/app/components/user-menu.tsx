@@ -46,7 +46,7 @@ export function UserMenu({ userEmail, userName, avatarUrl }: UserMenuProps) {
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : userEmail[0].toUpperCase();
+    : (userEmail[0] ?? "?").toUpperCase();
 
   return (
     <div className="relative" ref={menuRef}>

@@ -38,7 +38,7 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
         <div className="bg-zinc-900 dark:bg-zinc-950 p-3 font-mono text-xs leading-5 overflow-x-auto">
           {diffContext.diff_context_before && (
             <div className="text-zinc-500">
-              {diffContext.diff_context_before.split("\n").map((l: string, i) => (
+              {diffContext.diff_context_before.split("\n").map((l: string, i: number) => (
                 <div key={`before-${i}`}>{l || "\u00A0"}</div>
               ))}
             </div>
@@ -48,7 +48,7 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
           </div>
           {diffContext.diff_context_after && (
             <div className="text-zinc-500">
-              {diffContext.diff_context_after.split("\n").map((l: string, i) => (
+              {diffContext.diff_context_after.split("\n").map((l: string, i: number) => (
                 <div key={`after-${i}`}>{l || "\u00A0"}</div>
               ))}
             </div>

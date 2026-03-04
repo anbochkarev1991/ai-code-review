@@ -198,8 +198,9 @@ function CustomPRDropdown({
         break;
       case "Enter":
         event.preventDefault();
-        if (highlightedIndex >= 0 && highlightedIndex < pulls.length) {
-          handleSelect(pulls[highlightedIndex]);
+        const pull = highlightedIndex >= 0 ? pulls[highlightedIndex] : undefined;
+        if (pull !== undefined) {
+          handleSelect(pull);
         }
         break;
       case "Escape":

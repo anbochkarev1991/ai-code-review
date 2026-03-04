@@ -90,8 +90,9 @@ export function RepoSelector({
         break;
       case "Enter":
         event.preventDefault();
-        if (highlightedIndex >= 0 && highlightedIndex < repos.length) {
-          handleSelect(repos[highlightedIndex]);
+        const repo = highlightedIndex >= 0 ? repos[highlightedIndex] : undefined;
+        if (repo !== undefined) {
+          handleSelect(repo);
         }
         break;
       case "Escape":
