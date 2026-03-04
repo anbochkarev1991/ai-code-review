@@ -20,7 +20,7 @@ async function fetchReview(
     });
     if (!res.ok) return null;
     return res.json();
-  } catch (error) {
+  } catch (error: unknown) {
     // Handle network errors, DNS failures, etc.
     console.error("Failed to fetch review:", error);
     return null;

@@ -19,7 +19,7 @@ export function RepoSelector({
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const selectedRepo = repos.find((repo) => repo.full_name === value);
+  const selectedRepo = repos.find((repo: Repo) => repo.full_name === value);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -146,7 +146,7 @@ export function RepoSelector({
               role="listbox"
               className="max-h-64 overflow-y-auto"
             >
-              {repos.map((repo, index) => {
+              {repos.map((repo: Repo, index: number) => {
                 const isSelected = repo.full_name === value;
                 const isHighlighted = index === highlightedIndex;
 

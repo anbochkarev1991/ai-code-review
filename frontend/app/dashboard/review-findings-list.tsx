@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Finding, DiffContext } from "@/lib/types";
+import type { Finding, DiffContext, AffectedLocation } from "@/lib/types";
 
 const DEFAULT_VISIBLE_FINDINGS = 5;
 
@@ -87,7 +87,7 @@ function AffectedLocationsExpander({ locations }: { locations: { file: string; l
       </button>
       {expanded && (
         <div className="px-3 py-2 flex flex-col gap-1">
-          {locations.map((loc, i) => (
+          {locations.map((loc: AffectedLocation, i: number) => (
             <div key={i} className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono">
               <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -417,7 +417,7 @@ function FindingCard({ finding }: { finding: Finding }) {
                     <div className="flex items-center gap-1.5">
                       <span className="text-zinc-500 dark:text-zinc-400">Agent:</span>
                       {finding.merged_agents ? (
-                        finding.merged_agents.map((agent) => (
+                        finding.merged_agents.map((agent: string) => (
                           <span
                             key={agent}
                             className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
@@ -506,7 +506,7 @@ function classifyFinding(finding: Finding): "systemic" | "code-level" {
 
 function deduplicateIds(findings: Finding[]): Finding[] {
   const seen = new Set<string>();
-  return findings.map((f, i) => {
+  return findings.map((f: Finding, i: number) => {
     if (seen.has(f.id)) {
       return { ...f, id: `${f.id}-${i}` };
     }
@@ -528,8 +528,8 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
 
   const uniqueFindings = deduplicateIds(findings);
 
-  const systemic = uniqueFindings.filter((f) => classifyFinding(f) === "systemic");
-  const codeLevelAll = uniqueFindings.filter((f) => classifyFinding(f) === "code-level");
+  const systemic = uniqueFindings.filter((f: Finding) => classifyFinding(f) === "systemic");
+  const codeLevelAll = uniqueFindings.filter((f: Finding) => classifyFinding(f) === "code-level");
 
   const visibleCodeLevel = showAll
     ? codeLevelAll
@@ -553,7 +553,7 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
           <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Systemic Issues
           </h4>
-          {systemic.map((finding) => (
+          {systemic.map((finding: Finding) => (
             <FindingCard key={finding.id} finding={finding} />
           ))}
         </div>
@@ -566,7 +566,7 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
             Code-Level Issues
           </h4>
         )}
-        {visibleCodeLevel.map((finding) => (
+        {visibleCodeLevel.map((finding: Finding) => (
           <FindingCard key={finding.id} finding={finding} />
         ))}
       </div>

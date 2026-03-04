@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { GetReviewsResponse } from "@/lib/types";
+import type { GetReviewsResponse, ReviewRun } from "@/lib/types";
 
 async function fetchReviews(
   accessToken: string,
@@ -21,7 +21,7 @@ async function fetchReviews(
     );
     if (!res.ok) return null;
     return res.json();
-  } catch (error) {
+  } catch (error: unknown) {
     // Handle network errors, DNS failures, etc.
     console.error("Failed to fetch reviews:", error);
     return null;
@@ -126,7 +126,7 @@ export default async function ReviewsPage() {
               Showing {reviewsData.items.length} of {reviewsData.total} reviews
             </p>
             <div className="flex flex-col gap-3">
-              {reviewsData.items.map((review) => (
+              {reviewsData.items.map((review: ReviewRun) => (
                 <Link
                   key={review.id}
                   href={`/reviews/${review.id}`}

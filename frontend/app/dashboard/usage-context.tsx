@@ -55,7 +55,7 @@ export function UsageProvider({
         console.debug("[UsageProvider] reconciled with server", data);
         setUsage(data);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("[UsageProvider] refetch failed", err);
     }
   }, [accessToken]);

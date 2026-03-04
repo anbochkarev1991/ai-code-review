@@ -40,12 +40,12 @@ export function PRSelector({
         cache: "no-store",
       }
     )
-      .then(async (res) => {
+      .then(async (res: Response) => {
         if (cancelled) return null;
         if (!res.ok) return null;
         return res.json() as Promise<PullsResponse>;
       })
-      .then((data) => {
+      .then((data: PullsResponse | null) => {
         if (cancelled) return;
         if (data) {
           setPulls(data.pulls);
@@ -53,7 +53,7 @@ export function PRSelector({
           setError("Failed to load pull requests.");
         }
       })
-      .catch(() => {
+      .catch((_err: unknown) => {
         if (!cancelled) {
           setError("Failed to load pull requests.");
         }
@@ -127,7 +127,7 @@ function CustomPRDropdown({
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const selectedPull = pulls.find((pull) => pull.number.toString() === value);
+  const selectedPull = pulls.find((pull: Pull) => pull.number.toString() === value);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -253,7 +253,7 @@ function CustomPRDropdown({
               role="listbox"
               className="max-h-64 overflow-y-auto"
             >
-              {pulls.map((pull, index) => {
+              {pulls.map((pull: Pull, index: number) => {
                 const isSelected = pull.number.toString() === value;
                 const isHighlighted = index === highlightedIndex;
 

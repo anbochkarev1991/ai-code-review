@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { UserMenu } from "./user-menu";
 
+type NavLink = { href: string; label: string };
+
 interface HeaderClientProps {
-  links: Array<{ href: string; label: string }>;
+  links: NavLink[];
   isAuthenticated: boolean;
   userEmail: string;
   userName?: string;
@@ -28,7 +30,7 @@ export function HeaderClient({
       <div className="flex flex-1 items-center justify-end gap-4">
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-6 md:flex">
-          {links.map((link) => {
+          {links.map((link: NavLink) => {
             const isActive =
               pathname === link.href ||
               (link.href !== "/" && pathname?.startsWith(link.href));
@@ -127,7 +129,7 @@ function MobileNavigation({
   isAuthenticated,
   onLinkClick,
 }: {
-  links: Array<{ href: string; label: string }>;
+  links: NavLink[];
   currentPath?: string | null;
   isAuthenticated: boolean;
   onLinkClick: () => void;
@@ -135,7 +137,7 @@ function MobileNavigation({
   return (
     <nav>
       <div className="flex flex-col gap-2">
-        {links.map((link) => {
+        {links.map((link: NavLink) => {
           const isActive =
             currentPath === link.href ||
             (link.href !== "/" && currentPath?.startsWith(link.href));

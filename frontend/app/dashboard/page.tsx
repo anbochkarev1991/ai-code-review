@@ -28,7 +28,7 @@ async function fetchBillingUsage(
       return null;
     }
     return res.json();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching billing usage:", error);
     return null;
   }
@@ -54,7 +54,7 @@ async function fetchMe(accessToken: string): Promise<MeResponse | null> {
       return null;
     }
     return res.json();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching me:", error);
     return null;
   }
@@ -79,7 +79,7 @@ async function fetchRepos(
       return null;
     }
     return res.json();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching repos:", error);
     return null;
   }

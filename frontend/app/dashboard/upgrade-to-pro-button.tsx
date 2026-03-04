@@ -47,7 +47,7 @@ export function UpgradeToProButton({ accessToken }: UpgradeToProButtonProps) {
       } else {
         throw new Error("No checkout URL returned");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
       setIsLoading(false);

@@ -35,7 +35,7 @@ export async function Header() {
         userName = meData.profile.display_name || undefined;
         avatarUrl = meData.profile.avatar_url || undefined;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Silently fallback to Supabase metadata
       console.debug("Failed to fetch profile from backend, using Supabase metadata");
     }
@@ -55,8 +55,9 @@ export async function Header() {
     { href: "/reviews", label: "Reviews", requiresAuth: true },
   ];
 
+  type NavLinkItem = { href: string; label: string; requiresAuth?: boolean };
   const filteredNavLinks = navLinks.filter(
-    (link) => !link.requiresAuth || isAuthenticated
+    (link: NavLinkItem) => !link.requiresAuth || isAuthenticated
   );
 
   return (

@@ -42,10 +42,10 @@ function formatTokens(tokens: number): string {
 
 function FindingsStats({ findings, multiAgentCount }: { findings: Finding[]; multiAgentCount?: number }) {
   const counts = {
-    critical: findings.filter((f) => f.severity === "critical").length,
-    high: findings.filter((f) => f.severity === "high").length,
-    medium: findings.filter((f) => f.severity === "medium").length,
-    low: findings.filter((f) => f.severity === "low").length,
+    critical: findings.filter((f: Finding) => f.severity === "critical").length,
+    high: findings.filter((f: Finding) => f.severity === "high").length,
+    medium: findings.filter((f: Finding) => f.severity === "medium").length,
+    low: findings.filter((f: Finding) => f.severity === "low").length,
   };
 
   const total = findings.length;
@@ -213,7 +213,7 @@ function DegradedAnalysisBanner({
   agentsStatus: Record<string, string>;
 }) {
   const degraded = Object.entries(agentsStatus).filter(
-    ([, status]) => status !== "ok",
+    ([_name, status]: [string, string]) => status !== "ok",
   );
   if (degraded.length === 0) return null;
 
@@ -237,7 +237,7 @@ function DegradedAnalysisBanner({
           Degraded analysis:
         </span>{" "}
         <span className="text-xs text-amber-700 dark:text-amber-400">
-          {degraded.map(([name, status]) => `${name} (${status})`).join(", ")}
+          {degraded.map(([name, status]: [string, string]) => `${name} (${status})`).join(", ")}
           {" "}— results may be incomplete.
         </span>
       </div>
@@ -296,7 +296,7 @@ function SystemicPatternsBanner({ patterns }: { patterns: string[] }) {
           Systemic patterns detected:
         </span>
         <ul className="mt-1 list-disc list-inside">
-          {patterns.map((pattern, i) => (
+          {patterns.map((pattern: string, i: number) => (
             <li key={i} className="text-xs text-violet-700 dark:text-violet-400">
               {pattern}
             </li>

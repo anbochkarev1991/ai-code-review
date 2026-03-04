@@ -6,7 +6,7 @@ const PROTECTED_PREFIXES = ["/dashboard", "/reviews", "/billing"];
 
 function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
+    (p: string) => pathname === p || pathname.startsWith(`${p}/`)
   );
 }
 
@@ -24,14 +24,14 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+          cookiesToSet.forEach((cookie: { name: string; value: string }) =>
+            request.cookies.set(cookie.name, cookie.value)
           );
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+          cookiesToSet.forEach((cookie: { name: string; value: string; options?: object }) =>
+            supabaseResponse.cookies.set(cookie.name, cookie.value, cookie.options)
           );
         },
       },

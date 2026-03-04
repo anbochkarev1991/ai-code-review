@@ -120,12 +120,12 @@ export function ReviewTrace({ trace }: ReviewTraceProps) {
   }
 
   const totalDuration = Math.max(
-    ...trace.map((s) => new Date(s.finished_at).getTime()),
-  ) - Math.min(...trace.map((s) => new Date(s.started_at).getTime()));
+    ...trace.map((s: TraceStep) => new Date(s.finished_at).getTime()),
+  ) - Math.min(...trace.map((s: TraceStep) => new Date(s.started_at).getTime()));
 
   const totalTokens = trace
-    .filter((s) => s.tokens_used !== undefined)
-    .reduce((sum, s) => sum + (s.tokens_used ?? 0), 0);
+    .filter((s: TraceStep) => s.tokens_used !== undefined)
+    .reduce((sum: number, s: TraceStep) => sum + (s.tokens_used ?? 0), 0);
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -168,7 +168,7 @@ export function ReviewTrace({ trace }: ReviewTraceProps) {
 
       {isExpanded && (
         <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-3 sm:p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-          {trace.map((step, index) => (
+          {trace.map((step: TraceStep, index: number) => (
             <AgentTelemetryCard key={index} step={step} />
           ))}
         </div>

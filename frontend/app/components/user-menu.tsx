@@ -42,7 +42,7 @@ export function UserMenu({ userEmail, userName, avatarUrl }: UserMenuProps) {
   const initials = userName
     ? userName
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)

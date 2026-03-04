@@ -29,7 +29,7 @@ export function RunReviewButton({
 
   const startTimer = () => {
     setElapsed(0);
-    intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    intervalRef.current = setInterval(() => setElapsed((e: number) => e + 1), 1000);
   };
 
   const stopTimer = () => {
@@ -64,7 +64,7 @@ export function RunReviewButton({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch((_err: unknown) => ({}));
         throw new Error(
           errorData.message ?? `Failed to run review: ${response.statusText}`
         );
@@ -93,7 +93,7 @@ export function RunReviewButton({
         console.debug("[RunReviewButton] Pushing usage from review response", data.usage);
         pushUsage(data.usage);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
