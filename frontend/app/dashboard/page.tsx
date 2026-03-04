@@ -5,15 +5,22 @@ import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
 import { GitHubCallbackHandler } from "./github-callback-handler";
+import { ensureAbsoluteUrl } from "@/lib/url-utils";
 import { Tooltip } from "./tooltip";
+
+function getBackendUrl(): string {
+  return ensureAbsoluteUrl(
+    process.env.NEXT_PUBLIC_BACKEND_URL,
+    "http://localhost:3001"
+  );
+}
 import { UsageProvider } from "./usage-context";
 import { UsageCounter } from "./usage-counter";
 
 async function fetchBillingUsage(
   accessToken: string
 ): Promise<UsageResponse | null> {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+  const backendUrl = getBackendUrl();
   try {
     const res = await fetch(`${backendUrl}/billing/usage`, {
       headers: {
@@ -35,8 +42,7 @@ async function fetchBillingUsage(
 }
 
 async function fetchMe(accessToken: string): Promise<MeResponse | null> {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+  const backendUrl = getBackendUrl();
   try {
     const res = await fetch(`${backendUrl}/me`, {
       headers: {
@@ -63,8 +69,7 @@ async function fetchMe(accessToken: string): Promise<MeResponse | null> {
 async function fetchRepos(
   accessToken: string
 ): Promise<ReposResponse | null> {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+  const backendUrl = getBackendUrl();
   try {
     const res = await fetch(`${backendUrl}/github/repos`, {
       headers: {
@@ -273,7 +278,7 @@ export default async function DashboardPage() {
                         Connect your GitHub account to access repositories and run code reviews.
                       </p>
                       <a
-                        href={`${process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001"}/github/oauth?state=${encodeURIComponent(session.access_token)}`}
+                        href={`${getBackendUrl()}/github/oauth?state=${encodeURIComponent(session.access_token)}`}
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                       >
                         <svg
@@ -307,6 +312,9 @@ export default async function DashboardPage() {
           <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-800 dark:bg-zinc-900">
             <p className="text-sm text-amber-800 dark:text-amber-200">
               Failed to load profile from backend. Make sure the backend is running and NEXT_PUBLIC_BACKEND_URL is set.
+            </p>
+            <p className="mt-2 font-mono text-xs text-zinc-500">
+              Backend URL: {getBackendUrl()}
             </p>
           </div>
         )}

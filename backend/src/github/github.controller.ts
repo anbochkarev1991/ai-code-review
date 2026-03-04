@@ -44,13 +44,22 @@ export class GitHubController {
     return { url: `${GITHUB_AUTHORIZE_URL}?${params.toString()}` };
   }
 
+  private normalizeFrontendUrl(base: string | undefined): string {
+    if (!base?.trim()) return 'http://localhost:3000';
+    const trimmed = base.trim().replace(/\/$/, '');
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  }
+
   @Get('oauth/callback')
   @Redirect()
   async oauthCallback(
     @Query('code') code: string,
     @Query('state') state: string,
   ) {
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const frontendUrl = this.normalizeFrontendUrl(process.env.FRONTEND_URL);
 
     if (!code || !state) {
       return {
