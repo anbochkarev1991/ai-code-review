@@ -24,7 +24,12 @@ export async function GET() {
     };
     if (res.ok) {
       const json = await res.json();
-      results.healthCheck = { ...results.healthCheck, body: json };
+      results.healthCheck = {
+        ok: res.ok,
+        status: res.status,
+        statusText: res.statusText,
+        body: json,
+      };
     }
   } catch (err) {
     results.healthCheck = {
