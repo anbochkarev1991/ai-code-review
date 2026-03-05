@@ -31,8 +31,13 @@ export function PRSelector({
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
+    // #region agent log
+    const fetchUrl = `${backendUrl}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open`;
+    console.log('[DEBUG] Fetch PRs - before fetch', {backendUrl,owner,repo,hasAccessToken:!!accessToken,url:fetchUrl});
+    // #endregion
+
     fetch(
-      `${backendUrl}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open`,
+      fetchUrl,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -41,11 +46,29 @@ export function PRSelector({
       }
     )
       .then(async (res: Response) => {
+        // #region agent log
+        console.log('[DEBUG] Fetch PRs - response received', {status:res.status,ok:res.ok,statusText:res.statusText,headers:Object.fromEntries(res.headers.entries())});
+        // #endregion
         if (cancelled) return null;
-        if (!res.ok) return null;
+        if (!res.ok) {
+          // #region agent log
+          let errorBody = '';
+          try {
+            errorBody = await res.clone().text();
+          } catch {}
+          console.error('[DEBUG] Fetch PRs - response not ok', {status:res.status,statusText:res.statusText,errorBody:errorBody.substring(0,500)});
+          // #endregion
+          return null;
+        }
+        // #region agent log
+        console.log('[DEBUG] Fetch PRs - before JSON parse');
+        // #endregion
         return res.json() as Promise<PullsResponse>;
       })
       .then((data: PullsResponse | null) => {
+        // #region agent log
+        console.log('[DEBUG] Fetch PRs - after JSON parse', {hasData:!!data,dataType:data?typeof data:'null',pullsCount:data?.pulls?.length??null});
+        // #endregion
         if (cancelled) return;
         if (data) {
           setPulls(data.pulls);
@@ -53,7 +76,12 @@ export function PRSelector({
           setError("Failed to load pull requests.");
         }
       })
-      .catch((_err: unknown) => {
+      .catch((err: unknown) => {
+        // #region agent log
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const errStack = err instanceof Error ? err.stack : undefined;
+        console.error('[DEBUG] Fetch PRs - catch block', {errorMessage:errMsg,errorStack:errStack?.substring(0,500),errorType:err?.constructor?.name});
+        // #endregion
         if (!cancelled) {
           setError("Failed to load pull requests.");
         }

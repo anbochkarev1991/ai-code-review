@@ -214,12 +214,18 @@ export class GitHubService {
     repo: string,
     state?: 'open' | 'closed' | 'all',
   ): Promise<PullsResponse> {
+    // #region agent log
+    console.log('[DEBUG] listPulls - entry', {owner,repo,state,hasAccessToken:!!accessToken});
+    // #endregion
     const params = new URLSearchParams();
     if (state) {
       params.set('state', state);
     }
 
     const url = `${GITHUB_PULLS_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls${params.toString() ? `?${params.toString()}` : ''}`;
+    // #region agent log
+    console.log('[DEBUG] listPulls - before GitHub API call', {url});
+    // #endregion
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -227,7 +233,18 @@ export class GitHubService {
       },
     });
 
+    // #region agent log
+    console.log('[DEBUG] listPulls - GitHub API response', {status:response.status,ok:response.ok,statusText:response.statusText});
+    // #endregion
+
     if (!response.ok) {
+      // #region agent log
+      let errorBody = '';
+      try {
+        errorBody = await response.clone().text();
+      } catch {}
+      console.error('[DEBUG] listPulls - GitHub API error', {status:response.status,statusText:response.statusText,errorBody:errorBody.substring(0,500)});
+      // #endregion
       throw new UnauthorizedException(
         'Failed to fetch pull requests from GitHub',
       );
@@ -240,6 +257,10 @@ export class GitHubService {
       head: { ref: string };
       created_at: string;
     }>;
+
+    // #region agent log
+    console.log('[DEBUG] listPulls - parsed GitHub response', {pullsCount:data.length});
+    // #endregion
 
     const pulls: Pull[] = data.map((p) => ({
       number: p.number,
