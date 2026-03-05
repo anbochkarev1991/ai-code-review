@@ -170,55 +170,25 @@ export class GitHubController {
     @Param('repo') repo: string,
     @Query('state') state?: string,
   ) {
-    // #region agent log
-    console.log('[DEBUG] listPulls - entry', {owner,repo,state,userId:user.id});
-    // #endregion
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7).trim()
       : '';
 
     if (!token) {
-      // #region agent log
-      console.error('[DEBUG] listPulls - missing token');
-      // #endregion
       throw new UnauthorizedException('Missing Bearer token');
     }
 
-    let accessToken: string;
-    try {
-      accessToken = await this.githubService.getAccessTokenForUser(
-        user.id,
-        token,
-      );
-      // #region agent log
-      console.log('[DEBUG] listPulls - got access token', {hasAccessToken:!!accessToken});
-      // #endregion
-    } catch (err) {
-      // #region agent log
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[DEBUG] listPulls - getAccessTokenForUser failed', {error:errMsg});
-      // #endregion
-      throw err;
-    }
+    const accessToken = await this.githubService.getAccessTokenForUser(
+      user.id,
+      token,
+    );
 
     const validState =
       state === 'open' || state === 'closed' || state === 'all'
         ? state
         : undefined;
 
-    try {
-      const result = await this.githubService.listPulls(accessToken, owner, repo, validState);
-      // #region agent log
-      console.log('[DEBUG] listPulls - service call success', {pullsCount:result.pulls.length});
-      // #endregion
-      return result;
-    } catch (err) {
-      // #region agent log
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[DEBUG] listPulls - service call failed', {error:errMsg});
-      // #endregion
-      throw err;
-    }
+    return this.githubService.listPulls(accessToken, owner, repo, validState);
   }
 }
