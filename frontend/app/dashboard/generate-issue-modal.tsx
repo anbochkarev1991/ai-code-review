@@ -89,7 +89,8 @@ const markdownComponents: Components = {
     </ol>
   ),
   // Inline code
-  code: ({ node, inline, children, ...props }) => {
+  code: ({ node, children, ...props }) => {
+    const inline = (props as any).inline;
     if (inline) {
       return (
         <code className="!text-xs !bg-zinc-100 dark:!bg-zinc-800 !text-zinc-900 dark:!text-zinc-100 !px-1.5 !py-0.5 !rounded !font-mono !break-all" {...props}>
