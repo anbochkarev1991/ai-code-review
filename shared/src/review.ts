@@ -308,6 +308,21 @@ export interface GetReviewsResponse {
   total: number;
 }
 
+// ── Issue generation ──
+
+export interface GenerateIssueBody {
+  finding: Finding;
+  pr_metadata?: {
+    repo_full_name: string;
+    pr_number: number;
+    pr_title: string;
+  };
+}
+
+export interface GenerateIssueResponse {
+  issue_text: string;
+}
+
 // ── Engine options (PART 10) ──
 
 export interface ReviewEngineOptions {

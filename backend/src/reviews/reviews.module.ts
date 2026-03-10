@@ -12,6 +12,7 @@ import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
 import { ReviewOrchestrator } from './engine/orchestrator';
 import { ReviewRunsRepository } from './review-runs.repository';
+import { IssueGeneratorService } from './issue-generator.service';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { SeverityNormalizer } from './severity-normalizer';
@@ -33,6 +34,7 @@ import { SeverityNormalizer } from './severity-normalizer';
     PerformanceAgent,
     SecurityAgent,
     SeverityNormalizer,
+    IssueGeneratorService,
   ],
   exports: [
     ReviewsService,

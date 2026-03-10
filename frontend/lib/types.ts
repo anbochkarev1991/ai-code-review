@@ -33,4 +33,6 @@ export type {
   PostReviewsResponse,
   GetReviewsResponse,
   GetReviewResponse,
+  GenerateIssueBody,
+  GenerateIssueResponse,
 } from "shared";

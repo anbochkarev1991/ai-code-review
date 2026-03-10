@@ -19,15 +19,17 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/user.decorator';
 import type { User } from '@supabase/supabase-js';
-import type { PostReviewsBody } from 'shared';
+import type { PostReviewsBody, GenerateIssueBody } from 'shared';
 import { BillingService } from '../billing/billing.service';
 import { ReviewsService } from './reviews.service';
+import { IssueGeneratorService } from './issue-generator.service';
 
 @Controller('reviews')
 export class ReviewsController {
   constructor(
     private readonly billingService: BillingService,
     private readonly reviewsService: ReviewsService,
+    private readonly issueGeneratorService: IssueGeneratorService,
   ) {}
 
   @Get()
@@ -59,6 +61,23 @@ export class ReviewsController {
       throw new NotFoundException('Review not found');
     }
     return review;
+  }
+
+  @Post('generate-issue')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async generateIssue(@Body() body: GenerateIssueBody) {
+    const { finding, pr_metadata } = body ?? {};
+    if (!finding?.title || !finding?.severity) {
+      throw new BadRequestException(
+        'finding with title and severity is required',
+      );
+    }
+    const issue_text = await this.issueGeneratorService.generate(
+      finding,
+      pr_metadata,
+    );
+    return { issue_text };
   }
 
   @Post()

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Finding, DiffContext, AffectedLocation } from "@/lib/types";
+import { GenerateIssueModal } from "./generate-issue-modal";
 
 const DEFAULT_VISIBLE_FINDINGS = 5;
 
@@ -182,22 +183,11 @@ function MultiAgentBadge() {
 
 function FindingCard({ finding }: { finding: Finding }) {
   const [showReasoning, setShowReasoning] = useState(false);
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
   const severityStyles = getSeverityStyles(finding.severity);
   const hasAIMetadata =
     finding.agent_name || finding.confidence !== undefined || finding.reasoning_trace;
   const isMultiAgent = finding.consensus_level === "multi-agent";
-
-  const handleMarkResolved = () => {
-    console.log("Mark as resolved:", finding.id);
-  };
-
-  const handleIgnore = () => {
-    console.log("Ignore:", finding.id);
-  };
-
-  const handleCreateTicket = () => {
-    console.log("Create ticket:", finding.id);
-  };
 
   return (
     <div
@@ -326,48 +316,10 @@ function FindingCard({ finding }: { finding: Finding }) {
           )}
 
           {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
             <button
-              onClick={handleMarkResolved}
+              onClick={() => setIssueModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Mark as resolved
-            </button>
-            <button
-              onClick={handleIgnore}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-              Ignore
-            </button>
-            <button
-              onClick={handleCreateTicket}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -382,9 +334,14 @@ function FindingCard({ finding }: { finding: Finding }) {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Create ticket
+              Generate issue
             </button>
           </div>
+          <GenerateIssueModal
+            finding={finding}
+            open={issueModalOpen}
+            onClose={() => setIssueModalOpen(false)}
+          />
 
           {/* Outside diff warning */}
           {finding.outside_diff && (
@@ -539,10 +496,10 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
           Findings
         </h3>
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+        <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-sm font-medium text-zinc-600 dark:text-zinc-400">
           {findings.length} {findings.length === 1 ? "finding" : "findings"}
         </span>
       </div>

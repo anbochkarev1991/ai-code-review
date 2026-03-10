@@ -143,6 +143,9 @@ export function RunReviewButton({
                 reviewStatus={reviewStatus ?? undefined}
                 reviewMetadata={result.review_metadata}
               />
+              {result.findings.length > 0 && (
+                <div className="border-t border-zinc-200 dark:border-zinc-700 mt-4" />
+              )}
               <ReviewFindingsList findings={result.findings} />
             </>
           )}

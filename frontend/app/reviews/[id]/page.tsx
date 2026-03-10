@@ -165,7 +165,7 @@ export default async function ReviewDetailPage({
             )}
 
             {review.result_snapshot && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-8">
                 <ReviewSummary
                   summary={review.result_snapshot.summary}
                   findings={review.result_snapshot.findings}
@@ -177,6 +177,7 @@ export default async function ReviewDetailPage({
                   reviewStatus={review.status}
                   reviewMetadata={review.result_snapshot.review_metadata}
                 />
+                <div className="border-t border-zinc-200 dark:border-zinc-700" />
                 <ReviewFindingsList
                   findings={review.result_snapshot.findings}
                 />
