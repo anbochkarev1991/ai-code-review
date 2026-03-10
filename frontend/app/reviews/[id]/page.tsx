@@ -180,6 +180,7 @@ export default async function ReviewDetailPage({
                 <div className="border-t border-zinc-200 dark:border-zinc-700" />
                 <ReviewFindingsList
                   findings={review.result_snapshot.findings}
+                  accessToken={session.access_token}
                 />
               </div>
             )}

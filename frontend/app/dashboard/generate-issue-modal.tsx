@@ -14,6 +14,7 @@ interface PRMeta {
 interface GenerateIssueModalProps {
   finding: Finding;
   prMetadata?: PRMeta;
+  accessToken: string;
   open: boolean;
   onClose: () => void;
 }
@@ -21,6 +22,7 @@ interface GenerateIssueModalProps {
 export function GenerateIssueModal({
   finding,
   prMetadata,
+  accessToken,
   open,
   onClose,
 }: GenerateIssueModalProps) {
@@ -36,10 +38,13 @@ export function GenerateIssueModal({
     setErrorMessage("");
     try {
       const backendUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
       const res = await fetch(`${backendUrl}/reviews/generate-issue`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           finding,
           pr_metadata: prMetadata,
@@ -60,7 +65,7 @@ export function GenerateIssueModal({
       );
       setState("error");
     }
-  }, [finding, prMetadata]);
+  }, [finding, prMetadata, accessToken]);
 
   useEffect(() => {
     if (open) {

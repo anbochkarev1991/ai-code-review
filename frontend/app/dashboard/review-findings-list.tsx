@@ -104,6 +104,7 @@ function AffectedLocationsExpander({ locations }: { locations: { file: string; l
 
 interface ReviewFindingsListProps {
   findings: Finding[];
+  accessToken: string;
 }
 
 function getSeverityStyles(severity: Finding["severity"]): {
@@ -181,7 +182,7 @@ function MultiAgentBadge() {
   );
 }
 
-function FindingCard({ finding }: { finding: Finding }) {
+function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: string }) {
   const [showReasoning, setShowReasoning] = useState(false);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
   const severityStyles = getSeverityStyles(finding.severity);
@@ -339,6 +340,7 @@ function FindingCard({ finding }: { finding: Finding }) {
           </div>
           <GenerateIssueModal
             finding={finding}
+            accessToken={accessToken}
             open={issueModalOpen}
             onClose={() => setIssueModalOpen(false)}
           />
@@ -472,7 +474,7 @@ function deduplicateIds(findings: Finding[]): Finding[] {
   });
 }
 
-export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
+export function ReviewFindingsList({ findings, accessToken }: ReviewFindingsListProps) {
   const [showAll, setShowAll] = useState(false);
 
   if (findings.length === 0) {
@@ -511,7 +513,7 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
             Systemic Issues
           </h4>
           {systemic.map((finding: Finding) => (
-            <FindingCard key={finding.id} finding={finding} />
+            <FindingCard key={finding.id} finding={finding} accessToken={accessToken} />
           ))}
         </div>
       )}
@@ -524,7 +526,7 @@ export function ReviewFindingsList({ findings }: ReviewFindingsListProps) {
           </h4>
         )}
         {visibleCodeLevel.map((finding: Finding) => (
-          <FindingCard key={finding.id} finding={finding} />
+          <FindingCard key={finding.id} finding={finding} accessToken={accessToken} />
         ))}
       </div>
 

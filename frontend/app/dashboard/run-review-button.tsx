@@ -146,7 +146,10 @@ export function RunReviewButton({
               {result.findings.length > 0 && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 mt-4" />
               )}
-              <ReviewFindingsList findings={result.findings} />
+              <ReviewFindingsList
+                findings={result.findings}
+                accessToken={accessToken}
+              />
             </>
           )}
           {trace && <ReviewTrace trace={trace} />}
