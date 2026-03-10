@@ -26,10 +26,10 @@ export default function Home() {
               Get Started
             </Link>
             <Link
-              href="/login"
+              href="/pricing"
               className="flex h-12 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-6 text-base font-medium text-zinc-900 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
             >
-              Sign In
+              View Pricing
             </Link>
           </div>
 

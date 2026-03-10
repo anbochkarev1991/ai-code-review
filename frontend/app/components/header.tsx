@@ -51,6 +51,7 @@ export async function Header() {
 
   const navLinks = [
     { href: "/", label: "Home" },
+    { href: "/pricing", label: "Pricing" },
     { href: "/dashboard", label: "Dashboard", requiresAuth: true },
     { href: "/reviews", label: "Reviews", requiresAuth: true },
   ];

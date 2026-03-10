@@ -25,6 +25,14 @@ export function Footer() {
             <ul className="flex flex-col gap-2">
               <li>
                 <Link
+                  href="/pricing"
+                  className="text-sm text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Pricing
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/dashboard"
                   className="text-sm text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                 >

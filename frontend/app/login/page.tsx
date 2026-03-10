@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { LoginButtons } from "./LoginButtons";
 
 export const dynamic = "force-dynamic";
@@ -19,16 +18,6 @@ export default function LoginPage() {
             </div>
             <LoginButtons />
           </div>
-        </div>
-
-        {/* Footer Link */}
-        <div className="mt-6 text-center">
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Back to home
-          </Link>
         </div>
       </div>
     </div>

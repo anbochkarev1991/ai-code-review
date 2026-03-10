@@ -130,16 +130,10 @@ export default async function DashboardPage() {
       </Suspense>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             Dashboard
           </h1>
-          <Link
-            href="/reviews"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Past Reviews →
-          </Link>
         </div>
 
         {me ? (
@@ -242,6 +236,12 @@ export default async function DashboardPage() {
                     with Pro.
                   </p>
                   <UpgradeToProButton accessToken={session.access_token} />
+                  <Link
+                    href="/pricing"
+                    className="mt-3 block text-center text-xs text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  >
+                    See full pricing details →
+                  </Link>
                 </div>
               )}
             </div>
@@ -315,16 +315,6 @@ export default async function DashboardPage() {
             </p>
           </div>
         )}
-
-        {/* Footer Link */}
-        <div className="mt-6 text-center">
-          <Link
-            href="/"
-            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Back to home
-          </Link>
-        </div>
       </div>
     </div>
   );
