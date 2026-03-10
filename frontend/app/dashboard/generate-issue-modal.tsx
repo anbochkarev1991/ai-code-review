@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 import type { Finding } from "@/lib/types";
 
 type ModalState = "loading" | "success" | "error";
@@ -27,6 +28,106 @@ function getSeverityBadgeClass(severity: Finding["severity"]): string {
       return "bg-zinc-600 text-white dark:bg-zinc-500";
   }
 }
+
+const markdownComponents: Components = {
+  // Custom rendering for task lists (checkboxes) - remarkGfm creates these
+  input: ({ node, ...props }) => {
+    const { checked } = props as { checked?: boolean };
+    return (
+      <input
+        type="checkbox"
+        checked={checked ?? false}
+        readOnly
+        disabled
+        className="mr-2.5 mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 cursor-default"
+        style={{ accentColor: "rgb(39 39 42)" }}
+      />
+    );
+  },
+  // Headings with proper hierarchy and spacing
+  h2: ({ node, children, ...props }) => (
+    <h2 className="!mt-8 !mb-4 !text-lg !font-semibold !text-zinc-900 dark:!text-zinc-100 !border-b !border-zinc-200 dark:!border-zinc-700 !pb-2 first:!mt-0" {...props}>
+      {children}
+    </h2>
+  ),
+  h3: ({ node, children, ...props }) => (
+    <h3 className="!mt-6 !mb-3 !text-base !font-semibold !text-zinc-900 dark:!text-zinc-100" {...props}>
+      {children}
+    </h3>
+  ),
+  // Paragraphs with proper spacing
+  p: ({ node, children, ...props }) => (
+    <p className="!my-3 !text-sm !text-zinc-700 dark:!text-zinc-300 !leading-relaxed !break-words" {...props}>
+      {children}
+    </p>
+  ),
+  // List items - handle both regular and task lists
+  li: ({ node, children, ...props }) => {
+    // Check if this is a task list item by looking at the first child
+    const firstChild = (node as any)?.children?.[0];
+    const isTaskItem = firstChild?.type === "input" || 
+      (firstChild?.type === "paragraph" && firstChild?.children?.[0]?.type === "input");
+    
+    return (
+      <li className={`!my-1.5 !text-sm !text-zinc-700 dark:!text-zinc-300 !leading-relaxed !break-words ${isTaskItem ? "!flex !items-start" : ""}`} {...props}>
+        {children}
+      </li>
+    );
+  },
+  // Unordered lists - CSS handles task list styling, but we ensure proper spacing
+  ul: ({ node, children, ...props }) => {
+    return (
+      <ul className="!my-3 !space-y-1.5 !list-disc !pl-5" {...props}>
+        {children}
+      </ul>
+    );
+  },
+  // Ordered lists
+  ol: ({ node, children, ...props }) => (
+    <ol className="!my-3 !space-y-1.5 !list-decimal !pl-5" {...props}>
+      {children}
+    </ol>
+  ),
+  // Inline code
+  code: ({ node, inline, children, ...props }) => {
+    if (inline) {
+      return (
+        <code className="!text-xs !bg-zinc-100 dark:!bg-zinc-800 !text-zinc-900 dark:!text-zinc-100 !px-1.5 !py-0.5 !rounded !font-mono !break-all" {...props}>
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className="!text-xs !font-mono" {...props}>
+        {children}
+      </code>
+    );
+  },
+  // Code blocks
+  pre: ({ node, children, ...props }) => (
+    <pre className="!my-4 !bg-zinc-900 dark:!bg-zinc-950 !border !border-zinc-700 !rounded-lg !p-4 !overflow-x-auto !text-xs" {...props}>
+      {children}
+    </pre>
+  ),
+  // Strong/bold text
+  strong: ({ node, children, ...props }) => (
+    <strong className="!font-semibold !text-zinc-900 dark:!text-zinc-100" {...props}>
+      {children}
+    </strong>
+  ),
+  // Blockquotes
+  blockquote: ({ node, children, ...props }) => (
+    <blockquote className="!my-3 !border-l-4 !border-zinc-300 dark:!border-zinc-600 !pl-4 !italic !text-zinc-700 dark:!text-zinc-300 !break-words" {...props}>
+      {children}
+    </blockquote>
+  ),
+  // Links
+  a: ({ node, children, ...props }) => (
+    <a className="!text-blue-600 dark:!text-blue-400 !no-underline hover:!underline !break-all" {...props}>
+      {children}
+    </a>
+  ),
+};
 
 interface GenerateIssueModalProps {
   finding: Finding;
@@ -211,19 +312,11 @@ export function GenerateIssueModal({
 
           {state === "success" && (
             <div className="flex-1 overflow-y-auto">
-              <div className="prose prose-sm dark:prose-invert max-w-none break-words
-                prose-headings:font-semibold prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100
-                prose-h2:mt-8 prose-h2:mb-4 prose-h2:text-lg prose-h2:font-semibold prose-h2:border-b prose-h2:border-zinc-200 dark:prose-h2:border-zinc-700 prose-h2:pb-2
-                prose-h3:mt-6 prose-h3:mb-3 prose-h3:text-base prose-h3:font-semibold
-                prose-p:my-3 prose-p:text-zinc-700 dark:prose-p:text-zinc-300 prose-p:text-sm prose-p:leading-relaxed prose-p:break-words
-                prose-ul:my-3 prose-ul:space-y-1.5 prose-li:text-sm prose-li:text-zinc-700 dark:prose-li:text-zinc-300 prose-li:break-words
-                prose-ol:my-3 prose-ol:space-y-1.5 prose-li:text-sm prose-li:break-words
-                prose-code:text-xs prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:text-zinc-900 dark:prose-code:text-zinc-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-code:break-all
-                prose-pre:my-4 prose-pre:bg-zinc-900 dark:prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-pre:rounded-lg prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:text-xs
-                prose-blockquote:my-3 prose-blockquote:border-l-4 prose-blockquote:border-zinc-300 dark:prose-blockquote:border-zinc-600 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:break-words
-                prose-strong:font-semibold prose-strong:text-zinc-900 dark:prose-strong:text-zinc-100
-                prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-all">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <div className="prose prose-sm dark:prose-invert max-w-none [&_ul:has(li_input[type='checkbox'])]:list-none [&_ul:has(li_input[type='checkbox'])]:pl-0 [&_ul:has(li_input[type='checkbox'])_li]:flex [&_ul:has(li_input[type='checkbox'])_li]:items-start">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
                   {issueText}
                 </ReactMarkdown>
               </div>
