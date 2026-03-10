@@ -154,7 +154,7 @@ export function GenerateIssueModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
           {state === "loading" && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <svg
@@ -210,15 +210,19 @@ export function GenerateIssueModal({
           )}
 
           {state === "success" && (
-            <div className="overflow-y-auto max-h-full">
-              <div className="prose prose-sm dark:prose-invert max-w-none 
-                prose-headings:font-semibold prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100 
-                prose-h2:mt-6 prose-h2:mb-3 prose-h2:text-base prose-h2:font-semibold
-                prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-sm prose-h3:font-semibold
-                prose-p:my-2 prose-p:text-zinc-700 dark:prose-p:text-zinc-300 prose-p:text-sm
-                prose-ul:my-2 prose-li:my-1 prose-li:text-sm
-                prose-code:text-xs prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:font-mono
-                prose-pre:bg-zinc-900 dark:prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-pre:rounded-lg prose-pre:p-3 prose-pre:overflow-x-auto prose-pre:text-xs">
+            <div className="flex-1 overflow-y-auto">
+              <div className="prose prose-sm dark:prose-invert max-w-none break-words
+                prose-headings:font-semibold prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100
+                prose-h2:mt-8 prose-h2:mb-4 prose-h2:text-lg prose-h2:font-semibold prose-h2:border-b prose-h2:border-zinc-200 dark:prose-h2:border-zinc-700 prose-h2:pb-2
+                prose-h3:mt-6 prose-h3:mb-3 prose-h3:text-base prose-h3:font-semibold
+                prose-p:my-3 prose-p:text-zinc-700 dark:prose-p:text-zinc-300 prose-p:text-sm prose-p:leading-relaxed prose-p:break-words
+                prose-ul:my-3 prose-ul:space-y-1.5 prose-li:text-sm prose-li:text-zinc-700 dark:prose-li:text-zinc-300 prose-li:break-words
+                prose-ol:my-3 prose-ol:space-y-1.5 prose-li:text-sm prose-li:break-words
+                prose-code:text-xs prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:text-zinc-900 dark:prose-code:text-zinc-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-mono prose-code:break-all
+                prose-pre:my-4 prose-pre:bg-zinc-900 dark:prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-pre:rounded-lg prose-pre:p-4 prose-pre:overflow-x-auto prose-pre:text-xs
+                prose-blockquote:my-3 prose-blockquote:border-l-4 prose-blockquote:border-zinc-300 dark:prose-blockquote:border-zinc-600 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:break-words
+                prose-strong:font-semibold prose-strong:text-zinc-900 dark:prose-strong:text-zinc-100
+                prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline prose-a:break-all">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {issueText}
                 </ReactMarkdown>
