@@ -44,7 +44,7 @@ const MULTI_AGENT_BOOST = 0.05;
 const OUTSIDE_DIFF_MULTIPLIER = 0.6;
 const CONFIDENCE_MIN = 0.3;
 const CONFIDENCE_MAX = 0.95;
-const DIFF_CONTEXT_LINES = 3;
+const DIFF_CONTEXT_LINES = 5;
 
 @Injectable()
 export class FindingNormalizer {
@@ -397,25 +397,38 @@ export class FindingNormalizer {
     if (!diffFile) return finding;
 
     for (const hunk of diffFile.hunks) {
-      if (finding.line >= hunk.startLine && finding.line <= hunk.endLine) {
-        const hunkLines = hunk.content.split('\n');
-        const lineOffset = finding.line - hunk.startLine;
+      if (finding.line < hunk.startLine || finding.line > hunk.endLine) continue;
 
-        const snippetStart = Math.max(0, lineOffset - DIFF_CONTEXT_LINES);
-        const snippetEnd = Math.min(hunkLines.length, lineOffset + DIFF_CONTEXT_LINES + 1);
-
-        const contextBefore = hunkLines.slice(snippetStart, lineOffset).join('\n');
-        const snippet = hunkLines[lineOffset] ?? '';
-        const contextAfter = hunkLines.slice(lineOffset + 1, snippetEnd).join('\n');
-
-        const diffContext: DiffContext = {
-          snippet,
-          diff_context_before: contextBefore,
-          diff_context_after: contextAfter,
-        };
-
-        return { ...finding, diff_context: diffContext };
+      const rawLines = hunk.content.split('\n');
+      // Build an array of {newLineNo, text} only for lines present in the new file
+      const newFileLines: { lineNo: number; text: string }[] = [];
+      let currentLine = hunk.startLine;
+      for (const raw of rawLines) {
+        if (raw.startsWith('-')) continue; // removed line -- skip
+        const text = (raw.startsWith('+') || raw.startsWith(' ')) ? raw.slice(1) : raw;
+        newFileLines.push({ lineNo: currentLine, text });
+        currentLine++;
       }
+
+      const targetIdx = newFileLines.findIndex((l) => l.lineNo === finding.line);
+      if (targetIdx === -1) continue;
+
+      const start = Math.max(0, targetIdx - DIFF_CONTEXT_LINES);
+      const end = Math.min(newFileLines.length, targetIdx + DIFF_CONTEXT_LINES + 1);
+
+      const before = newFileLines.slice(start, targetIdx).map((l) => l.text).join('\n');
+      const snippet = newFileLines[targetIdx].text;
+      const after = newFileLines.slice(targetIdx + 1, end).map((l) => l.text).join('\n');
+      const startLine = newFileLines[start].lineNo;
+
+      const diffContext: DiffContext = {
+        snippet,
+        diff_context_before: before,
+        diff_context_after: after,
+        start_line: startLine,
+      };
+
+      return { ...finding, diff_context: diffContext };
     }
 
     return finding;

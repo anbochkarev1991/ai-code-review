@@ -9,6 +9,20 @@ const DEFAULT_VISIBLE_FINDINGS = 5;
 function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffContext; file?: string; line?: number }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Compute line numbers: use start_line if available, otherwise fall back to computing from line and before count
+  const beforeLines = diffContext.diff_context_before ? diffContext.diff_context_before.split("\n") : [];
+  const snippetLine = diffContext.snippet || "";
+  const afterLines = diffContext.diff_context_after ? diffContext.diff_context_after.split("\n") : [];
+  
+  const startLine = diffContext.start_line ?? (line !== undefined ? line - beforeLines.length : 1);
+  const targetLineIndex = beforeLines.length;
+
+  // Combine all lines, preserving empty lines
+  const allLines: string[] = [];
+  beforeLines.forEach((l) => allLines.push(l));
+  allLines.push(snippetLine);
+  afterLines.forEach((l) => allLines.push(l));
+
   return (
     <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden">
       <button
@@ -36,24 +50,48 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
         )}
       </button>
       {expanded && (
-        <div className="bg-zinc-900 dark:bg-zinc-950 p-3 font-mono text-xs leading-5 overflow-x-auto">
-          {diffContext.diff_context_before && (
-            <div className="text-zinc-500">
-              {diffContext.diff_context_before.split("\n").map((l: string, i: number) => (
-                <div key={`before-${i}`}>{l || "\u00A0"}</div>
-              ))}
+        <div className="bg-zinc-900 dark:bg-zinc-950 overflow-hidden">
+          {/* File header */}
+          {file && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-700 bg-zinc-800/50">
+              <svg className="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="font-mono text-xs text-zinc-300">
+                {file}{line !== undefined ? `:${line}` : ""}
+              </span>
             </div>
           )}
-          <div className="text-amber-300 bg-amber-900/20 -mx-3 px-3">
-            {diffContext.snippet || "\u00A0"}
+          {/* Code block with line numbers */}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <tbody className="font-mono text-xs leading-5">
+                {allLines.map((codeLine, idx) => {
+                  const lineNumber = startLine + idx;
+                  const isTargetLine = idx === targetLineIndex;
+                  return (
+                    <tr
+                      key={idx}
+                      className={isTargetLine ? "bg-amber-900/30" : ""}
+                    >
+                      {/* Line number gutter */}
+                      <td className="sticky left-0 bg-zinc-900 dark:bg-zinc-950 px-3 py-0.5 text-right text-zinc-500 dark:text-zinc-600 select-none border-r border-zinc-700">
+                        {isTargetLine ? (
+                          <span className="text-amber-400 font-semibold">&gt;</span>
+                        ) : (
+                          <span>{lineNumber}</span>
+                        )}
+                      </td>
+                      {/* Code content */}
+                      <td className="px-3 py-0.5 text-zinc-100 whitespace-pre">
+                        {codeLine || "\u00A0"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          {diffContext.diff_context_after && (
-            <div className="text-zinc-500">
-              {diffContext.diff_context_after.split("\n").map((l: string, i: number) => (
-                <div key={`after-${i}`}>{l || "\u00A0"}</div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

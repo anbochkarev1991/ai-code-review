@@ -72,6 +72,7 @@ export interface DiffContext {
   snippet: string;
   diff_context_before: string;
   diff_context_after: string;
+  start_line?: number; // new-file line number of the first line in diff_context_before
 }
 
 // ── Finding ──
