@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Finding } from "@/lib/types";
 
 type ModalState = "loading" | "success" | "error";
@@ -9,6 +11,21 @@ interface PRMeta {
   repo_full_name: string;
   pr_number: number;
   pr_title: string;
+}
+
+function getSeverityBadgeClass(severity: Finding["severity"]): string {
+  switch (severity) {
+    case "critical":
+      return "bg-red-600 text-white dark:bg-red-500";
+    case "high":
+      return "bg-orange-600 text-white dark:bg-orange-500";
+    case "medium":
+      return "bg-yellow-500 text-white dark:bg-yellow-400";
+    case "low":
+      return "bg-blue-600 text-white dark:bg-blue-500";
+    default:
+      return "bg-zinc-600 text-white dark:bg-zinc-500";
+  }
 }
 
 interface GenerateIssueModalProps {
@@ -103,6 +120,7 @@ export function GenerateIssueModal({
   };
 
   const severityLabel = finding.severity.toUpperCase();
+  const severityBadgeClass = getSeverityBadgeClass(finding.severity);
 
   return (
     <div
@@ -115,12 +133,14 @@ export function GenerateIssueModal({
         <div className="flex items-start justify-between gap-3 border-b border-zinc-200 dark:border-zinc-700 px-5 py-4">
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              Generated issue draft
+              Generated Issue
             </h2>
-            <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <span className="font-medium">{severityLabel}</span>
-              <span className="text-zinc-300 dark:text-zinc-600">·</span>
-              <span className="truncate">{finding.title}</span>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${severityBadgeClass}`}>
+                {severityLabel}
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-600">—</span>
+              <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">{finding.title}</span>
             </div>
           </div>
           <button
@@ -157,7 +177,7 @@ export function GenerateIssueModal({
                 />
               </svg>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Generating issue draft...
+                Generating issue...
               </p>
             </div>
           )}
@@ -190,10 +210,19 @@ export function GenerateIssueModal({
           )}
 
           {state === "success" && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <pre className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700 font-sans">
-                {issueText}
-              </pre>
+            <div className="overflow-y-auto max-h-full">
+              <div className="prose prose-sm dark:prose-invert max-w-none 
+                prose-headings:font-semibold prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100 
+                prose-h2:mt-6 prose-h2:mb-3 prose-h2:text-base prose-h2:font-semibold
+                prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-sm prose-h3:font-semibold
+                prose-p:my-2 prose-p:text-zinc-700 dark:prose-p:text-zinc-300 prose-p:text-sm
+                prose-ul:my-2 prose-li:my-1 prose-li:text-sm
+                prose-code:text-xs prose-code:bg-zinc-100 dark:prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:font-mono
+                prose-pre:bg-zinc-900 dark:prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-700 prose-pre:rounded-lg prose-pre:p-3 prose-pre:overflow-x-auto prose-pre:text-xs">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {issueText}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
         </div>
@@ -233,7 +262,7 @@ export function GenerateIssueModal({
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    Copy to clipboard
+                    Copy Issue
                   </>
                 )}
               </button>

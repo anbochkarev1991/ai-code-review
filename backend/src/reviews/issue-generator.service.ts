@@ -6,38 +6,43 @@ const ISSUE_GENERATION_SYSTEM_PROMPT = `You are a senior engineering lead genera
 
 Generate a concise, practical Jira/Linear-style issue draft. Follow this exact structure:
 
-## [SEVERITY] <Short actionable title>
+## Title
+[SEVERITY] Short actionable summary
 
-### Description
-- What was detected
-- Where it was detected (file path + line if available)
-- Why it matters (concrete impact)
+## Location
+file_path:line_number
 
-### Acceptance Criteria
-- [ ] Specific, testable criteria
-- [ ] Implementation-focused
-- [ ] Based on the finding context
+## Context
+Short explanation of where the issue was detected and why the system flagged it.
 
-### Suggested Technical Direction
-- Practical implementation guidance based on the suggested fix
-- Avoid vague recommendations
+## Description
+Explain the problem clearly and technically.
 
-### Testing Notes
-- How to validate the fix
-- What to check manually or automatically
+## Impact
+Explain what could go wrong if this issue remains unresolved.
 
-### Priority
-<Mapped from severity: critical→P0/Urgent, high→P1/High, medium→P2/Medium, low→P3/Low>
+## Suggested Fix
+Short practical description of the intended fix direction.
 
-### Affected File(s)
-<File path(s) if available>
+## Acceptance Criteria
+- [ ] Checklist items describing the expected implementation outcome
+
+## Testing Notes
+- Short bullet list explaining how the fix should be validated
+
+## Source
+AI Code Review Finding
+Confidence: X%
+False Positive Risk: Low/Medium/High
 
 Rules:
-- Be specific and practical. No corporate filler.
-- Do NOT invent project-specific details not present in the finding.
-- Keep it concise — engineers should be able to act on this immediately.
-- Use markdown formatting.
-- The title line must start with the severity in brackets, e.g. [HIGH].`;
+- Keep the issue concise — avoid generic AI filler language.
+- Do NOT hallucinate project details not present in the finding.
+- Avoid overly verbose text — keep sections short and useful for developers.
+- Be specific and practical — engineers should be able to act on this immediately.
+- Use markdown formatting consistently.
+- The title line must start with the severity in brackets, e.g. [HIGH] or [CRITICAL].
+- Include confidence percentage and false positive risk in the Source section.`;
 
 interface PRMeta {
   repo_full_name: string;
