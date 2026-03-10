@@ -6,22 +6,32 @@ import { GenerateIssueModal } from "./generate-issue-modal";
 
 const DEFAULT_VISIBLE_FINDINGS = 5;
 
+const MAX_SNIPPET_LINES = 12;
+
 function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffContext; file?: string; line?: number }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Compute line numbers: use start_line if available, otherwise fall back to computing from line and before count
-  const beforeLines = diffContext.diff_context_before ? diffContext.diff_context_before.split("\n") : [];
+  // Raw lines from diff context
+  let beforeLines = diffContext.diff_context_before ? diffContext.diff_context_before.split("\n") : [];
   const snippetLine = diffContext.snippet || "";
-  const afterLines = diffContext.diff_context_after ? diffContext.diff_context_after.split("\n") : [];
-  
+  let afterLines = diffContext.diff_context_after ? diffContext.diff_context_after.split("\n") : [];
+
+  // Clamp to ~12 lines, keeping target centered
+  const total = beforeLines.length + 1 + afterLines.length;
+  if (total > MAX_SNIPPET_LINES) {
+    const maxPerSide = Math.floor((MAX_SNIPPET_LINES - 1) / 2);
+    beforeLines = beforeLines.slice(-maxPerSide);
+    afterLines = afterLines.slice(0, maxPerSide);
+  }
+
   const startLine = diffContext.start_line ?? (line !== undefined ? line - beforeLines.length : 1);
   const targetLineIndex = beforeLines.length;
 
-  // Combine all lines, preserving empty lines
-  const allLines: string[] = [];
-  beforeLines.forEach((l) => allLines.push(l));
-  allLines.push(snippetLine);
-  afterLines.forEach((l) => allLines.push(l));
+  const allLines: string[] = [...beforeLines, snippetLine, ...afterLines];
+
+  const shortFileName = file ? file.split("/").pop() ?? file : null;
+  const fileLabel = shortFileName && line !== undefined ? `${shortFileName}:${line}` : shortFileName ?? file ?? "";
+  const hasFullPath = file && file.includes("/");
 
   return (
     <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden">
@@ -43,26 +53,34 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
           />
         </svg>
         <span>View code context</span>
-        {file && (
+        {fileLabel && (
           <span className="font-mono text-zinc-400 dark:text-zinc-500 ml-auto">
-            {file}{line !== undefined ? `:${line}` : ""}
+            {fileLabel}
           </span>
         )}
       </button>
       {expanded && (
         <div className="bg-zinc-900 dark:bg-zinc-950 overflow-hidden">
-          {/* File header */}
           {file && (
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-700 bg-zinc-800/50">
-              <svg className="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="font-mono text-xs text-zinc-300">
-                {file}{line !== undefined ? `:${line}` : ""}
-              </span>
+            <div className="flex flex-col gap-0.5 px-3 py-2 border-b border-zinc-700 bg-zinc-800/50">
+              <div className="flex items-center gap-2">
+                <svg className="h-3.5 w-3.5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="font-mono text-xs font-medium text-zinc-300">
+                  {fileLabel}
+                </span>
+              </div>
+              {hasFullPath && (
+                <span className="font-mono text-[11px] text-zinc-500 pl-5.5">
+                  {file}
+                </span>
+              )}
             </div>
           )}
-          {/* Code block with line numbers */}
+          <div className="text-[11px] text-zinc-500 px-3 py-1.5">
+            Relevant code near the detected issue
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <tbody className="font-mono text-xs leading-5">
@@ -72,18 +90,19 @@ function DiffContextPreview({ diffContext, file, line }: { diffContext: DiffCont
                   return (
                     <tr
                       key={idx}
-                      className={isTargetLine ? "bg-amber-900/30" : ""}
+                      className={isTargetLine ? "bg-amber-900/30 border-l-2 border-amber-400" : ""}
                     >
-                      {/* Line number gutter */}
-                      <td className="sticky left-0 bg-zinc-900 dark:bg-zinc-950 px-3 py-0.5 text-right text-zinc-500 dark:text-zinc-600 select-none border-r border-zinc-700">
+                      <td className={`sticky left-0 w-6 px-1 py-0.5 text-center text-zinc-500 dark:text-zinc-600 select-none border-r border-zinc-700 ${isTargetLine ? "bg-amber-900/30" : "bg-zinc-900 dark:bg-zinc-950"}`}>
                         {isTargetLine ? (
                           <span className="text-amber-400 font-semibold">&gt;</span>
-                        ) : (
-                          <span>{lineNumber}</span>
-                        )}
+                        ) : null}
                       </td>
-                      {/* Code content */}
-                      <td className="px-3 py-0.5 text-zinc-100 whitespace-pre">
+                      <td className={`w-10 px-2 py-0.5 text-right text-zinc-500 dark:text-zinc-600 select-none border-r border-zinc-700 ${isTargetLine ? "bg-amber-900/30" : "bg-zinc-900 dark:bg-zinc-950"}`}>
+                        <span className={isTargetLine ? "text-amber-400 font-semibold" : ""}>
+                          {lineNumber}
+                        </span>
+                      </td>
+                      <td className={`px-3 py-0.5 whitespace-pre ${isTargetLine ? "bg-amber-900/30 text-amber-100" : "text-zinc-100"}`}>
                         {codeLine || "\u00A0"}
                       </td>
                     </tr>
