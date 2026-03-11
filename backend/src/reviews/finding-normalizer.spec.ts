@@ -381,6 +381,217 @@ describe('FindingNormalizer', () => {
       expect(result[0].diff_context).toBeDefined();
       expect(result[0].diff_context!.snippet).toBeDefined();
     });
+
+    it('corrects approximate AI line to most relevant line using keywords from finding', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/api.ts',
+        hunks: [{
+          startLine: 1,
+          endLine: 30,
+          content: [
+            '+import { UserService } from "./user.service";',
+            '+',
+            '+const db = getDb();',
+            '+',
+            '+function validateInput(data: string) {',
+            '+  return data.length > 0;',
+            '+}',
+            '+',
+            '+async function fetchUser(userId: string) {',
+            '+  const query = `SELECT * FROM users WHERE id = \'${userId}\'`;',
+            '+  return db.execute(query);',
+            '+}',
+          ].join('\n'),
+          addedLines: [
+            'import { UserService } from "./user.service";',
+            'const db = getDb();',
+            'function validateInput(data: string) {',
+            '  return data.length > 0;',
+            '}',
+            'async function fetchUser(userId: string) {',
+            '  const query = `SELECT * FROM users WHERE id = \'${userId}\'`;',
+            '  return db.execute(query);',
+            '}',
+          ],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/api.ts',
+          line: 5,
+          title: 'SQL injection in fetchUser',
+          message: 'The userId is concatenated directly into the query string. Use parameterized queries.',
+          suggested_fix: 'Use parameterized queries with db.execute(sql, [userId])',
+        })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].line).toBe(9);
+      expect(result[0].diff_context!.snippet).toContain('userId');
+    });
+
+    it('falls back to AI line when no keyword match found in search window', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/empty.ts',
+        hunks: [{
+          startLine: 1,
+          endLine: 10,
+          content: '+const x = 1;\n+const y = 2;\n+const z = 3;',
+          addedLines: ['const x = 1;', 'const y = 2;', 'const z = 3;'],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/empty.ts',
+          line: 2,
+          title: 'Unrelated issue',
+          message: 'Some problem with NonExistentClass and other symbols',
+        })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].line).toBe(2);
+      expect(result[0].diff_context!.snippet).toBe('const y = 2;');
+    });
+
+    it('prioritises CamelCase identifiers over generic words', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/service.ts',
+        hunks: [{
+          startLine: 1,
+          endLine: 10,
+          content: [
+            '+import { Logger } from "winston";',
+            '+const logger = new Logger();',
+            '+function processOrder(order: Order) {',
+            '+  const UserService = getUserService();',
+            '+  return UserService.validate(order);',
+            '+}',
+          ].join('\n'),
+          addedLines: [
+            'import { Logger } from "winston";',
+            'const logger = new Logger();',
+            'function processOrder(order: Order) {',
+            '  const UserService = getUserService();',
+            '  return UserService.validate(order);',
+          ],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/service.ts',
+          line: 1,
+          title: 'Missing validation in UserService',
+          message: 'UserService.validate does not check for null order.',
+        })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].diff_context!.snippet).toContain('UserService');
+    });
+
+    it('corrects line from approximate location across multiple hunks', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/multi.ts',
+        hunks: [
+          {
+            startLine: 5,
+            endLine: 8,
+            content: '+const a = 1;\n+const b = 2;',
+            addedLines: ['const a = 1;', 'const b = 2;'],
+            removedLines: [],
+          },
+          {
+            startLine: 40,
+            endLine: 45,
+            content: '+function dangerousEval(input: string) {\n+  return eval(input);\n+}',
+            addedLines: ['function dangerousEval(input: string) {', '  return eval(input);', '}'],
+            removedLines: [],
+          },
+        ],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/multi.ts',
+          line: 38,
+          title: 'Dangerous eval usage',
+          message: 'dangerousEval calls eval() directly on untrusted input.',
+        })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].diff_context!.snippet).toContain('dangerousEval');
+      expect(result[0].line).toBe(40);
+    });
+
+    it('does not crash when diff contains only removed lines', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/removed.ts',
+        hunks: [{
+          startLine: 10,
+          endLine: 10,
+          content: '-const old = true;',
+          addedLines: [],
+          removedLines: ['const old = true;'],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({ file: 'src/removed.ts', line: 10 })],
+        diffFiles,
+      );
+      expect(result[0].diff_context).toBeUndefined();
+    });
+
+    it('does not mark as outside_diff when AI line is near a hunk within correction radius', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/nearby.ts',
+        hunks: [{
+          startLine: 50,
+          endLine: 55,
+          content: '+const criticalFunction = () => {};',
+          addedLines: ['const criticalFunction = () => {};'],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/nearby.ts',
+          line: 65,
+          title: 'Issue in criticalFunction',
+          message: 'criticalFunction lacks error handling.',
+        })],
+        diffFiles,
+      );
+      expect(result[0].outside_diff).toBeUndefined();
+      expect(result[0].diff_context).toBeDefined();
+      expect(result[0].diff_context!.snippet).toContain('criticalFunction');
+    });
+
+    it('marks as outside_diff when AI line is far beyond correction radius', () => {
+      const diffFiles = [makeDiffFile({
+        path: 'src/far.ts',
+        hunks: [{
+          startLine: 10,
+          endLine: 15,
+          content: '+const x = 1;',
+          addedLines: ['const x = 1;'],
+          removedLines: [],
+        }],
+      })];
+      const result = normalizer.normalize(
+        [makeFinding({
+          file: 'src/far.ts',
+          line: 200,
+          title: 'Some issue',
+          message: 'Too far from any diff hunk.',
+        })],
+        diffFiles,
+      );
+      expect(result[0].outside_diff).toBe(true);
+    });
   });
 
   describe('uncertainty downgrade', () => {

@@ -39,12 +39,14 @@ const LINE_PROXIMITY_THRESHOLD = 3;
 const JACCARD_SIMILARITY_THRESHOLD = 0.5;
 const TITLE_SIMILARITY_THRESHOLD = 0.4;
 
+const LINE_CORRECTION_SEARCH_RADIUS = 30;
+const SNIPPET_CONTEXT_LINES = 5;
+
 const BASE_CONFIDENCE_CAP = 0.85;
 const MULTI_AGENT_BOOST = 0.05;
 const OUTSIDE_DIFF_MULTIPLIER = 0.6;
 const CONFIDENCE_MIN = 0.3;
 const CONFIDENCE_MAX = 0.95;
-const DIFF_CONTEXT_LINES = 5;
 
 @Injectable()
 export class FindingNormalizer {
@@ -338,8 +340,15 @@ export class FindingNormalizer {
     const lineInDiff = diffFile.hunks.some(
       (h) => finding.line! >= h.startLine && finding.line! <= h.endLine,
     );
+    if (lineInDiff) return finding;
 
-    if (!lineInDiff) {
+    const withinCorrectionReach = diffFile.hunks.some(
+      (h) =>
+        finding.line! >= h.startLine - LINE_CORRECTION_SEARCH_RADIUS &&
+        finding.line! <= h.endLine + LINE_CORRECTION_SEARCH_RADIUS,
+    );
+
+    if (!withinCorrectionReach) {
       return {
         ...finding,
         outside_diff: true,
@@ -390,48 +399,172 @@ export class FindingNormalizer {
     return { ...finding, ...updates };
   }
 
+  /**
+   * Refines the AI-reported line number using real file content.
+   * Treats AI line numbers as approximate; searches within ±30 lines and
+   * identifies the most relevant line based on keywords from the finding.
+   * Prioritises compound identifiers (camelCase/PascalCase class/variable names)
+   * and exact case-sensitive matches over lowercase-only matches.
+   */
+  correctLineLocation(
+    approximateLine: number,
+    fileLines: { lineNo: number; text: string }[],
+    finding: Finding,
+  ): number {
+    if (fileLines.length === 0) return approximateLine;
+
+    const keywords = this.extractKeywordsFromFinding(finding);
+    if (keywords.length === 0) return approximateLine;
+
+    const searchMin = Math.max(
+      fileLines[0].lineNo,
+      approximateLine - LINE_CORRECTION_SEARCH_RADIUS,
+    );
+    const searchMax = Math.min(
+      fileLines[fileLines.length - 1].lineNo,
+      approximateLine + LINE_CORRECTION_SEARCH_RADIUS,
+    );
+
+    const candidates = fileLines.filter(
+      (l) => l.lineNo >= searchMin && l.lineNo <= searchMax,
+    );
+    if (candidates.length === 0) return approximateLine;
+
+    let bestLineNo = approximateLine;
+    let bestScore = -1;
+
+    for (const { lineNo, text } of candidates) {
+      const lineLower = text.toLowerCase();
+      let score = 0;
+
+      for (const { word, isIdentifier } of keywords) {
+        const wordLower = word.toLowerCase();
+        if (!lineLower.includes(wordLower)) continue;
+
+        score += 2;
+
+        if (text.includes(word)) score += 1;
+
+        if (isIdentifier) score += 2;
+      }
+
+      const proximityBonus = 1 - Math.abs(lineNo - approximateLine) / (LINE_CORRECTION_SEARCH_RADIUS + 1);
+      score += proximityBonus * 0.5;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestLineNo = lineNo;
+      }
+    }
+
+    return bestScore > 0.5 ? bestLineNo : approximateLine;
+  }
+
+  extractKeywordsFromFinding(finding: Finding): { word: string; isIdentifier: boolean }[] {
+    const stopWords = new Set([
+      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+      'should', 'may', 'might', 'must', 'can', 'to', 'of', 'in', 'for',
+      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+      'before', 'after', 'above', 'below', 'between', 'and', 'or', 'but',
+      'if', 'then', 'else', 'this', 'that', 'these', 'those', 'it', 'its',
+      'use', 'using', 'used', 'possible', 'potential', 'vulnerability',
+      'issue', 'problem', 'found', 'detected', 'recommend', 'suggest',
+      'not', 'no', 'code', 'line', 'file', 'check', 'error', 'warning',
+    ]);
+
+    const text = [
+      finding.title,
+      finding.message,
+      finding.suggested_fix,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const words = text.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) ?? [];
+    const seenLower = new Set<string>();
+    const keywords: { word: string; isIdentifier: boolean }[] = [];
+
+    for (const w of words) {
+      if (w.length < 2 || stopWords.has(w.toLowerCase())) continue;
+      const lower = w.toLowerCase();
+      if (seenLower.has(lower)) continue;
+      seenLower.add(lower);
+
+      const isCompound = /[a-z][A-Z]/.test(w) || /^[A-Z][a-z].*[A-Z]/.test(w);
+      const isSnakeMultipart = w.includes('_') && w.length > 3;
+      const isIdentifier = isCompound || isSnakeMultipart;
+
+      keywords.push({ word: w, isIdentifier });
+    }
+
+    keywords.sort((a, b) => (b.isIdentifier ? 1 : 0) - (a.isIdentifier ? 1 : 0));
+    return keywords;
+  }
+
+  private collectFileLinesFromHunks(diffFile: ParsedFile): { lineNo: number; text: string }[] {
+    const result: { lineNo: number; text: string }[] = [];
+    for (const hunk of diffFile.hunks) {
+      const rawLines = hunk.content.split('\n');
+      let currentLine = hunk.startLine;
+      for (const raw of rawLines) {
+        if (raw.startsWith('-')) continue;
+        const text = (raw.startsWith('+') || raw.startsWith(' ')) ? raw.slice(1) : raw;
+        result.push({ lineNo: currentLine, text });
+        currentLine++;
+      }
+    }
+    return result.sort((a, b) => a.lineNo - b.lineNo);
+  }
+
+  /**
+   * Attaches diff context and corrects the AI-reported line number.
+   * Uses keyword matching within ±30 lines to find the most relevant code line,
+   * then extracts ±5 lines around it for the snippet.
+   */
   private attachDiffContext(finding: Finding, diffFiles: ParsedFile[]): Finding {
     if (!finding.file || finding.line === undefined) return finding;
 
     const diffFile = diffFiles.find((df) => df.path === finding.file);
     if (!diffFile) return finding;
 
-    for (const hunk of diffFile.hunks) {
-      if (finding.line < hunk.startLine || finding.line > hunk.endLine) continue;
+    const fileLines = this.collectFileLinesFromHunks(diffFile);
+    if (fileLines.length === 0) return finding;
 
-      const rawLines = hunk.content.split('\n');
-      // Build an array of {newLineNo, text} only for lines present in the new file
-      const newFileLines: { lineNo: number; text: string }[] = [];
-      let currentLine = hunk.startLine;
-      for (const raw of rawLines) {
-        if (raw.startsWith('-')) continue; // removed line -- skip
-        const text = (raw.startsWith('+') || raw.startsWith(' ')) ? raw.slice(1) : raw;
-        newFileLines.push({ lineNo: currentLine, text });
-        currentLine++;
-      }
-
-      const targetIdx = newFileLines.findIndex((l) => l.lineNo === finding.line);
-      if (targetIdx === -1) continue;
-
-      const start = Math.max(0, targetIdx - DIFF_CONTEXT_LINES);
-      const end = Math.min(newFileLines.length, targetIdx + DIFF_CONTEXT_LINES + 1);
-
-      const before = newFileLines.slice(start, targetIdx).map((l) => l.text).join('\n');
-      const snippet = newFileLines[targetIdx].text;
-      const after = newFileLines.slice(targetIdx + 1, end).map((l) => l.text).join('\n');
-      const startLine = newFileLines[start].lineNo;
-
-      const diffContext: DiffContext = {
-        snippet,
-        diff_context_before: before,
-        diff_context_after: after,
-        start_line: startLine,
-      };
-
-      return { ...finding, diff_context: diffContext };
+    const exactMatch = fileLines.some((l) => l.lineNo === finding.line);
+    if (!exactMatch) {
+      const nearest = fileLines.reduce((a, b) =>
+        Math.abs(a.lineNo - finding.line!) <= Math.abs(b.lineNo - finding.line!)
+          ? a
+          : b,
+      );
+      if (Math.abs(nearest.lineNo - finding.line!) > LINE_CORRECTION_SEARCH_RADIUS) return finding;
     }
 
-    return finding;
+    const correctedLine = this.correctLineLocation(finding.line!, fileLines, finding);
+    const targetIdx = fileLines.findIndex((l) => l.lineNo === correctedLine);
+    if (targetIdx === -1) return finding;
+
+    const start = Math.max(0, targetIdx - SNIPPET_CONTEXT_LINES);
+    const end = Math.min(fileLines.length, targetIdx + SNIPPET_CONTEXT_LINES + 1);
+
+    const before = fileLines.slice(start, targetIdx).map((l) => l.text).join('\n');
+    const snippet = fileLines[targetIdx].text;
+    const after = fileLines.slice(targetIdx + 1, end).map((l) => l.text).join('\n');
+    const startLine = fileLines[start].lineNo;
+
+    const diffContext: DiffContext = {
+      snippet,
+      diff_context_before: before,
+      diff_context_after: after,
+      start_line: startLine,
+    };
+
+    return {
+      ...finding,
+      line: correctedLine,
+      diff_context: diffContext,
+    };
   }
 
   private truncateToSentences(text: string, maxSentences: number): string {
