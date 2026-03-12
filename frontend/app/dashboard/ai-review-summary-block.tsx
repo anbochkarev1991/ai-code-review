@@ -6,28 +6,39 @@ interface AiReviewSummaryBlockProps {
   aiReviewSummary: AiReviewSummary;
 }
 
-function parseConcern(concern: string): { severity?: string; text: string } {
-  const match = concern.match(/^\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s*(.*)/);
-  if (match) {
-    const text = (match[2] ?? "").trim();
-    return { severity: match[1], text: text || concern };
+/** Matches severity badge style used in findings cards (review-findings-list). */
+function getSeverityBadgeClass(severityLabel: string): string {
+  switch (severityLabel.toUpperCase()) {
+    case "CRITICAL":
+      return "bg-red-600 text-white dark:bg-red-500";
+    case "HIGH":
+      return "bg-orange-600 text-white dark:bg-orange-500";
+    case "MEDIUM":
+      return "bg-yellow-500 text-white dark:bg-yellow-400";
+    case "LOW":
+      return "bg-blue-600 text-white dark:bg-blue-500";
+    default:
+      return "bg-zinc-600 text-white dark:bg-zinc-500";
   }
-  return { text: concern };
 }
 
-function getSeverityAccent(severity: string): string {
-  switch (severity.toUpperCase()) {
-    case "CRITICAL":
-      return "border-l-red-500 bg-red-50/50 dark:bg-red-950/20 dark:border-l-red-400";
-    case "HIGH":
-      return "border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20 dark:border-l-orange-400";
-    case "MEDIUM":
-      return "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20 dark:border-l-amber-400";
-    case "LOW":
-      return "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 dark:border-l-blue-400";
-    default:
-      return "border-l-zinc-300 dark:border-l-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/30";
+function parseConcern(concern: string): {
+  severity?: string;
+  title: string;
+  explanation?: string;
+} {
+  const match = concern.match(/^\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s*([\s\S]*)/);
+  if (match) {
+    const rest = (match[2] ?? "").trim();
+    const newlineIdx = rest.indexOf("\n");
+    if (newlineIdx >= 0) {
+      const title = rest.slice(0, newlineIdx).trim();
+      const explanation = rest.slice(newlineIdx + 1).trim();
+      return { severity: match[1], title: title || rest, explanation: explanation || undefined };
+    }
+    return { severity: match[1], title: rest || concern };
   }
+  return { title: concern.trim() };
 }
 
 export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockProps) {
@@ -35,12 +46,12 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
-      <div className="px-4 py-4 flex flex-col gap-5">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+      <div className="px-4 py-5 flex flex-col gap-6">
+        <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
           AI Review Summary
         </h3>
 
-        <section className="flex flex-col gap-1">
+        <section className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Overall Assessment
           </span>
@@ -50,15 +61,13 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
         </section>
 
         {primary_risk && (
-          <section className="flex flex-col gap-1">
+          <section className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Primary Risk
             </span>
-            <div className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-              <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                {primary_risk}
-              </span>
-            </div>
+            <span className="inline-flex items-center self-start rounded px-2.5 py-1 text-xs font-semibold whitespace-nowrap bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300">
+              {primary_risk}
+            </span>
           </section>
         )}
 
@@ -67,21 +76,31 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Key Concerns
             </span>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               {key_concerns.map((concern, i) => {
-                const { severity, text } = parseConcern(concern);
-                const accent = severity ? getSeverityAccent(severity) : "border-l-zinc-300 dark:border-l-zinc-600 bg-zinc-50/50 dark:bg-zinc-800/30";
+                const { severity, title, explanation } = parseConcern(concern);
                 return (
                   <li
                     key={i}
-                    className={`rounded-md border-l-4 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 ${accent}`}
+                    className="flex flex-col gap-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 px-3 py-2.5"
                   >
-                    {severity && (
-                      <span className="mr-2 font-semibold text-zinc-600 dark:text-zinc-400">
-                        [{severity}]
+                    <div className="flex flex-wrap items-center gap-2">
+                      {severity && (
+                        <span
+                          className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${getSeverityBadgeClass(severity)}`}
+                        >
+                          {severity}
+                        </span>
+                      )}
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                        {title}
                       </span>
+                    </div>
+                    {explanation && (
+                      <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400 pl-0">
+                        {explanation}
+                      </p>
                     )}
-                    {text}
                   </li>
                 );
               })}
@@ -89,11 +108,11 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
           </section>
         )}
 
-        <section className="flex flex-col gap-1">
+        <section className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Recommendation
           </span>
-          <p className="text-sm font-medium leading-relaxed text-zinc-800 dark:text-zinc-200 rounded-md px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
+          <p className="text-sm font-medium leading-relaxed text-zinc-800 dark:text-zinc-200 rounded-md px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
             {recommendation}
           </p>
         </section>

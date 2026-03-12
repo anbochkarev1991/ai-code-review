@@ -48,14 +48,14 @@ describe('AiSummaryGeneratorService', () => {
   });
 
   it('returns parsed AiReviewSummary when OpenAI returns valid JSON', async () => {
-    const validResponse = {
+    const aiResponse = {
       overall_assessment: 'This PR introduces reliability risks.',
       primary_risk: 'Reliability',
       key_concerns: ['Error handling gaps', 'Validation issues'],
       recommendation: 'Address error handling before merge.',
     };
     mockCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(validResponse) } }],
+      choices: [{ message: { content: JSON.stringify(aiResponse) } }],
     });
 
     const findings: Finding[] = [
@@ -77,7 +77,13 @@ describe('AiSummaryGeneratorService', () => {
 
     const result = await service.generate(findings, reviewSummary);
 
-    expect(result).toEqual(validResponse);
+    expect(result?.overall_assessment).toBe(aiResponse.overall_assessment);
+    expect(result?.primary_risk).toBe(aiResponse.primary_risk);
+    expect(result?.recommendation).toBe(aiResponse.recommendation);
+    expect(result?.key_concerns).toEqual([
+      '[MEDIUM] Error handling gaps',
+      '[MEDIUM] Validation issues',
+    ]);
     expect(mockCreate).toHaveBeenCalledTimes(1);
     type CreateCallArg = { messages: Array<{ content?: string }> };
     const calls = mockCreate.mock.calls as CreateCallArg[][];
@@ -101,7 +107,13 @@ describe('AiSummaryGeneratorService', () => {
     const result = await service.generate([], makeReviewSummary({}));
 
     expect(result?.key_concerns).toHaveLength(5);
-    expect(result?.key_concerns).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(result?.key_concerns).toEqual([
+      '[MEDIUM] a',
+      '[MEDIUM] b',
+      '[MEDIUM] c',
+      '[MEDIUM] d',
+      '[MEDIUM] e',
+    ]);
   });
 
   it('falls back to primary_risk_category when AI does not return primary_risk', async () => {
@@ -151,5 +163,25 @@ describe('AiSummaryGeneratorService', () => {
     const result = await service.generate([], makeReviewSummary({}));
 
     expect(result).toBeUndefined();
+  });
+
+  it('merges similar concerns into single aggregated items', async () => {
+    const response = {
+      overall_assessment: 'Multiple null checks missing.',
+      primary_risk: 'Reliability',
+      key_concerns: [
+        '[HIGH] Missing null check in checkout method',
+        '[HIGH] Missing null check in getUsage method',
+      ],
+      recommendation: 'Add null checks to token handling.',
+    };
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(response) } }],
+    });
+
+    const result = await service.generate([], makeReviewSummary({}));
+
+    expect(result?.key_concerns).toHaveLength(1);
+    expect(result?.key_concerns[0]).toMatch(/\[HIGH\].*\(2 locations\)/);
   });
 });

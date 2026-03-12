@@ -2,6 +2,99 @@ import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import type { AiReviewSummary, Finding, ReviewSummary } from 'shared';
 
+type ParsedConcern = { severity: string; title: string; explanation?: string };
+
+function parseConcern(raw: string): ParsedConcern {
+  const match = raw.match(/^\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s*(.*)/s);
+  if (match) {
+    const rest = (match[2] ?? '').trim();
+    const newlineIdx = rest.indexOf('\n');
+    if (newlineIdx >= 0) {
+      return {
+        severity: match[1],
+        title: rest.slice(0, newlineIdx).trim(),
+        explanation: rest.slice(newlineIdx + 1).trim() || undefined,
+      };
+    }
+    return { severity: match[1], title: rest || raw, explanation: undefined };
+  }
+  return { severity: 'MEDIUM', title: raw.trim(), explanation: undefined };
+}
+
+function normalizeForSimilarity(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\b(in|the|a|an)\s+/g, '')
+    .replace(/\b(method|function|checkout|getUsage|handler|etc)\.?/gi, '')
+    .replace(/\d+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function concernSimilarity(a: ParsedConcern, b: ParsedConcern): number {
+  if (a.severity !== b.severity) return 0;
+  const na = normalizeForSimilarity(a.title);
+  const nb = normalizeForSimilarity(b.title);
+  if (na === nb) return 1;
+  const wordsA = new Set(na.split(/\s+/).filter((w) => w.length > 2));
+  const wordsB = new Set(nb.split(/\s+/).filter((w) => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const intersection = [...wordsA].filter((w) => wordsB.has(w));
+  const union = new Set([...wordsA, ...wordsB]);
+  return intersection.length / union.size;
+}
+
+const CONCERN_SIMILARITY_THRESHOLD = 0.6;
+
+function mergeSimilarConcerns(concerns: string[]): string[] {
+  const parsed = concerns.map(parseConcern);
+  const merged: ParsedConcern[] = [];
+  const used = new Set<number>();
+
+  for (let i = 0; i < parsed.length; i++) {
+    if (used.has(i)) continue;
+    const primary = parsed[i];
+    const group: ParsedConcern[] = [primary];
+
+    for (let j = i + 1; j < parsed.length; j++) {
+      if (used.has(j)) continue;
+      if (
+        concernSimilarity(primary, parsed[j]) >= CONCERN_SIMILARITY_THRESHOLD
+      ) {
+        group.push(parsed[j]);
+        used.add(j);
+      }
+    }
+
+    if (group.length === 1) {
+      merged.push(primary);
+    } else {
+      const count = group.length;
+      const locationsSuffix = count > 1 ? ` (${count} locations)` : '';
+      const explanations = group
+        .map((c) => c.explanation)
+        .filter(Boolean) as string[];
+      const combinedExplanation =
+        explanations.length > 0
+          ? [...new Set(explanations)].slice(0, 2).join('; ')
+          : undefined;
+      merged.push({
+        severity: primary.severity,
+        title:
+          primary.title.replace(/\s*\(\d+\s*locations?\)\s*$/i, '').trim() +
+          locationsSuffix,
+        explanation: combinedExplanation,
+      });
+    }
+  }
+
+  return merged.map((c) => {
+    let out = `[${c.severity}] ${c.title}`;
+    if (c.explanation) out += `\n${c.explanation}`;
+    return out;
+  });
+}
+
 function parseAiSummary(parsed: unknown): AiReviewSummary | null {
   if (!parsed || typeof parsed !== 'object') return null;
   const o = parsed as Record<string, unknown>;
@@ -36,7 +129,7 @@ const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code rev
 
 2. primary_risk: Single short label for the main concern category. Examples: "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality".
 
-3. key_concerns: 4–5 items max. Put more severe or impactful concerns first. Merge overlapping concerns. Each item may optionally start with [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity matters.
+3. key_concerns: 3–4 items max. Put more severe or impactful concerns first. MERGE overlapping or similar issues into a single pattern—do not repeat the same concern with different method/location names. Each item must start with exactly [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity matters. Format: "[SEVERITY] Short pattern title" (e.g. "[HIGH] Missing null checks in token handling"). When merging similar issues, create one concern with the pattern and optionally add a second line after a newline explaining specific locations (e.g. "checkout() and getUsage() may accept invalid tokens.").
 
 4. recommendation: One concise action-oriented sentence (e.g. "Remove exposed credentials and strengthen webhook validation before merging.").
 
@@ -45,6 +138,7 @@ const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code rev
 - Repetitive issue restatements
 - Marketing or dramatic language
 - Vague statements
+- Duplicate concerns that differ only by method/file name—merge them
 
 ## Themes to mention when relevant
 Error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
@@ -101,6 +195,7 @@ export class AiSummaryGeneratorService {
         this.logger.warn('AI summary schema validation failed');
         return undefined;
       }
+      summary.key_concerns = mergeSimilarConcerns(summary.key_concerns);
       if (summary.key_concerns.length > 5) {
         summary.key_concerns = summary.key_concerns.slice(0, 5);
       }

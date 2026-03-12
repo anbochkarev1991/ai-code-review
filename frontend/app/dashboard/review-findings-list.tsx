@@ -418,7 +418,7 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
       className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 pl-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
     >
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+        <div className="flex items-start gap-3 flex-wrap">
           <div className="flex items-start gap-2 flex-1 min-w-0">
             <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
             <div className="flex-1 min-w-0">
@@ -662,8 +662,8 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
       <div className="p-4">
         <div className="flex flex-col gap-3">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-            <div className="flex items-start gap-3 flex-1">
+          <div className="flex items-start gap-3 flex-wrap">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
               <div className={`shrink-0 w-1 h-6 rounded-full ${severityStyles.bg} mt-0.5`} />
               <div className="flex-1 min-w-0">
                 <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
