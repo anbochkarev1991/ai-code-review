@@ -93,7 +93,11 @@ export class ReviewsController {
       ? authHeader.slice(7).trim()
       : '';
 
-    const usage = await this.billingService.getUsage(user.id, token);
+    const usage = await this.billingService.getUsage(
+      user.id,
+      token,
+      user.email ?? undefined,
+    );
     if (usage.review_count >= usage.limit) {
       throw new HttpException(
         { message: 'Review quota exceeded. Upgrade to Pro for more reviews.' },
@@ -125,7 +129,11 @@ export class ReviewsController {
       await this.billingService.incrementUsage(user.id, token);
     }
 
-    const updatedUsage = await this.billingService.getUsage(user.id, token);
+    const updatedUsage = await this.billingService.getUsage(
+      user.id,
+      token,
+      user.email ?? undefined,
+    );
     return { ...result, usage: updatedUsage };
   }
 }

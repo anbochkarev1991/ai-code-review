@@ -125,7 +125,11 @@ export class BillingService {
     }
   }
 
-  async getUsage(userId: string, accessToken: string): Promise<UsageResponse> {
+  async getUsage(
+    userId: string,
+    accessToken: string,
+    userEmail?: string,
+  ): Promise<UsageResponse> {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -152,7 +156,18 @@ export class BillingService {
         .maybeSingle(),
     ]);
 
-    const plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    let plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    const emulatedEmails = (process.env.PRO_EMULATE_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      emulatedEmails.length > 0 &&
+      userEmail &&
+      emulatedEmails.includes(userEmail.toLowerCase())
+    ) {
+      plan = 'pro';
+    }
     const reviewCount: number = (usageResult.data?.review_count as number) ?? 0;
     const limit = USAGE_LIMITS[plan];
 

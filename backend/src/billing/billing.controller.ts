@@ -44,7 +44,7 @@ export class BillingController {
     const token = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7).trim()
       : '';
-    return this.billingService.getUsage(user.id, token);
+    return this.billingService.getUsage(user.id, token, user.email ?? undefined);
   }
 
   @Post('webhook')

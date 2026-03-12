@@ -62,7 +62,17 @@ export class MeService {
           };
         })();
 
-    const plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    let plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    const emulatedEmails = (process.env.PRO_EMULATE_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      emulatedEmails.length > 0 &&
+      emulatedEmails.includes((user.email ?? '').toLowerCase())
+    ) {
+      plan = 'pro';
+    }
     const github_connected = !!githubResult.data;
 
     return { profile, plan, github_connected };
