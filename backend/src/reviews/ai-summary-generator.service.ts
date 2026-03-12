@@ -129,16 +129,31 @@ const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code rev
 
 2. primary_risk: Single short label for the main concern category. Examples: "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality".
 
-3. key_concerns: 3–4 items max. Put more severe or impactful concerns first. MERGE overlapping or similar issues into a single pattern—do not repeat the same concern with different method/location names. Each item must start with exactly [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity matters. Format: "[SEVERITY] Short pattern title" (e.g. "[HIGH] Missing null checks in token handling"). When merging similar issues, create one concern with the pattern and optionally add a second line after a newline explaining specific locations (e.g. "checkout() and getUsage() may accept invalid tokens.").
+3. key_concerns: 3–5 items max. Put more severe or impactful concerns first.
+
+   **Purpose:** Summarize patterns across findings—do NOT repeat finding titles or wording. Write like an experienced engineer quickly describing the main risks.
+
+   **Rules:**
+   - One short line per concern. Summarize the underlying issue pattern, not each finding verbatim.
+   - Use accurate wording. Do not exaggerate: if the secret comes from env vars, do not say "hardcoded"; if validation is weak, say "weak validation" not "missing validation."
+   - Merge similar issues into a single pattern. Do not list "Missing X in A" and "Missing X in B" separately—write one: "Missing X in [category/area]."
+   - Do not speculate beyond the available code context.
+
+   **Format:** "[SEVERITY] Short pattern title" (e.g. "[HIGH] Missing null checks for authentication headers").
+
+   **Good vs bad examples:**
+   - Bad: "Hardcoded Stripe Webhook Secret Handling" → Good: "Weak validation of Stripe webhook secret"
+   - Bad: "Missing null checks for token in checkout" + "Missing null checks for token in getUsage" (two items) → Good: "Missing null checks for authentication headers" (one item)
 
 4. recommendation: One concise action-oriented sentence (e.g. "Remove exposed credentials and strengthen webhook validation before merging.").
 
 ## Forbidden
 - Fluffy wording or generic filler (e.g. "improve code quality")
-- Repetitive issue restatements
+- Repeating finding titles or wording verbatim—summarize patterns instead
+- Exaggeration or inaccurate wording (e.g. "hardcoded secret" when the code uses env vars)
 - Marketing or dramatic language
 - Vague statements
-- Duplicate concerns that differ only by method/file name—merge them
+- Separate concerns that differ only by method/file name—merge into one pattern
 
 ## Themes to mention when relevant
 Error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
@@ -269,6 +284,8 @@ export class AiSummaryGeneratorService {
     }
 
     parts.push(
+      '',
+      'For key_concerns: Infer accurate descriptions from each finding\'s message (not just the title). Do not mischaracterize—e.g. if a finding says the value comes from env vars, do not label it as "hardcoded."',
       '',
       'Return JSON: { "overall_assessment": "...", "primary_risk": "Label", "key_concerns": [...], "recommendation": "..." }',
     );
