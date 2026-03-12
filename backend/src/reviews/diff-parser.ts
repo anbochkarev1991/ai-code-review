@@ -7,20 +7,43 @@ import type {
   DiffStats,
 } from '../types';
 
+/**
+ * Patterns for excluding non-reviewable files from AI analysis.
+ * Categories: env examples, lock files, vendor/build artifacts, git/docker config,
+ * low-value config files, binary/media files.
+ * Goal: reduce noisy findings, not hide real code issues.
+ */
 const IGNORE_PATTERNS: RegExp[] = [
-  /^\.env($|\.)/,
+  // .env and env example/template files (at any path depth)
+  /(^|\/)\.env($|\.)/,
+  /\.env\.example$/i,
+  /\.env\.sample$/i,
+  /\.env\.template$/i,
+  /\.env\.local\.example$/i,
+  // Git and docker ignore files
+  /\.gitignore$/,
+  /\.dockerignore$/,
+  // Vendor and build artifacts
   /node_modules\//,
+  /vendor\//,
   /^dist\//,
   /^build\//,
   /^\.next\//,
   /^out\//,
   /^coverage\//,
+  // Lock files
   /package-lock\.json$/,
   /yarn\.lock$/,
   /pnpm-lock\.yaml$/,
+  /bun\.lock$/,
+  /Cargo\.lock$/,
+  /Gemfile\.lock$/,
   /\.min\.(js|css)$/,
   /\.map$/,
   /\.lock$/,
+  // Low-value config
+  /\.cursorignore$/,
+  /\.editorconfig$/,
   /\.DS_Store$/,
   // Binary image/font/media files
   /\.ico$/,

@@ -415,12 +415,12 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
 
   return (
     <div
-      className={`rounded-md border-l-2 pl-3 py-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 ${severityStyles.border}`}
+      className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 pl-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
           <div className="flex items-start gap-2 flex-1 min-w-0">
-            <div className={`shrink-0 w-0.5 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
+            <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
             <div className="flex-1 min-w-0">
               <h5 className="font-medium text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
                 {finding.title}
@@ -436,42 +436,42 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
             </div>
           </div>
           <span
-            className={`rounded px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
+            className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
           >
             {finding.severity.toUpperCase()}
           </span>
         </div>
 
-        <div className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed wrap-break-word">
+        <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed wrap-break-word">
           {finding.message}
         </div>
 
         {finding.impact && (
-          <div className="flex items-start gap-2 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5">
-            <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 shrink-0">
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+            <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 shrink-0">
               Impact:
             </span>
-            <span className="text-[10px] text-amber-700 dark:text-amber-400">
+            <span className="text-xs text-amber-700 dark:text-amber-400">
               {finding.impact}
             </span>
           </div>
         )}
 
         {(finding.suggested_fix || finding.suggestion) && (
-          <div className="rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100/50 dark:bg-zinc-800/50 px-2 py-1.5">
-            <div className="text-[10px] font-medium text-zinc-700 dark:text-zinc-300 mb-0.5">
+          <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2">
+            <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-0.5">
               Suggested Fix
             </div>
-            <div className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
+            <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
               {finding.suggested_fix || finding.suggestion}
             </div>
           </div>
         )}
 
-        <div className="flex items-center pt-1 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center pt-2 border-t border-zinc-200 dark:border-zinc-700">
           <button
             onClick={() => setIssueModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
           >
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -492,14 +492,14 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
         />
 
         {finding.outside_diff && (
-          <div className="flex items-center gap-1.5 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400">
+          <div className="flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1.5 text-xs text-zinc-600 dark:text-zinc-400">
             References code outside the diff — lower confidence
           </div>
         )}
 
         {(hasAIMetadata || finding.false_positive_risk) && (
-          <div className="pt-1 border-t border-zinc-200 dark:border-zinc-700">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               {finding.agent_name && (
                 <div className="flex items-center gap-1">
                   <span className="text-zinc-500 dark:text-zinc-400">Agent:</span>
@@ -507,13 +507,13 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                     finding.merged_agents.map((agent: string) => (
                       <span
                         key={agent}
-                        className="rounded px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
+                        className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium"
                       >
                         {agent}
                       </span>
                     ))
                   ) : (
-                    <span className="rounded px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
+                    <span className="rounded px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
                       {finding.agent_name}
                     </span>
                   )}
@@ -522,7 +522,7 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
               {finding.confidence !== undefined && (
                 <div className="flex items-center gap-1">
                   <span className="text-zinc-500 dark:text-zinc-400">Confidence:</span>
-                  <div className="w-10 h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden inline-block">
+                  <div className="w-10 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden inline-block">
                     <div
                       className={`h-full ${getConfidenceColor(finding.confidence)}`}
                       style={{ width: `${finding.confidence * 100}%` }}
@@ -535,7 +535,7 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                 <div className="flex items-center gap-1">
                   <span className="text-zinc-500 dark:text-zinc-400">FP risk:</span>
                   <span
-                    className={`rounded px-1 py-0.5 text-[10px] font-semibold ${getFPRiskStyle(finding.false_positive_risk).bg} ${getFPRiskStyle(finding.false_positive_risk).text}`}
+                    className={`rounded px-1.5 py-0.5 text-xs font-semibold ${getFPRiskStyle(finding.false_positive_risk).bg} ${getFPRiskStyle(finding.false_positive_risk).text}`}
                   >
                     {finding.false_positive_risk}
                   </span>
@@ -543,15 +543,15 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
               )}
             </div>
             {finding.reasoning_trace && (
-              <div className="mt-1">
+              <div className="mt-1.5">
                 <button
                   onClick={() => setShowReasoning(!showReasoning)}
-                  className="text-[10px] font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  className="text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
                   {showReasoning ? "Hide reasoning" : "Show reasoning"}
                 </button>
                 {showReasoning && (
-                  <div className="mt-1 text-[10px] text-zinc-600 dark:text-zinc-400 italic wrap-break-word">
+                  <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400 italic wrap-break-word">
                     {finding.reasoning_trace}
                   </div>
                 )}
@@ -594,7 +594,7 @@ function FileBlock({
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <span className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <span className="font-mono text-base font-semibold text-zinc-900 dark:text-zinc-100">
               {shortFileName}
             </span>
           </div>
@@ -609,18 +609,18 @@ function FileBlock({
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-6">
+      <div className="p-4 flex flex-col gap-5">
         {lineGroups.map(({ line, findings }) => {
           const sharedDiffContext = findings.find((f) => f.diff_context)?.diff_context;
           return (
-            <div key={line} className="flex flex-col gap-3">
+            <div key={line} className="flex flex-col gap-4 pl-3 border-l-2 border-zinc-200 dark:border-zinc-700">
               {/* Line section header */}
-              <h5 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              <h5 className="text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
                 Line {line}
               </h5>
               {sharedDiffContext && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-500 mb-1.5">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-500 mb-1.5">
                     Code context
                   </div>
                   <DiffContextPreview
@@ -630,7 +630,7 @@ function FileBlock({
                   />
                 </div>
               )}
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {findings.map((finding) => (
                   <FindingSubCard
                     key={finding.id}

@@ -28,26 +28,26 @@ function parseAiSummary(parsed: unknown): AiReviewSummary | null {
   return result;
 }
 
-const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code review results for a colleague.
+const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code review results for a colleague. Produce a technical, concise, high-signal executive overview readable in under 10 seconds.
 
-Generate a concise, high-signal executive summary. Your tone should be:
-- Clear and engineering-focused
-- Non-marketing, non-dramatic, non-redundant
-- Practical and grounded
+## Required structure (return valid JSON)
 
-Do NOT use:
-- Fluffy language or generic management-speak
-- Vague statements like "improve code quality"
-- Repetitive rewordings of the same issue
-- Exaggerated claims
+1. overall_assessment: 1–2 concise sentences describing the PR state clearly. Answer: What are the main risks? Is this PR mostly safe, risky, or blocked?
 
-Return valid JSON with exactly four fields:
-- overall_assessment: one short paragraph (1–2 sentences) answering "What are the main risks? Is this PR mostly safe, risky, or blocked?"
-- primary_risk: one short label identifying the main category of concern (e.g. "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality")
-- key_concerns: array of 3–5 short bullet points summarizing the most important issue clusters (avoid listing every finding individually). Each bullet may optionally start with [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity is relevant.
-- recommendation: one short action-oriented sentence, e.g. "Remove exposed credentials and strengthen webhook validation before merging."
+2. primary_risk: Single short label for the main concern category. Examples: "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality".
 
-If useful, mention systemic themes like: error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
+3. key_concerns: 4–5 items max. Put more severe or impactful concerns first. Merge overlapping concerns. Each item may optionally start with [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity matters.
+
+4. recommendation: One concise action-oriented sentence (e.g. "Remove exposed credentials and strengthen webhook validation before merging.").
+
+## Forbidden
+- Fluffy wording or generic filler (e.g. "improve code quality")
+- Repetitive issue restatements
+- Marketing or dramatic language
+- Vague statements
+
+## Themes to mention when relevant
+Error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
 
 @Injectable()
 export class AiSummaryGeneratorService {
