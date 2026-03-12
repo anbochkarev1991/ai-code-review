@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { Finding, DiffContext, AffectedLocation } from "@/lib/types";
 import { GenerateIssueModal } from "./generate-issue-modal";
 
@@ -164,50 +164,170 @@ interface ReviewFindingsListProps {
   accessToken: string;
 }
 
-// ── Location grouping utilities ──
+// ── Similarity & deduplication ──
 
-function normalizeLocationKey(file: string, line: number): string {
-  const trimmed = (file ?? "").trim();
-  return `${trimmed}|${line}`;
+const TITLE_SIMILARITY_THRESHOLD = 0.7;
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function textSimilarity(textA: string, textB: string): number {
+  const a = textA.toLowerCase();
+  const b = textB.toLowerCase();
+  if (a === b) return 1;
+  const shorter = a.length < b.length ? a : b;
+  const longer = a.length >= b.length ? a : b;
+  if (longer.includes(shorter) && shorter.length > 20) return 0.9;
+  const wordsA = new Set(a.split(/\s+/).filter((w) => w.length > 3));
+  const wordsB = new Set(b.split(/\s+/).filter((w) => w.length > 3));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const intersection = [...wordsA].filter((w) => wordsB.has(w));
+  const union = new Set([...wordsA, ...wordsB]);
+  return intersection.length / union.size;
 }
 
-function groupFindingsByLocation(findings: Finding[]): Map<string, Finding[]> {
-  const map = new Map<string, Finding[]>();
-  for (const f of findings) {
-    const file = f.file?.trim();
-    const line = f.line;
-    if (!file || line === undefined) continue;
-    const key = normalizeLocationKey(file, line);
-    const existing = map.get(key) ?? [];
-    existing.push(f);
-    map.set(key, existing);
-  }
-  return map;
-}
-
-type ClusterItem =
-  | { type: "cluster"; key: string; file: string; line: number; findings: Finding[] }
-  | { type: "standalone"; finding: Finding };
-
-function getOrderedClustersAndStandalone(findings: Finding[]): ClusterItem[] {
-  const groups = groupFindingsByLocation(findings);
-  const result: ClusterItem[] = [];
-  const seenKeys = new Set<string>();
-
+function mergeSimilarFindings(findings: Finding[]): Finding[] {
+  const withLocation: Finding[] = [];
+  const withoutLocation: Finding[] = [];
   for (const f of findings) {
     const file = f.file?.trim();
     const line = f.line;
     if (!file || line === undefined) {
-      result.push({ type: "standalone", finding: f });
+      withoutLocation.push(f);
       continue;
     }
-    const key = normalizeLocationKey(file, line);
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-    const clusterFindings = groups.get(key) ?? [];
-    result.push({ type: "cluster", key, file, line, findings: clusterFindings });
+    withLocation.push(f);
   }
-  return result;
+
+  const merged: Finding[] = [];
+  const used = new Set<number>();
+
+  for (let i = 0; i < withLocation.length; i++) {
+    if (used.has(i)) continue;
+    const primary = withLocation[i]!;
+    const group: Finding[] = [primary];
+
+    for (let j = i + 1; j < withLocation.length; j++) {
+      if (used.has(j)) continue;
+      const other = withLocation[j];
+      if (!other) continue;
+      if (
+        (primary.file?.trim() ?? "") !== (other.file?.trim() ?? "") ||
+        primary.line !== other.line
+      ) {
+        continue;
+      }
+      if (textSimilarity(primary.title, other.title) >= TITLE_SIMILARITY_THRESHOLD) {
+        group.push(other);
+        used.add(j);
+      }
+    }
+
+    if (group.length === 1) {
+      merged.push(primary);
+    } else {
+      group.sort(
+        (a, b) => (SEVERITY_ORDER[b.severity] ?? 0) - (SEVERITY_ORDER[a.severity] ?? 0),
+      );
+      const best = group[0]!;
+      const agents = new Set<string>();
+      const categories = new Set<string>();
+      for (const f of group) {
+        if (f.agent_name)
+          f.agent_name.split(", ").forEach((a: string) => agents.add(a.trim()));
+        if (f.merged_agents) f.merged_agents.forEach((a: string) => agents.add(a));
+        if (f.category) categories.add(f.category);
+        if (f.merged_categories) f.merged_categories.forEach((c: string) => categories.add(c));
+      }
+      merged.push({
+        ...best,
+        message: group.reduce(
+          (acc, f) => ((f.message?.length ?? 0) > (acc.length ?? 0) ? (f.message ?? "") : acc),
+          best.message ?? "",
+        ),
+        impact: group.reduce(
+          (acc, f) => ((f.impact?.length ?? 0) > (acc.length ?? 0) ? (f.impact ?? "") : acc),
+          best.impact ?? "",
+        ),
+        suggested_fix: group.reduce(
+          (acc, f) =>
+            ((f.suggested_fix?.length ?? 0) > (acc.length ?? 0) ? (f.suggested_fix ?? "") : acc),
+          best.suggested_fix ?? "",
+        ),
+        merged_agents: agents.size > 0 ? [...agents] : undefined,
+        merged_categories: categories.size > 1 ? [...categories] : undefined,
+        consensus_level: agents.size > 1 ? "multi-agent" : best.consensus_level,
+      });
+    }
+  }
+
+  return [...merged, ...withoutLocation];
+}
+
+// ── Hierarchical grouping (FILE → LINE → FINDINGS) ──
+
+type FileGroup = {
+  file: string;
+  totalCount: number;
+  lineGroups: { line: number; findings: Finding[] }[];
+};
+
+function groupByFileThenLine(findings: Finding[]): FileGroup[] {
+  const fileMap = new Map<string, Map<number, Finding[]>>();
+
+  for (const f of findings) {
+    const file = f.file?.trim();
+    const line = f.line;
+    if (!file || line === undefined) continue;
+
+    let lineMap = fileMap.get(file);
+    if (!lineMap) {
+      lineMap = new Map<number, Finding[]>();
+      fileMap.set(file, lineMap);
+    }
+    const list = lineMap.get(line) ?? [];
+    list.push(f);
+    lineMap.set(line, list);
+  }
+
+  const groups: FileGroup[] = [];
+  for (const [file, lineMap] of fileMap) {
+    const lineGroups: { line: number; findings: Finding[] }[] = [];
+    let totalCount = 0;
+    const lines = [...lineMap.keys()].sort((a, b) => a - b);
+    for (const line of lines) {
+      const findingsAtLine = lineMap.get(line) ?? [];
+      lineGroups.push({ line, findings: findingsAtLine });
+      totalCount += findingsAtLine.length;
+    }
+    groups.push({ file, totalCount, lineGroups });
+  }
+
+  groups.sort((a, b) => {
+    const maxSevA = Math.max(
+      ...a.lineGroups.flatMap((lg) => lg.findings.map((f) => SEVERITY_ORDER[f.severity] ?? 0)),
+      0,
+    );
+    const maxSevB = Math.max(
+      ...b.lineGroups.flatMap((lg) => lg.findings.map((f) => SEVERITY_ORDER[f.severity] ?? 0)),
+      0,
+    );
+    if (maxSevB !== maxSevA) return maxSevB - maxSevA;
+    return a.file.localeCompare(b.file);
+  });
+
+  return groups;
+}
+
+// ── Systemic: standalone items (flat list for architectural/cross-cutting issues) ──
+
+type StandaloneItem = { type: "standalone"; finding: Finding };
+
+function getSystemicStandaloneItems(findings: Finding[]): StandaloneItem[] {
+  return findings.map((f) => ({ type: "standalone" as const, finding: f }));
 }
 
 function getSeverityStyles(severity: Finding["severity"]): {
@@ -444,25 +564,20 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
   );
 }
 
-function LocationCluster({
-  file,
-  line,
-  findings,
+function FileBlock({
+  fileGroup,
   accessToken,
 }: {
-  file: string;
-  line: number;
-  findings: Finding[];
+  fileGroup: FileGroup;
   accessToken: string;
 }) {
+  const { file, totalCount, lineGroups } = fileGroup;
   const shortFileName = file.split("/").pop() ?? file;
-  const fileLabel = `${shortFileName}:${line}`;
   const hasFullPath = file.includes("/");
-  const sharedDiffContext = findings.find((f) => f.diff_context)?.diff_context;
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
-      {/* Group header */}
+      {/* File header */}
       <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -480,7 +595,7 @@ function LocationCluster({
               />
             </svg>
             <span className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              {fileLabel}
+              {shortFileName}
             </span>
           </div>
           {hasFullPath && (
@@ -489,38 +604,44 @@ function LocationCluster({
             </span>
           )}
           <p className="text-xs text-zinc-600 dark:text-zinc-400 pl-6">
-            {findings.length === 1
-              ? "1 issue at this location"
-              : `${findings.length} issues detected at this location`}
+            {totalCount} {totalCount === 1 ? "issue" : "issues"} detected
           </p>
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-4">
-        {/* Shared code context */}
-        {sharedDiffContext && (
-          <div>
-            <div className="text-[11px] text-zinc-500 dark:text-zinc-500 mb-1.5">
-              Shared code context
+      <div className="p-4 flex flex-col gap-6">
+        {lineGroups.map(({ line, findings }) => {
+          const sharedDiffContext = findings.find((f) => f.diff_context)?.diff_context;
+          return (
+            <div key={line} className="flex flex-col gap-3">
+              {/* Line section header */}
+              <h5 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Line {line}
+              </h5>
+              {sharedDiffContext && (
+                <div>
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-500 mb-1.5">
+                    Code context
+                  </div>
+                  <DiffContextPreview
+                    diffContext={sharedDiffContext}
+                    file={file}
+                    line={line}
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-3">
+                {findings.map((finding) => (
+                  <FindingSubCard
+                    key={finding.id}
+                    finding={finding}
+                    accessToken={accessToken}
+                  />
+                ))}
+              </div>
             </div>
-            <DiffContextPreview
-              diffContext={sharedDiffContext}
-              file={file}
-              line={line}
-            />
-          </div>
-        )}
-
-        {/* Findings stack */}
-        <div className="flex flex-col gap-3">
-          {findings.map((finding) => (
-            <FindingSubCard
-              key={finding.id}
-              finding={finding}
-              accessToken={accessToken}
-            />
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -818,30 +939,6 @@ function deduplicateIds(findings: Finding[]): Finding[] {
   });
 }
 
-function renderClusterOrStandalone(
-  item: ClusterItem,
-  accessToken: string
-): ReactNode {
-  if (item.type === "cluster") {
-    return (
-      <LocationCluster
-        key={item.key}
-        file={item.file}
-        line={item.line}
-        findings={item.findings}
-        accessToken={accessToken}
-      />
-    );
-  }
-  return (
-    <FindingCard
-      key={item.finding.id}
-      finding={item.finding}
-      accessToken={accessToken}
-    />
-  );
-}
-
 export function ReviewFindingsList({ findings, accessToken }: ReviewFindingsListProps) {
   const [showAll, setShowAll] = useState(false);
 
@@ -854,17 +951,25 @@ export function ReviewFindingsList({ findings, accessToken }: ReviewFindingsList
   }
 
   const uniqueFindings = deduplicateIds(findings);
+  const mergedFindings = mergeSimilarFindings(uniqueFindings);
 
-  const systemic = uniqueFindings.filter((f: Finding) => classifyFinding(f) === "systemic");
-  const codeLevelAll = uniqueFindings.filter((f: Finding) => classifyFinding(f) === "code-level");
+  const systemic = mergedFindings.filter((f: Finding) => classifyFinding(f) === "systemic");
+  const codeLevelAll = mergedFindings.filter((f: Finding) => classifyFinding(f) === "code-level");
 
-  const systemicItems = getOrderedClustersAndStandalone(systemic);
-  const codeLevelItems = getOrderedClustersAndStandalone(codeLevelAll);
+  const codeLevelWithLocation = codeLevelAll.filter(
+    (f) => f.file?.trim() && f.line !== undefined,
+  );
+  const codeLevelStandalone = codeLevelAll.filter(
+    (f) => !f.file?.trim() || f.line === undefined,
+  );
 
-  const visibleCodeLevelItems = showAll
-    ? codeLevelItems
-    : codeLevelItems.slice(0, DEFAULT_VISIBLE_FINDINGS);
-  const hiddenCount = codeLevelItems.length - visibleCodeLevelItems.length;
+  const systemicItems = getSystemicStandaloneItems(systemic);
+  const codeLevelFileGroups = groupByFileThenLine(codeLevelWithLocation);
+
+  const visibleFileGroups = showAll
+    ? codeLevelFileGroups
+    : codeLevelFileGroups.slice(0, DEFAULT_VISIBLE_FINDINGS);
+  const hiddenCount = codeLevelFileGroups.length - visibleFileGroups.length;
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -873,28 +978,47 @@ export function ReviewFindingsList({ findings, accessToken }: ReviewFindingsList
           Findings
         </h3>
         <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          {findings.length} {findings.length === 1 ? "finding" : "findings"}
+          {mergedFindings.length} {mergedFindings.length === 1 ? "finding" : "findings"}
         </span>
       </div>
 
-      {/* Systemic issues group */}
+      {/* Systemic issues: standalone cards */}
       {systemicItems.length > 0 && (
         <div className="flex flex-col gap-3">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Systemic Issues
           </h4>
-          {systemicItems.map((item) => renderClusterOrStandalone(item, accessToken))}
+          {systemicItems.map((item) => (
+            <FindingCard
+              key={item.finding.id}
+              finding={item.finding}
+              accessToken={accessToken}
+            />
+          ))}
         </div>
       )}
 
-      {/* Code-level issues group */}
+      {/* Code-level: hierarchical FILE → LINE → FINDINGS + standalone */}
       <div className="flex flex-col gap-3">
-        {systemicItems.length > 0 && codeLevelItems.length > 0 && (
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Code-Level Issues
-          </h4>
-        )}
-        {visibleCodeLevelItems.map((item) => renderClusterOrStandalone(item, accessToken))}
+        {(codeLevelFileGroups.length > 0 || codeLevelStandalone.length > 0) && (
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Code-Level Issues
+            </h4>
+          )}
+        {codeLevelStandalone.map((finding) => (
+          <FindingCard
+            key={finding.id}
+            finding={finding}
+            accessToken={accessToken}
+          />
+        ))}
+        {visibleFileGroups.map((fileGroup) => (
+          <FileBlock
+            key={fileGroup.file}
+            fileGroup={fileGroup}
+            accessToken={accessToken}
+          />
+        ))}
       </div>
 
       {/* "+ X more" expandable */}
@@ -906,11 +1030,11 @@ export function ReviewFindingsList({ findings, accessToken }: ReviewFindingsList
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
-          + {hiddenCount} more location{hiddenCount === 1 ? "" : "s"}
+          + {hiddenCount} more file{hiddenCount === 1 ? "" : "s"}
         </button>
       )}
 
-      {showAll && codeLevelItems.length > DEFAULT_VISIBLE_FINDINGS && (
+      {showAll && codeLevelFileGroups.length > DEFAULT_VISIBLE_FINDINGS && (
         <button
           onClick={() => setShowAll(false)}
           className="mx-auto flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"

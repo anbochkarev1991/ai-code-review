@@ -7,7 +7,7 @@ interface AiReviewSummaryBlockProps {
 }
 
 export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockProps) {
-  const { overall_assessment, key_concerns, recommendation } = aiReviewSummary;
+  const { overall_assessment, primary_risk, key_concerns, recommendation } = aiReviewSummary;
 
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
@@ -18,6 +18,13 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
         <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
           {overall_assessment}
         </p>
+        {primary_risk && (
+          <div>
+            <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+              Primary risk: {primary_risk}
+            </span>
+          </div>
+        )}
         {key_concerns.length > 0 && (
           <div>
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">

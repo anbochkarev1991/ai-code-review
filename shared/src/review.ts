@@ -215,6 +215,7 @@ export interface ReviewSummary {
 
 export interface AiReviewSummary {
   overall_assessment: string;
+  primary_risk?: string;
   key_concerns: string[];
   recommendation: string;
 }

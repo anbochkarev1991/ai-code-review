@@ -50,6 +50,7 @@ describe('AiSummaryGeneratorService', () => {
   it('returns parsed AiReviewSummary when OpenAI returns valid JSON', async () => {
     const validResponse = {
       overall_assessment: 'This PR introduces reliability risks.',
+      primary_risk: 'Reliability',
       key_concerns: ['Error handling gaps', 'Validation issues'],
       recommendation: 'Address error handling before merge.',
     };
@@ -86,10 +87,11 @@ describe('AiSummaryGeneratorService', () => {
     expect(userContent).toContain('Merge with caution');
   });
 
-  it('caps key_concerns at 4 items', async () => {
+  it('caps key_concerns at 5 items', async () => {
     const response = {
       overall_assessment: 'Summary',
-      key_concerns: ['a', 'b', 'c', 'd', 'e'],
+      primary_risk: 'Security',
+      key_concerns: ['a', 'b', 'c', 'd', 'e', 'f'],
       recommendation: 'Fix issues.',
     };
     mockCreate.mockResolvedValue({
@@ -98,8 +100,26 @@ describe('AiSummaryGeneratorService', () => {
 
     const result = await service.generate([], makeReviewSummary({}));
 
-    expect(result?.key_concerns).toHaveLength(4);
-    expect(result?.key_concerns).toEqual(['a', 'b', 'c', 'd']);
+    expect(result?.key_concerns).toHaveLength(5);
+    expect(result?.key_concerns).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('falls back to primary_risk_category when AI does not return primary_risk', async () => {
+    const response = {
+      overall_assessment: 'Summary',
+      key_concerns: ['Issue'],
+      recommendation: 'Fix issues.',
+    };
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(response) } }],
+    });
+
+    const result = await service.generate(
+      [],
+      makeReviewSummary({ primary_risk_category: 'Architecture' }),
+    );
+
+    expect(result?.primary_risk).toBe('Architecture');
   });
 
   it('returns undefined when OPENAI_API_KEY is not set', async () => {

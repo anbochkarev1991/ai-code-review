@@ -8,6 +8,7 @@ function parseAiSummary(parsed: unknown): AiReviewSummary | null {
   const overall_assessment = o.overall_assessment;
   const key_concerns = o.key_concerns;
   const recommendation = o.recommendation;
+  const primary_risk = o.primary_risk;
   if (
     typeof overall_assessment !== 'string' ||
     !Array.isArray(key_concerns) ||
@@ -16,11 +17,15 @@ function parseAiSummary(parsed: unknown): AiReviewSummary | null {
   ) {
     return null;
   }
-  return {
+  const result: AiReviewSummary = {
     overall_assessment,
     key_concerns: key_concerns,
     recommendation,
   };
+  if (typeof primary_risk === 'string' && primary_risk.trim()) {
+    result.primary_risk = primary_risk.trim();
+  }
+  return result;
 }
 
 const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code review results for a colleague.
@@ -36,10 +41,11 @@ Do NOT use:
 - Repetitive rewordings of the same issue
 - Exaggerated claims
 
-Return valid JSON with exactly three fields:
-- overall_assessment: one short paragraph answering "What are the main risks? Is this PR mostly safe, risky, or blocked?"
-- key_concerns: array of 2–4 short bullet points summarizing the most important issue clusters or repeated patterns (avoid listing every finding individually)
-- recommendation: one short practical line, e.g. "Address error handling and token validation before merging."
+Return valid JSON with exactly four fields:
+- overall_assessment: one short paragraph (1–2 sentences) answering "What are the main risks? Is this PR mostly safe, risky, or blocked?"
+- primary_risk: one short label identifying the main category of concern (e.g. "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality")
+- key_concerns: array of 3–5 short bullet points summarizing the most important issue clusters (avoid listing every finding individually). Each bullet may optionally start with [CRITICAL], [HIGH], [MEDIUM], or [LOW] when severity is relevant.
+- recommendation: one short action-oriented sentence, e.g. "Remove exposed credentials and strengthen webhook validation before merging."
 
 If useful, mention systemic themes like: error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
 
@@ -95,8 +101,11 @@ export class AiSummaryGeneratorService {
         this.logger.warn('AI summary schema validation failed');
         return undefined;
       }
-      if (summary.key_concerns.length > 4) {
-        summary.key_concerns = summary.key_concerns.slice(0, 4);
+      if (summary.key_concerns.length > 5) {
+        summary.key_concerns = summary.key_concerns.slice(0, 5);
+      }
+      if (!summary.primary_risk && reviewSummary.primary_risk_category) {
+        summary.primary_risk = reviewSummary.primary_risk_category;
       }
       return summary;
     } catch (err) {
@@ -111,6 +120,13 @@ export class AiSummaryGeneratorService {
     findings: Finding[],
     reviewSummary: ReviewSummary,
   ): string {
+    const severityCounts = [
+      `Critical: ${reviewSummary.critical_count}`,
+      `High: ${reviewSummary.high_count}`,
+      `Medium: ${reviewSummary.medium_count}`,
+      `Low: ${reviewSummary.low_count}`,
+    ].join(', ');
+
     const parts: string[] = [
       'Generate an AI Review Summary from the following code review data.',
       '',
@@ -118,6 +134,7 @@ export class AiSummaryGeneratorService {
       `Risk score: ${reviewSummary.risk_score}/100`,
       `Risk level: ${reviewSummary.risk_level}`,
       `Merge recommendation: ${reviewSummary.merge_recommendation}`,
+      `Severity counts: ${severityCounts}`,
       reviewSummary.merge_explanation
         ? `Merge explanation: ${reviewSummary.merge_explanation}`
         : '',
@@ -158,7 +175,7 @@ export class AiSummaryGeneratorService {
 
     parts.push(
       '',
-      'Return JSON: { "overall_assessment": "...", "key_concerns": [...], "recommendation": "..." }',
+      'Return JSON: { "overall_assessment": "...", "primary_risk": "Label", "key_concerns": [...], "recommendation": "..." }',
     );
 
     return parts.join('\n');
