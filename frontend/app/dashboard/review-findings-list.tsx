@@ -300,7 +300,10 @@ function groupByFileThenLine(findings: Finding[]): FileGroup[] {
     const lines = [...lineMap.keys()].sort((a, b) => a - b);
     for (const line of lines) {
       const findingsAtLine = lineMap.get(line) ?? [];
-      lineGroups.push({ line, findings: findingsAtLine });
+      const sorted = [...findingsAtLine].sort(
+        (a, b) => (SEVERITY_ORDER[b.severity] ?? 0) - (SEVERITY_ORDER[a.severity] ?? 0),
+      );
+      lineGroups.push({ line, findings: sorted });
       totalCount += findingsAtLine.length;
     }
     groups.push({ file, totalCount, lineGroups });
@@ -418,28 +421,28 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
       className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 pl-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
     >
       <div className="flex flex-col gap-3">
-        <div className="flex items-start gap-3 flex-wrap">
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
-            <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-2">
+          <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <h5 className="font-medium text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
                 {finding.title}
               </h5>
-              <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                {finding.category && (
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {finding.category}
-                  </span>
-                )}
-                {isMultiAgent && <MultiAgentBadge />}
-              </div>
+              <span
+                className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
+              >
+                {finding.severity.toUpperCase()}
+              </span>
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              {finding.category && (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {finding.category}
+                </span>
+              )}
+              {isMultiAgent && <MultiAgentBadge />}
             </div>
           </div>
-          <span
-            className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
-          >
-            {finding.severity.toUpperCase()}
-          </span>
         </div>
 
         <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed wrap-break-word">
@@ -662,28 +665,28 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
       <div className="p-4">
         <div className="flex flex-col gap-3">
           {/* Header */}
-          <div className="flex items-start gap-3 flex-wrap">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div className={`shrink-0 w-1 h-6 rounded-full ${severityStyles.bg} mt-0.5`} />
-              <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2">
+            <div className={`shrink-0 w-1 h-6 rounded-full ${severityStyles.bg} mt-0.5`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
                   {finding.title}
                 </h4>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  {finding.category && (
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {finding.category}
-                    </span>
-                  )}
-                  {isMultiAgent && <MultiAgentBadge />}
-                </div>
+                <span
+                  className={`rounded px-2.5 py-1 text-xs font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
+                >
+                  {finding.severity.toUpperCase()}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {finding.category && (
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {finding.category}
+                  </span>
+                )}
+                {isMultiAgent && <MultiAgentBadge />}
               </div>
             </div>
-            <span
-              className={`rounded px-2.5 py-1 text-xs font-semibold whitespace-nowrap shrink-0 ${severityStyles.badge}`}
-            >
-              {finding.severity.toUpperCase()}
-            </span>
           </div>
 
           {/* Affected locations */}
