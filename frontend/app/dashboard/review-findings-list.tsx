@@ -418,14 +418,14 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
 
   return (
     <div
-      className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 pl-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
+      className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 px-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-2">
           <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h5 className="font-medium text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
+            <div className="flex items-center justify-between">
+              <h5 className="flex-1 min-w-0 font-medium text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
                 {finding.title}
               </h5>
               <span
@@ -668,8 +668,8 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
           <div className="flex items-start gap-2">
             <div className={`shrink-0 w-1 h-6 rounded-full ${severityStyles.bg} mt-0.5`} />
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word">
+              <div className="flex items-center justify-between">
+                <h4 className="flex-1 min-w-0 font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
                   {finding.title}
                 </h4>
                 <span
