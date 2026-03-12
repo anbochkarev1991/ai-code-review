@@ -25,7 +25,8 @@ const SAMPLE_FILES: ParsedFile[] = [
       {
         startLine: 10,
         endLine: 20,
-        content: '+for (const user of users) {\n+  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);\n+}',
+        content:
+          '+for (const user of users) {\n+  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);\n+}',
         addedLines: [
           'for (const user of users) {',
           '  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',

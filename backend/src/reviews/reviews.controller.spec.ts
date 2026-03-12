@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { User } from '@supabase/supabase-js';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { BillingService } from '../billing/billing.service';
+import { IssueGeneratorService } from './issue-generator.service';
+import type { AuthenticatedRequest } from '../auth/jwt-auth.guard';
 import { HttpException } from '@nestjs/common';
 
 describe('ReviewsController', () => {
@@ -19,11 +22,16 @@ describe('ReviewsController', () => {
       runReview: jest.fn(),
     };
 
+    const issueGeneratorService = {
+      generate: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReviewsController],
       providers: [
         { provide: BillingService, useValue: billingService },
         { provide: ReviewsService, useValue: reviewsService },
+        { provide: IssueGeneratorService, useValue: issueGeneratorService },
       ],
     }).compile();
 
@@ -31,10 +39,10 @@ describe('ReviewsController', () => {
   });
 
   describe('POST /reviews', () => {
-    const mockUser = { id: 'user-123' } as any;
-    const mockReq = {
+    const mockUser: User = { id: 'user-123' } as User;
+    const mockReq: AuthenticatedRequest = {
       headers: { authorization: 'Bearer test-token' },
-    } as any;
+    } as AuthenticatedRequest;
     const mockBody = { repo_full_name: 'owner/repo', pr_number: 42 };
 
     it('should return updated usage in the response after a completed review', async () => {

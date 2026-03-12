@@ -19,7 +19,7 @@ export default function PrivacyPage() {
                 Introduction
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">
-                AI Code Review Assistant ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.
+                AI Code Review Assistant (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.
               </p>
             </section>
 

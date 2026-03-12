@@ -45,7 +45,10 @@ export class RiskEngine {
     }
 
     const severityContribution: Record<FindingSeverity, number> = {
-      critical: 0, high: 0, medium: 0, low: 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
     };
     const categoryContribution: Record<string, number> = {};
 
@@ -54,7 +57,8 @@ export class RiskEngine {
       const weight = SEVERITY_WEIGHT[f.severity] ?? 1;
       rawWeightedSum += weight;
       severityContribution[f.severity] += weight;
-      categoryContribution[f.category] = (categoryContribution[f.category] ?? 0) + weight;
+      categoryContribution[f.category] =
+        (categoryContribution[f.category] ?? 0) + weight;
     }
 
     const diminishingScore = 100 * (1 - Math.exp(-rawWeightedSum / 100));
@@ -62,7 +66,7 @@ export class RiskEngine {
     let score = Math.round(diminishingScore);
 
     let floorApplied: string | undefined;
-    const hasCritical = findings.some(f => f.severity === 'critical');
+    const hasCritical = findings.some((f) => f.severity === 'critical');
 
     if (hasCritical && score < RISK_FLOOR_CRITICAL) {
       score = RISK_FLOOR_CRITICAL;

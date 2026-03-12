@@ -4,7 +4,12 @@ import type { ReviewSummary } from '../types';
 import { RiskEngine } from './risk-engine';
 import { FindingNormalizer } from './finding-normalizer';
 
-const AGENT_NAMES = ['Code Quality', 'Architecture', 'Performance', 'Security'] as const;
+const AGENT_NAMES = [
+  'Code Quality',
+  'Architecture',
+  'Performance',
+  'Security',
+] as const;
 
 interface AggregatedResult {
   findings: Finding[];
@@ -29,7 +34,7 @@ export class DeterministicAggregator {
       diffFiles,
       strictMode,
     );
-    const reviewSummary = this.buildSummary(normalized, agentOutputs);
+    const reviewSummary = this.buildSummary(normalized);
 
     return { findings: normalized, review_summary: reviewSummary };
   }
@@ -53,10 +58,7 @@ export class DeterministicAggregator {
     return merged;
   }
 
-  private buildSummary(
-    findings: Finding[],
-    agentOutputs: AgentOutput[],
-  ): ReviewSummary {
+  private buildSummary(findings: Finding[]): ReviewSummary {
     const counts = { critical: 0, high: 0, medium: 0, low: 0 };
     for (const f of findings) {
       counts[f.severity]++;
@@ -103,8 +105,10 @@ export class DeterministicAggregator {
       merge_explanation: mergeDecision.explanation,
       primary_risk_category: primaryRiskCategory,
       most_severe_issue: mostSevereIssue,
-      systemic_patterns: systemicPatterns.length > 0 ? systemicPatterns : undefined,
-      multi_agent_confirmed_count: multiAgentConfirmedCount > 0 ? multiAgentConfirmedCount : undefined,
+      systemic_patterns:
+        systemicPatterns.length > 0 ? systemicPatterns : undefined,
+      multi_agent_confirmed_count:
+        multiAgentConfirmedCount > 0 ? multiAgentConfirmedCount : undefined,
       text,
     };
   }
@@ -114,12 +118,16 @@ export class DeterministicAggregator {
 
     const categoryScores: Record<string, number> = {};
     const severityWeight: Record<string, number> = {
-      critical: 50, high: 15, medium: 5, low: 1,
+      critical: 50,
+      high: 15,
+      medium: 5,
+      low: 1,
     };
 
     for (const f of findings) {
       const cat = f.category || 'unknown';
-      categoryScores[cat] = (categoryScores[cat] ?? 0) + (severityWeight[f.severity] ?? 1);
+      categoryScores[cat] =
+        (categoryScores[cat] ?? 0) + (severityWeight[f.severity] ?? 1);
     }
 
     let maxCat = '';
@@ -162,7 +170,10 @@ export class DeterministicAggregator {
     const titleWords = new Map<string, Set<string>>();
     for (const f of findings) {
       if (!f.file) continue;
-      const words = f.title.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
+      const words = f.title
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 4);
       for (const word of words) {
         if (!titleWords.has(word)) titleWords.set(word, new Set());
         titleWords.get(word)!.add(f.file);
@@ -171,9 +182,21 @@ export class DeterministicAggregator {
 
     for (const [word, files] of titleWords) {
       if (files.size >= 2) {
-        const keywords = ['injection', 'error', 'handling', 'validation', 'missing', 'unsafe', 'async', 'memory', 'leak'];
+        const keywords = [
+          'injection',
+          'error',
+          'handling',
+          'validation',
+          'missing',
+          'unsafe',
+          'async',
+          'memory',
+          'leak',
+        ];
         if (keywords.includes(word)) {
-          patterns.push(`Cross-file "${word}" pattern across ${files.size} files`);
+          patterns.push(
+            `Cross-file "${word}" pattern across ${files.size} files`,
+          );
         }
       }
     }
@@ -202,9 +225,14 @@ export class DeterministicAggregator {
     multiAgentConfirmedCount: number;
   }): string {
     const {
-      findings, counts, riskScore, riskLevel,
-      mergeRecommendation, primaryRiskCategory, mostSevereIssue,
-      systemicPatterns, multiAgentConfirmedCount,
+      findings,
+      counts,
+      riskScore,
+      riskLevel,
+      mergeRecommendation,
+      primaryRiskCategory,
+      systemicPatterns,
+      multiAgentConfirmedCount,
     } = params;
 
     if (findings.length === 0) {
@@ -228,9 +256,10 @@ export class DeterministicAggregator {
     }
 
     if (systemicPatterns.length > 0) {
-      const patternDesc = systemicPatterns.length === 1
-        ? systemicPatterns[0].toLowerCase()
-        : `${systemicPatterns.length} systemic patterns detected`;
+      const patternDesc =
+        systemicPatterns.length === 1
+          ? systemicPatterns[0].toLowerCase()
+          : `${systemicPatterns.length} systemic patterns detected`;
       sentences.push(
         `Analysis reveals ${patternDesc}, suggesting structural gaps rather than isolated incidents.`,
       );
@@ -244,9 +273,13 @@ export class DeterministicAggregator {
 
     if (sentences.length < 4) {
       if (mergeRecommendation === 'Merge blocked') {
-        sentences.push('Recommendation: Block merge until critical issues are resolved.');
+        sentences.push(
+          'Recommendation: Block merge until critical issues are resolved.',
+        );
       } else if (mergeRecommendation === 'Merge with caution') {
-        sentences.push('Recommendation: Proceed with caution and address high-severity findings before production deployment.');
+        sentences.push(
+          'Recommendation: Proceed with caution and address high-severity findings before production deployment.',
+        );
       } else {
         sentences.push('Recommendation: Safe to merge.');
       }

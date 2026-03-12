@@ -35,7 +35,7 @@ export async function Header() {
         userName = meData.profile.display_name || undefined;
         avatarUrl = meData.profile.avatar_url || undefined;
       }
-    } catch (error: unknown) {
+    } catch {
       // Silently fallback to Supabase metadata
       console.debug("Failed to fetch profile from backend, using Supabase metadata");
     }

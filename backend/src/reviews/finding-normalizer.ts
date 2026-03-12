@@ -109,7 +109,10 @@ export class FindingNormalizer {
   }
 
   private finalConfidenceClamp(finding: Finding): Finding {
-    const clamped = Math.max(CONFIDENCE_MIN, Math.min(CONFIDENCE_MAX, finding.confidence));
+    const clamped = Math.max(
+      CONFIDENCE_MIN,
+      Math.min(CONFIDENCE_MAX, finding.confidence),
+    );
     if (clamped !== finding.confidence) {
       return { ...finding, confidence: Math.round(clamped * 100) / 100 };
     }
@@ -162,11 +165,18 @@ export class FindingNormalizer {
       return false;
     }
 
-    if (this.textSimilarity(a.title, b.title) > TITLE_SIMILARITY_THRESHOLD) return true;
-    if (this.textSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD) return true;
+    if (this.textSimilarity(a.title, b.title) > TITLE_SIMILARITY_THRESHOLD)
+      return true;
+    if (
+      this.textSimilarity(a.message, b.message) > JACCARD_SIMILARITY_THRESHOLD
+    )
+      return true;
 
     if (a.suggested_fix && b.suggested_fix) {
-      if (this.textSimilarity(a.suggested_fix, b.suggested_fix) > JACCARD_SIMILARITY_THRESHOLD) {
+      if (
+        this.textSimilarity(a.suggested_fix, b.suggested_fix) >
+        JACCARD_SIMILARITY_THRESHOLD
+      ) {
         return true;
       }
     }
@@ -178,7 +188,8 @@ export class FindingNormalizer {
     if (group.length === 1) {
       const single = group[0];
       const agents = this.extractAgents(single);
-      const consensus: ConsensusLevel = agents.size > 1 ? 'multi-agent' : 'single-agent';
+      const consensus: ConsensusLevel =
+        agents.size > 1 ? 'multi-agent' : 'single-agent';
       const categories = new Set<string>();
       if (single.category) categories.add(single.category);
       const locations = this.extractLocations(group);
@@ -216,9 +227,7 @@ export class FindingNormalizer {
     }
 
     let mergedConfidence =
-      weightSum > 0
-        ? weightedConfidenceSum / weightSum
-        : 0.5;
+      weightSum > 0 ? weightedConfidenceSum / weightSum : 0.5;
 
     if (agents.size > 1) {
       mergedConfidence += MULTI_AGENT_BOOST;
@@ -228,16 +237,17 @@ export class FindingNormalizer {
 
     const agentList = [...agents];
     const categoryList = [...categories];
-    const consensus: ConsensusLevel = agents.size > 1 ? 'multi-agent' : 'single-agent';
+    const consensus: ConsensusLevel =
+      agents.size > 1 ? 'multi-agent' : 'single-agent';
     const locations = this.extractLocations(group);
 
     const bestImpact = group
-      .map(f => f.impact)
+      .map((f) => f.impact)
       .filter(Boolean)
       .sort((a, b) => (b?.length ?? 0) - (a?.length ?? 0))[0];
 
     const bestFix = group
-      .map(f => f.suggested_fix)
+      .map((f) => f.suggested_fix)
       .filter(Boolean)
       .sort((a, b) => (b?.length ?? 0) - (a?.length ?? 0))[0];
 
@@ -292,7 +302,10 @@ export class FindingNormalizer {
       risk = 'low';
     } else if (finding.outside_diff) {
       risk = 'high';
-    } else if (finding.consensus_level === 'single-agent' && finding.confidence < 0.7) {
+    } else if (
+      finding.consensus_level === 'single-agent' &&
+      finding.confidence < 0.7
+    ) {
       risk = 'high';
     } else {
       risk = 'medium';
@@ -448,7 +461,10 @@ export class FindingNormalizer {
         if (isIdentifier) score += 2;
       }
 
-      const proximityBonus = 1 - Math.abs(lineNo - approximateLine) / (LINE_CORRECTION_SEARCH_RADIUS + 1);
+      const proximityBonus =
+        1 -
+        Math.abs(lineNo - approximateLine) /
+          (LINE_CORRECTION_SEARCH_RADIUS + 1);
       score += proximityBonus * 0.5;
 
       if (score > bestScore) {
@@ -460,24 +476,87 @@ export class FindingNormalizer {
     return bestScore > 0.5 ? bestLineNo : approximateLine;
   }
 
-  extractKeywordsFromFinding(finding: Finding): { word: string; isIdentifier: boolean }[] {
+  extractKeywordsFromFinding(
+    finding: Finding,
+  ): { word: string; isIdentifier: boolean }[] {
     const stopWords = new Set([
-      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'must', 'can', 'to', 'of', 'in', 'for',
-      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
-      'before', 'after', 'above', 'below', 'between', 'and', 'or', 'but',
-      'if', 'then', 'else', 'this', 'that', 'these', 'those', 'it', 'its',
-      'use', 'using', 'used', 'possible', 'potential', 'vulnerability',
-      'issue', 'problem', 'found', 'detected', 'recommend', 'suggest',
-      'not', 'no', 'code', 'line', 'file', 'check', 'error', 'warning',
+      'the',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'must',
+      'can',
+      'to',
+      'of',
+      'in',
+      'for',
+      'on',
+      'with',
+      'at',
+      'by',
+      'from',
+      'as',
+      'into',
+      'through',
+      'during',
+      'before',
+      'after',
+      'above',
+      'below',
+      'between',
+      'and',
+      'or',
+      'but',
+      'if',
+      'then',
+      'else',
+      'this',
+      'that',
+      'these',
+      'those',
+      'it',
+      'its',
+      'use',
+      'using',
+      'used',
+      'possible',
+      'potential',
+      'vulnerability',
+      'issue',
+      'problem',
+      'found',
+      'detected',
+      'recommend',
+      'suggest',
+      'not',
+      'no',
+      'code',
+      'line',
+      'file',
+      'check',
+      'error',
+      'warning',
     ]);
 
-    const text = [
-      finding.title,
-      finding.message,
-      finding.suggested_fix,
-    ]
+    const text = [finding.title, finding.message, finding.suggested_fix]
       .filter(Boolean)
       .join(' ');
 
@@ -498,18 +577,23 @@ export class FindingNormalizer {
       keywords.push({ word: w, isIdentifier });
     }
 
-    keywords.sort((a, b) => (b.isIdentifier ? 1 : 0) - (a.isIdentifier ? 1 : 0));
+    keywords.sort(
+      (a, b) => (b.isIdentifier ? 1 : 0) - (a.isIdentifier ? 1 : 0),
+    );
     return keywords;
   }
 
-  private collectFileLinesFromHunks(diffFile: ParsedFile): { lineNo: number; text: string }[] {
+  private collectFileLinesFromHunks(
+    diffFile: ParsedFile,
+  ): { lineNo: number; text: string }[] {
     const result: { lineNo: number; text: string }[] = [];
     for (const hunk of diffFile.hunks) {
       const rawLines = hunk.content.split('\n');
       let currentLine = hunk.startLine;
       for (const raw of rawLines) {
         if (raw.startsWith('-')) continue;
-        const text = (raw.startsWith('+') || raw.startsWith(' ')) ? raw.slice(1) : raw;
+        const text =
+          raw.startsWith('+') || raw.startsWith(' ') ? raw.slice(1) : raw;
         result.push({ lineNo: currentLine, text });
         currentLine++;
       }
@@ -522,7 +606,10 @@ export class FindingNormalizer {
    * Uses keyword matching within ±30 lines to find the most relevant code line,
    * then extracts ±5 lines around it for the snippet.
    */
-  private attachDiffContext(finding: Finding, diffFiles: ParsedFile[]): Finding {
+  private attachDiffContext(
+    finding: Finding,
+    diffFiles: ParsedFile[],
+  ): Finding {
     if (!finding.file || finding.line === undefined) return finding;
 
     const diffFile = diffFiles.find((df) => df.path === finding.file);
@@ -538,19 +625,35 @@ export class FindingNormalizer {
           ? a
           : b,
       );
-      if (Math.abs(nearest.lineNo - finding.line!) > LINE_CORRECTION_SEARCH_RADIUS) return finding;
+      if (
+        Math.abs(nearest.lineNo - finding.line) > LINE_CORRECTION_SEARCH_RADIUS
+      )
+        return finding;
     }
 
-    const correctedLine = this.correctLineLocation(finding.line!, fileLines, finding);
+    const correctedLine = this.correctLineLocation(
+      finding.line,
+      fileLines,
+      finding,
+    );
     const targetIdx = fileLines.findIndex((l) => l.lineNo === correctedLine);
     if (targetIdx === -1) return finding;
 
     const start = Math.max(0, targetIdx - SNIPPET_CONTEXT_LINES);
-    const end = Math.min(fileLines.length, targetIdx + SNIPPET_CONTEXT_LINES + 1);
+    const end = Math.min(
+      fileLines.length,
+      targetIdx + SNIPPET_CONTEXT_LINES + 1,
+    );
 
-    const before = fileLines.slice(start, targetIdx).map((l) => l.text).join('\n');
+    const before = fileLines
+      .slice(start, targetIdx)
+      .map((l) => l.text)
+      .join('\n');
     const snippet = fileLines[targetIdx].text;
-    const after = fileLines.slice(targetIdx + 1, end).map((l) => l.text).join('\n');
+    const after = fileLines
+      .slice(targetIdx + 1, end)
+      .map((l) => l.text)
+      .join('\n');
     const startLine = fileLines[start].lineNo;
 
     const diffContext: DiffContext = {

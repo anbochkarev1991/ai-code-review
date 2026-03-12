@@ -1,8 +1,4 @@
-import {
-  buildTraceStep,
-  TRACE_AGENT_NAMES,
-  type TraceAgentName,
-} from './trace.utils';
+import { buildTraceStep, TRACE_AGENT_NAMES } from './trace.utils';
 import { TRACE_RAW_OUTPUT_MAX_LENGTH } from 'shared';
 
 describe('trace.utils', () => {
@@ -169,7 +165,7 @@ describe('trace.utils', () => {
         'Security',
       ]);
       trace.forEach((step, i) => {
-        expect(step.agent).toBe(TRACE_AGENT_NAMES[i] as TraceAgentName);
+        expect(step.agent).toBe(TRACE_AGENT_NAMES[i]);
         expect(step.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
         expect(step.finished_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
         expect(step.status).toBe('ok');

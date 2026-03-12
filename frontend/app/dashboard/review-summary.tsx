@@ -213,7 +213,7 @@ function DegradedAnalysisBanner({
   agentsStatus: Record<string, string>;
 }) {
   const degraded = Object.entries(agentsStatus).filter(
-    ([_name, status]: [string, string]) => status !== "ok",
+    ([, status]: [string, string]) => status !== "ok",
   );
   if (degraded.length === 0) return null;
 

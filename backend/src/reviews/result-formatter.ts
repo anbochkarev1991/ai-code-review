@@ -106,7 +106,7 @@ export class ResultFormatter {
     if (promptTokens === 0 && completionTokens === 0) return undefined;
 
     const modelName = model ?? 'gpt-4o-mini';
-    const rate = MODEL_RATES[modelName] ?? MODEL_RATES['gpt-4o-mini']!;
+    const rate = MODEL_RATES[modelName] ?? MODEL_RATES['gpt-4o-mini'];
 
     const totalUsd =
       promptTokens * rate.prompt + completionTokens * rate.completion;

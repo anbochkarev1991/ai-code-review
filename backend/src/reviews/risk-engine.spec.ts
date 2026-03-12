@@ -27,8 +27,16 @@ describe('RiskEngine', () => {
 
     it('is deterministic — same findings always produce same score', () => {
       const findings = [
-        makeFinding({ severity: 'high', confidence: 0.9, category: 'security' }),
-        makeFinding({ severity: 'medium', confidence: 0.7, category: 'performance' }),
+        makeFinding({
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+        }),
+        makeFinding({
+          severity: 'medium',
+          confidence: 0.7,
+          category: 'performance',
+        }),
       ];
       const score1 = engine.calculateRiskScore(findings);
       const score2 = engine.calculateRiskScore(findings);
@@ -39,8 +47,16 @@ describe('RiskEngine', () => {
 
     it('returns an integer (no floating-point drift)', () => {
       const findings = [
-        makeFinding({ severity: 'high', confidence: 0.333, category: 'security' }),
-        makeFinding({ severity: 'medium', confidence: 0.777, category: 'architecture' }),
+        makeFinding({
+          severity: 'high',
+          confidence: 0.333,
+          category: 'security',
+        }),
+        makeFinding({
+          severity: 'medium',
+          confidence: 0.777,
+          category: 'architecture',
+        }),
       ];
       const score = engine.calculateRiskScore(findings);
       expect(Number.isInteger(score)).toBe(true);
@@ -57,7 +73,11 @@ describe('RiskEngine', () => {
 
     it('caps at 100', () => {
       const findings = Array.from({ length: 50 }, () =>
-        makeFinding({ severity: 'critical', confidence: 1.0, category: 'security' }),
+        makeFinding({
+          severity: 'critical',
+          confidence: 1.0,
+          category: 'security',
+        }),
       );
       expect(engine.calculateRiskScore(findings)).toBe(100);
     });
@@ -94,7 +114,11 @@ describe('RiskEngine', () => {
   describe('calculateRiskBreakdown', () => {
     it('applies floor 70 when critical finding exists', () => {
       const breakdown = engine.calculateRiskBreakdown([
-        makeFinding({ severity: 'critical', confidence: 0.3, category: 'security' }),
+        makeFinding({
+          severity: 'critical',
+          confidence: 0.3,
+          category: 'security',
+        }),
       ]);
       expect(breakdown.final_score).toBeGreaterThanOrEqual(70);
       expect(breakdown.floor_applied).toBeDefined();
@@ -118,7 +142,11 @@ describe('RiskEngine', () => {
 
     it('provides severity contribution breakdown', () => {
       const breakdown = engine.calculateRiskBreakdown([
-        makeFinding({ severity: 'high', confidence: 0.8, category: 'security' }),
+        makeFinding({
+          severity: 'high',
+          confidence: 0.8,
+          category: 'security',
+        }),
       ]);
       expect(breakdown.severity_contribution.high).toBe(15);
     });

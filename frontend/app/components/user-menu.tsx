@@ -58,6 +58,7 @@ export function UserMenu({ userEmail, userName, avatarUrl }: UserMenuProps) {
         aria-expanded={isOpen}
       >
         {avatarUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element -- Avatar from OAuth provider, external URL */
           <img
             src={avatarUrl}
             alt={displayName}

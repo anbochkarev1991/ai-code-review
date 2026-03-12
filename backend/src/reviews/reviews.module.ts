@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module';
 import { GitHubModule } from '../github/github.module';
+import { AiSummaryGeneratorService } from './ai-summary-generator.service';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
 import { PerformanceAgent } from './agents/performance.agent';
@@ -21,6 +22,7 @@ import { SeverityNormalizer } from './severity-normalizer';
   imports: [BillingModule, GitHubModule],
   controllers: [ReviewsController],
   providers: [
+    AiSummaryGeneratorService,
     ReviewsService,
     ReviewRunsRepository,
     DiffParser,

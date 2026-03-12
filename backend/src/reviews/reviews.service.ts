@@ -1,16 +1,10 @@
-import {
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type {
   GetReviewResponse,
   GetReviewsResponse,
   PostReviewsResponse,
   PRMetadata,
   ReviewResult,
-  ReviewStatus,
-  TraceStep,
 } from 'shared';
 import { DiffParser } from './diff-parser';
 import { ReviewOrchestrator } from './engine/orchestrator';
@@ -97,8 +91,15 @@ export class ReviewsService {
 
   async runPipeline(params: RunPipelineParams): Promise<PostReviewsResponse> {
     const {
-      userId, userJwt, repoFullName, prNumber,
-      prTitle, prAuthor, commitCount, prDiff, prFiles,
+      userId,
+      userJwt,
+      repoFullName,
+      prNumber,
+      prTitle,
+      prAuthor,
+      commitCount,
+      prDiff,
+      prFiles,
     } = params;
 
     const parsedDiff = this.diffParser.parse(prFiles);
@@ -115,20 +116,34 @@ export class ReviewsService {
     };
 
     if (parsedDiff.files.length === 0) {
-      return this.handleEmptyDiff(userId, userJwt, repoFullName, prNumber, prTitle, prMetadata);
+      return this.handleEmptyDiff(
+        userId,
+        userJwt,
+        repoFullName,
+        prNumber,
+        prTitle,
+        prMetadata,
+      );
     }
 
-    const allMarkdown = parsedDiff.files.every(
-      (f) => MARKDOWN_ONLY_EXTENSIONS.has(f.language),
+    const allMarkdown = parsedDiff.files.every((f) =>
+      MARKDOWN_ONLY_EXTENSIONS.has(f.language),
     );
     if (allMarkdown) {
-      return this.handleMarkdownOnly(userId, userJwt, repoFullName, prNumber, prTitle, prMetadata);
+      return this.handleMarkdownOnly(
+        userId,
+        userJwt,
+        repoFullName,
+        prNumber,
+        prTitle,
+        prMetadata,
+      );
     }
 
     if (parsedDiff.stats.totalChangedLines > LARGE_PR_LINE_THRESHOLD) {
       this.logger.warn(
         `Large PR detected: ${parsedDiff.stats.totalChangedLines} changed lines. ` +
-        `Results may be less precise for PRs exceeding ${LARGE_PR_LINE_THRESHOLD} lines.`,
+          `Results may be less precise for PRs exceeding ${LARGE_PR_LINE_THRESHOLD} lines.`,
       );
     }
 
@@ -213,7 +228,8 @@ export class ReviewsService {
         risk_score: 0,
         risk_level: 'Low risk',
         merge_recommendation: 'Safe to merge',
-        merge_explanation: 'No reviewable code changes detected. All changed files were filtered out (lock files, build artifacts, binary files, etc.).',
+        merge_explanation:
+          'No reviewable code changes detected. All changed files were filtered out (lock files, build artifacts, binary files, etc.).',
         text: 'No reviewable changes found. All changed files were filtered out (lock files, build artifacts, etc.).',
       },
       execution_metadata: {
@@ -250,7 +266,8 @@ export class ReviewsService {
   ): Promise<PostReviewsResponse> {
     const result: ReviewResult = {
       findings: [],
-      summary: 'Only documentation/markdown changes detected. No code review needed.',
+      summary:
+        'Only documentation/markdown changes detected. No code review needed.',
       review_summary: {
         total_findings: 0,
         critical_count: 0,

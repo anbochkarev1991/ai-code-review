@@ -25,8 +25,12 @@ const SAMPLE_FILES: ParsedFile[] = [
       {
         startLine: 1,
         endLine: 10,
-        content: '+import { db } from "./database";\n+const users = db.query("SELECT * FROM users");',
-        addedLines: ['import { db } from "./database";', 'const users = db.query("SELECT * FROM users");'],
+        content:
+          '+import { db } from "./database";\n+const users = db.query("SELECT * FROM users");',
+        addedLines: [
+          'import { db } from "./database";',
+          'const users = db.query("SELECT * FROM users");',
+        ],
         removedLines: [],
       },
     ],

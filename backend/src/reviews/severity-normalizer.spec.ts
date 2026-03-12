@@ -1,5 +1,5 @@
 import { SeverityNormalizer } from './severity-normalizer';
-import type { Finding, FindingSeverity, ConsensusLevel } from 'shared';
+import type { Finding, ConsensusLevel } from 'shared';
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
@@ -15,19 +15,6 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
   };
 }
 
-function countSeverities(findings: Finding[]): Record<FindingSeverity, number> {
-  const counts: Record<FindingSeverity, number> = {
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-  };
-  for (const f of findings) {
-    counts[f.severity]++;
-  }
-  return counts;
-}
-
 describe('SeverityNormalizer', () => {
   let normalizer: SeverityNormalizer;
 
@@ -38,13 +25,53 @@ describe('SeverityNormalizer', () => {
   describe('determinism', () => {
     it('produces identical output for identical input on repeated calls', () => {
       const input = [
-        makeFinding({ id: 'a', severity: 'high', confidence: 0.6, category: 'security', file: 'src/a.ts' }),
-        makeFinding({ id: 'b', severity: 'high', confidence: 0.9, category: 'security', file: 'src/b.ts' }),
-        makeFinding({ id: 'c', severity: 'high', confidence: 0.7, category: 'performance', file: 'src/c.ts' }),
-        makeFinding({ id: 'd', severity: 'medium', confidence: 0.5, file: 'src/d.ts' }),
-        makeFinding({ id: 'e', severity: 'low', confidence: 0.3, file: 'src/e.ts' }),
-        makeFinding({ id: 'f', severity: 'high', confidence: 0.4, category: 'architecture', file: 'src/f.ts' }),
-        makeFinding({ id: 'g', severity: 'high', confidence: 0.85, category: 'code-quality', file: 'src/g.ts' }),
+        makeFinding({
+          id: 'a',
+          severity: 'high',
+          confidence: 0.6,
+          category: 'security',
+          file: 'src/a.ts',
+        }),
+        makeFinding({
+          id: 'b',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          file: 'src/b.ts',
+        }),
+        makeFinding({
+          id: 'c',
+          severity: 'high',
+          confidence: 0.7,
+          category: 'performance',
+          file: 'src/c.ts',
+        }),
+        makeFinding({
+          id: 'd',
+          severity: 'medium',
+          confidence: 0.5,
+          file: 'src/d.ts',
+        }),
+        makeFinding({
+          id: 'e',
+          severity: 'low',
+          confidence: 0.3,
+          file: 'src/e.ts',
+        }),
+        makeFinding({
+          id: 'f',
+          severity: 'high',
+          confidence: 0.4,
+          category: 'architecture',
+          file: 'src/f.ts',
+        }),
+        makeFinding({
+          id: 'g',
+          severity: 'high',
+          confidence: 0.85,
+          category: 'code-quality',
+          file: 'src/g.ts',
+        }),
       ];
 
       const result1 = normalizer.normalize(input);
@@ -154,11 +181,46 @@ describe('SeverityNormalizer', () => {
   describe('Rule 3: max 3 HIGH per category', () => {
     it('keeps top 3 by confidence and downgrades the rest', () => {
       const findings = [
-        makeFinding({ id: 'h1', severity: 'high', confidence: 0.95, category: 'security', file: 'a.ts', title: 'Unique finding about SQL injection' }),
-        makeFinding({ id: 'h2', severity: 'high', confidence: 0.90, category: 'security', file: 'b.ts', title: 'Unique finding about XSS vulnerability' }),
-        makeFinding({ id: 'h3', severity: 'high', confidence: 0.85, category: 'security', file: 'c.ts', title: 'Unique finding about CSRF attack' }),
-        makeFinding({ id: 'h4', severity: 'high', confidence: 0.80, category: 'security', file: 'd.ts', title: 'Unique finding about auth bypass' }),
-        makeFinding({ id: 'h5', severity: 'high', confidence: 0.78, category: 'security', file: 'e.ts', title: 'Unique finding about path traversal' }),
+        makeFinding({
+          id: 'h1',
+          severity: 'high',
+          confidence: 0.95,
+          category: 'security',
+          file: 'a.ts',
+          title: 'Unique finding about SQL injection',
+        }),
+        makeFinding({
+          id: 'h2',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          file: 'b.ts',
+          title: 'Unique finding about XSS vulnerability',
+        }),
+        makeFinding({
+          id: 'h3',
+          severity: 'high',
+          confidence: 0.85,
+          category: 'security',
+          file: 'c.ts',
+          title: 'Unique finding about CSRF attack',
+        }),
+        makeFinding({
+          id: 'h4',
+          severity: 'high',
+          confidence: 0.8,
+          category: 'security',
+          file: 'd.ts',
+          title: 'Unique finding about auth bypass',
+        }),
+        makeFinding({
+          id: 'h5',
+          severity: 'high',
+          confidence: 0.78,
+          category: 'security',
+          file: 'e.ts',
+          title: 'Unique finding about path traversal',
+        }),
       ];
 
       const result = normalizer.normalize(findings);
@@ -171,11 +233,46 @@ describe('SeverityNormalizer', () => {
 
     it('applies independently across categories (within overflow limit)', () => {
       const findings = [
-        makeFinding({ id: 's1', severity: 'high', confidence: 0.95, category: 'security', file: 'a.ts', title: 'Security issue one' }),
-        makeFinding({ id: 's2', severity: 'high', confidence: 0.90, category: 'security', file: 'b.ts', title: 'Security issue two' }),
-        makeFinding({ id: 'p1', severity: 'high', confidence: 0.95, category: 'performance', file: 'c.ts', title: 'Performance issue one' }),
-        makeFinding({ id: 'p2', severity: 'high', confidence: 0.90, category: 'performance', file: 'd.ts', title: 'Performance issue two' }),
-        makeFinding({ id: 'p3', severity: 'high', confidence: 0.85, category: 'performance', file: 'e.ts', title: 'Performance issue three' }),
+        makeFinding({
+          id: 's1',
+          severity: 'high',
+          confidence: 0.95,
+          category: 'security',
+          file: 'a.ts',
+          title: 'Security issue one',
+        }),
+        makeFinding({
+          id: 's2',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          file: 'b.ts',
+          title: 'Security issue two',
+        }),
+        makeFinding({
+          id: 'p1',
+          severity: 'high',
+          confidence: 0.95,
+          category: 'performance',
+          file: 'c.ts',
+          title: 'Performance issue one',
+        }),
+        makeFinding({
+          id: 'p2',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'performance',
+          file: 'd.ts',
+          title: 'Performance issue two',
+        }),
+        makeFinding({
+          id: 'p3',
+          severity: 'high',
+          confidence: 0.85,
+          category: 'performance',
+          file: 'e.ts',
+          title: 'Performance issue three',
+        }),
       ];
 
       const result = normalizer.normalize(findings);
@@ -188,12 +285,50 @@ describe('SeverityNormalizer', () => {
   describe('Rule 4: overflow downgrade (total > 5)', () => {
     it('downgrades lowest-confidence single-agent HIGHs when total findings > 5', () => {
       const findings = [
-        makeFinding({ id: '1', severity: 'high', confidence: 0.95, file: 'a.ts', category: 'security', title: 'SQL injection vulnerability' }),
-        makeFinding({ id: '2', severity: 'high', confidence: 0.90, file: 'b.ts', category: 'performance', title: 'Memory leak issue' }),
-        makeFinding({ id: '3', severity: 'high', confidence: 0.85, file: 'c.ts', category: 'architecture', title: 'Circular dependency' }),
-        makeFinding({ id: '4', severity: 'high', confidence: 0.80, file: 'd.ts', category: 'code-quality', title: 'Missing error handling' }),
-        makeFinding({ id: '5', severity: 'medium', confidence: 0.7, file: 'e.ts' }),
-        makeFinding({ id: '6', severity: 'low', confidence: 0.5, file: 'f.ts' }),
+        makeFinding({
+          id: '1',
+          severity: 'high',
+          confidence: 0.95,
+          file: 'a.ts',
+          category: 'security',
+          title: 'SQL injection vulnerability',
+        }),
+        makeFinding({
+          id: '2',
+          severity: 'high',
+          confidence: 0.9,
+          file: 'b.ts',
+          category: 'performance',
+          title: 'Memory leak issue',
+        }),
+        makeFinding({
+          id: '3',
+          severity: 'high',
+          confidence: 0.85,
+          file: 'c.ts',
+          category: 'architecture',
+          title: 'Circular dependency',
+        }),
+        makeFinding({
+          id: '4',
+          severity: 'high',
+          confidence: 0.8,
+          file: 'd.ts',
+          category: 'code-quality',
+          title: 'Missing error handling',
+        }),
+        makeFinding({
+          id: '5',
+          severity: 'medium',
+          confidence: 0.7,
+          file: 'e.ts',
+        }),
+        makeFinding({
+          id: '6',
+          severity: 'low',
+          confidence: 0.5,
+          file: 'f.ts',
+        }),
       ];
 
       const result = normalizer.normalize(findings);
@@ -203,11 +338,39 @@ describe('SeverityNormalizer', () => {
 
     it('does not downgrade when total findings <= 5', () => {
       const findings = [
-        makeFinding({ id: '1', severity: 'high', confidence: 0.9, category: 'security', file: 'a.ts' }),
-        makeFinding({ id: '2', severity: 'high', confidence: 0.8, category: 'performance', file: 'b.ts' }),
-        makeFinding({ id: '3', severity: 'high', confidence: 0.85, category: 'architecture', file: 'c.ts' }),
-        makeFinding({ id: '4', severity: 'medium', confidence: 0.6, file: 'd.ts' }),
-        makeFinding({ id: '5', severity: 'low', confidence: 0.5, file: 'e.ts' }),
+        makeFinding({
+          id: '1',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          file: 'a.ts',
+        }),
+        makeFinding({
+          id: '2',
+          severity: 'high',
+          confidence: 0.8,
+          category: 'performance',
+          file: 'b.ts',
+        }),
+        makeFinding({
+          id: '3',
+          severity: 'high',
+          confidence: 0.85,
+          category: 'architecture',
+          file: 'c.ts',
+        }),
+        makeFinding({
+          id: '4',
+          severity: 'medium',
+          confidence: 0.6,
+          file: 'd.ts',
+        }),
+        makeFinding({
+          id: '5',
+          severity: 'low',
+          confidence: 0.5,
+          file: 'e.ts',
+        }),
       ];
 
       const result = normalizer.normalize(findings);
@@ -217,12 +380,51 @@ describe('SeverityNormalizer', () => {
 
     it('preserves multi-agent findings during overflow downgrade (boosted to critical)', () => {
       const findings = [
-        makeFinding({ id: '1', severity: 'high', confidence: 0.95, file: 'a.ts', category: 'security', title: 'SQL injection', consensus_level: 'multi-agent' as ConsensusLevel }),
-        makeFinding({ id: '2', severity: 'high', confidence: 0.90, file: 'b.ts', category: 'performance', title: 'Memory leak' }),
-        makeFinding({ id: '3', severity: 'high', confidence: 0.85, file: 'c.ts', category: 'architecture', title: 'Circular dep' }),
-        makeFinding({ id: '4', severity: 'high', confidence: 0.80, file: 'd.ts', category: 'code-quality', title: 'Error handling' }),
-        makeFinding({ id: '5', severity: 'medium', confidence: 0.7, file: 'e.ts' }),
-        makeFinding({ id: '6', severity: 'low', confidence: 0.5, file: 'f.ts' }),
+        makeFinding({
+          id: '1',
+          severity: 'high',
+          confidence: 0.95,
+          file: 'a.ts',
+          category: 'security',
+          title: 'SQL injection',
+          consensus_level: 'multi-agent' as ConsensusLevel,
+        }),
+        makeFinding({
+          id: '2',
+          severity: 'high',
+          confidence: 0.9,
+          file: 'b.ts',
+          category: 'performance',
+          title: 'Memory leak',
+        }),
+        makeFinding({
+          id: '3',
+          severity: 'high',
+          confidence: 0.85,
+          file: 'c.ts',
+          category: 'architecture',
+          title: 'Circular dep',
+        }),
+        makeFinding({
+          id: '4',
+          severity: 'high',
+          confidence: 0.8,
+          file: 'd.ts',
+          category: 'code-quality',
+          title: 'Error handling',
+        }),
+        makeFinding({
+          id: '5',
+          severity: 'medium',
+          confidence: 0.7,
+          file: 'e.ts',
+        }),
+        makeFinding({
+          id: '6',
+          severity: 'low',
+          confidence: 0.5,
+          file: 'f.ts',
+        }),
       ];
 
       const result = normalizer.normalize(findings);
@@ -264,11 +466,17 @@ describe('SeverityNormalizer', () => {
     it('does NOT merge findings with different files', () => {
       const findings = [
         makeFinding({
-          id: 'rc-1', severity: 'high', file: 'src/a.ts', category: 'security',
+          id: 'rc-1',
+          severity: 'high',
+          file: 'src/a.ts',
+          category: 'security',
           title: 'SQL injection vulnerability',
         }),
         makeFinding({
-          id: 'rc-2', severity: 'high', file: 'src/b.ts', category: 'security',
+          id: 'rc-2',
+          severity: 'high',
+          file: 'src/b.ts',
+          category: 'security',
           title: 'SQL injection vulnerability',
         }),
       ];
@@ -280,11 +488,17 @@ describe('SeverityNormalizer', () => {
     it('does NOT merge non-HIGH/CRITICAL findings', () => {
       const findings = [
         makeFinding({
-          id: 'rc-1', severity: 'medium', file: 'src/a.ts', category: 'security',
+          id: 'rc-1',
+          severity: 'medium',
+          file: 'src/a.ts',
+          category: 'security',
           title: 'Missing input validation',
         }),
         makeFinding({
-          id: 'rc-2', severity: 'medium', file: 'src/a.ts', category: 'security',
+          id: 'rc-2',
+          severity: 'medium',
+          file: 'src/a.ts',
+          category: 'security',
           title: 'Missing input validation check',
         }),
       ];
@@ -297,10 +511,34 @@ describe('SeverityNormalizer', () => {
   describe('normalizeWithStats', () => {
     it('returns before/after severity distribution and counts', () => {
       const findings = [
-        makeFinding({ id: '1', severity: 'high', confidence: 0.5, file: 'a.ts', title: 'Issue one' }),
-        makeFinding({ id: '2', severity: 'high', confidence: 0.9, file: 'b.ts', title: 'Issue two' }),
-        makeFinding({ id: '3', severity: 'high', confidence: 0.6, file: 'c.ts', title: 'Issue three' }),
-        makeFinding({ id: '4', severity: 'medium', confidence: 0.7, file: 'd.ts', title: 'Issue four' }),
+        makeFinding({
+          id: '1',
+          severity: 'high',
+          confidence: 0.5,
+          file: 'a.ts',
+          title: 'Issue one',
+        }),
+        makeFinding({
+          id: '2',
+          severity: 'high',
+          confidence: 0.9,
+          file: 'b.ts',
+          title: 'Issue two',
+        }),
+        makeFinding({
+          id: '3',
+          severity: 'high',
+          confidence: 0.6,
+          file: 'c.ts',
+          title: 'Issue three',
+        }),
+        makeFinding({
+          id: '4',
+          severity: 'medium',
+          confidence: 0.7,
+          file: 'd.ts',
+          title: 'Issue four',
+        }),
       ];
 
       const { stats } = normalizer.normalizeWithStats(findings);
@@ -313,12 +551,16 @@ describe('SeverityNormalizer', () => {
     it('tracks upgrade count for multi-agent consensus', () => {
       const findings = [
         makeFinding({
-          id: '1', severity: 'medium', confidence: 0.8, file: 'a.ts',
+          id: '1',
+          severity: 'medium',
+          confidence: 0.8,
+          file: 'a.ts',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ];
 
-      const { stats, findings: result } = normalizer.normalizeWithStats(findings);
+      const { stats, findings: result } =
+        normalizer.normalizeWithStats(findings);
       expect(result[0].severity).toBe('high');
       expect(stats.upgradedCount).toBeGreaterThan(0);
     });
@@ -327,17 +569,76 @@ describe('SeverityNormalizer', () => {
   describe('combined rules interaction', () => {
     it('applies all rules together for a realistic scenario', () => {
       const findings = [
-        makeFinding({ id: '1', severity: 'high', confidence: 0.95, category: 'security', file: 'src/auth.ts', title: 'SQL injection in user login' }),
-        makeFinding({ id: '2', severity: 'high', confidence: 0.90, category: 'security', file: 'src/api.ts', title: 'XSS vulnerability in template rendering' }),
-        makeFinding({ id: '3', severity: 'high', confidence: 0.85, category: 'security', file: 'src/db.ts', title: 'SQL injection in query builder function', line: 20 }),
-        makeFinding({ id: '4', severity: 'high', confidence: 0.80, category: 'security', file: 'src/db.ts', title: 'SQL injection risk in query builder module', line: 25 }),
-        makeFinding({ id: '5', severity: 'high', confidence: 0.60, category: 'performance', file: 'src/cache.ts', title: 'Missing cache invalidation strategy' }),
-        makeFinding({ id: '6', severity: 'high', confidence: 0.55, category: 'code-quality', file: 'src/utils.ts', title: 'Deeply nested callback pattern' }),
-        makeFinding({ id: '7', severity: 'medium', confidence: 0.70, category: 'architecture', file: 'src/router.ts', title: 'Tight coupling between modules' }),
-        makeFinding({ id: '8', severity: 'low', confidence: 0.40, category: 'code-quality', file: 'src/index.ts', title: 'Unused import statement' }),
+        makeFinding({
+          id: '1',
+          severity: 'high',
+          confidence: 0.95,
+          category: 'security',
+          file: 'src/auth.ts',
+          title: 'SQL injection in user login',
+        }),
+        makeFinding({
+          id: '2',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          file: 'src/api.ts',
+          title: 'XSS vulnerability in template rendering',
+        }),
+        makeFinding({
+          id: '3',
+          severity: 'high',
+          confidence: 0.85,
+          category: 'security',
+          file: 'src/db.ts',
+          title: 'SQL injection in query builder function',
+          line: 20,
+        }),
+        makeFinding({
+          id: '4',
+          severity: 'high',
+          confidence: 0.8,
+          category: 'security',
+          file: 'src/db.ts',
+          title: 'SQL injection risk in query builder module',
+          line: 25,
+        }),
+        makeFinding({
+          id: '5',
+          severity: 'high',
+          confidence: 0.6,
+          category: 'performance',
+          file: 'src/cache.ts',
+          title: 'Missing cache invalidation strategy',
+        }),
+        makeFinding({
+          id: '6',
+          severity: 'high',
+          confidence: 0.55,
+          category: 'code-quality',
+          file: 'src/utils.ts',
+          title: 'Deeply nested callback pattern',
+        }),
+        makeFinding({
+          id: '7',
+          severity: 'medium',
+          confidence: 0.7,
+          category: 'architecture',
+          file: 'src/router.ts',
+          title: 'Tight coupling between modules',
+        }),
+        makeFinding({
+          id: '8',
+          severity: 'low',
+          confidence: 0.4,
+          category: 'code-quality',
+          file: 'src/index.ts',
+          title: 'Unused import statement',
+        }),
       ];
 
-      const { findings: result, stats } = normalizer.normalizeWithStats(findings);
+      const { findings: result, stats } =
+        normalizer.normalizeWithStats(findings);
 
       expect(stats.before.high).toBe(6);
       expect(stats.after.high).toBeLessThanOrEqual(3);
@@ -371,7 +672,12 @@ describe('SeverityNormalizer', () => {
 
     it('handles all LOW findings', () => {
       const findings = Array.from({ length: 10 }, (_, i) =>
-        makeFinding({ id: `l-${i}`, severity: 'low', confidence: 0.5, file: `f${i}.ts` }),
+        makeFinding({
+          id: `l-${i}`,
+          severity: 'low',
+          confidence: 0.5,
+          file: `f${i}.ts`,
+        }),
       );
       const result = normalizer.normalize(findings);
       expect(result.length).toBe(10);

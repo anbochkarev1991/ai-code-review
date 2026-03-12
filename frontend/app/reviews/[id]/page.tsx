@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { GetReviewResponse } from "@/lib/types";
+import { AiReviewSummaryBlock } from "@/app/dashboard/ai-review-summary-block";
 import { ReviewFindingsList } from "@/app/dashboard/review-findings-list";
 import { ReviewSummary } from "@/app/dashboard/review-summary";
 import { ReviewTrace } from "@/app/dashboard/review-trace";
@@ -101,7 +102,7 @@ export default async function ReviewDetailPage({
               Review Not Found
             </h1>
             <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-              The review you're looking for doesn't exist or you don't have
+              The review you&apos;re looking for doesn&apos;t exist or you don&apos;t have
               permission to view it.
             </p>
             <Link
@@ -166,6 +167,14 @@ export default async function ReviewDetailPage({
 
             {review.result_snapshot && (
               <div className="flex flex-col gap-8">
+                {review.result_snapshot.ai_review_summary && (
+                  <>
+                    <AiReviewSummaryBlock
+                      aiReviewSummary={review.result_snapshot.ai_review_summary}
+                    />
+                    <div className="border-t border-zinc-200 dark:border-zinc-700" />
+                  </>
+                )}
                 <ReviewSummary
                   summary={review.result_snapshot.summary}
                   findings={review.result_snapshot.findings}

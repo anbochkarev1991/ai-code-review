@@ -38,6 +38,7 @@ It is not a replacement for human review. It is a fast, systematic first pass th
 - **Deterministic risk scoring** — exponential risk model (0–100) based on severity-weighted findings.
 - **Merge recommendation** — structured decision (Safe to merge / Merge with caution / Merge blocked) derived from risk score and critical findings.
 - **Finding normalization** — confidence clamping, multi-agent consensus detection, false positive risk estimation, and severity coherence checks.
+- **AI Review Summary** — concise executive overview of main risks, themes, and recommendation, generated from final findings.
 - **Systemic issue detection** — recurring patterns across findings are surfaced separately from code-level issues.
 - **Review telemetry** — per-agent latency, token counts, prompt sizes, and status tracked in every review.
 - **Cost estimation** — USD cost computed from token usage and model rates.
@@ -69,6 +70,7 @@ Click **Run Code Review**. The backend fetches the PR diff from GitHub, parses i
 
 The review result includes:
 
+- **AI Review Summary** — overall assessment, key concerns (2–4 bullets), and a practical recommendation.
 - **PR metadata** — file count, additions/deletions, commit count, analysis scope.
 - **Severity breakdown** — counts of critical, high, medium, and low findings.
 - **Risk score** — 0 to 100, with a risk level label (Low / Moderate / High / Critical).
@@ -135,6 +137,10 @@ ResultFormatter
 (execution metadata, cost estimate, telemetry)
         │
         ▼
+AiSummaryGenerator
+(LLM synthesizes findings into executive summary)
+        │
+        ▼
 Persist to Supabase + return to frontend
 ```
 
@@ -175,6 +181,7 @@ graph TB
             Aggregator[Deterministic Aggregator]
             RiskEng[Risk Engine]
             Formatter[Result Formatter]
+            AiSummary[AiSummaryGenerator]
         end
     end
 
@@ -197,6 +204,8 @@ graph TB
     SevNorm --> Aggregator
     Aggregator --> RiskEng
     Aggregator --> Formatter
+    Formatter --> AiSummary
+    AiSummary --> OpenAI
     Controller --> BillingMod
     BillingMod --> Stripe
     AuthMod --> Supabase
@@ -222,6 +231,8 @@ graph TB
 - **Multi-layer normalization.** Findings pass through confidence clamping (0.3–0.95), diff boundary enforcement (outside-diff findings penalized), cross-agent consolidation, severity coherence, and uncertainty phrase detection before scoring.
 
 - **Deterministic merge logic.** The merge decision is a pure function of severity counts and risk score — no LLM involved. Any critical finding blocks merge; 3+ high findings or risk score >= 60 triggers caution.
+
+- **AI Review Summary.** After findings are aggregated and normalized, a single LLM call synthesizes them into a concise executive summary (overall assessment, key concerns, recommendation). Generation is non-blocking — if it fails, the pipeline completes and the block is omitted.
 
 - **Zod-validated agent output.** Agent responses are parsed against a strict Zod schema with up to 2 retries, preventing malformed data from propagating through the pipeline.
 

@@ -71,9 +71,7 @@ export class IssueGeneratorService {
     if (!this.client) {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
-        throw new Error(
-          'OPENAI_API_KEY is required for issue generation',
-        );
+        throw new Error('OPENAI_API_KEY is required for issue generation');
       }
       this.client = new OpenAI({ apiKey });
     }
@@ -141,7 +139,9 @@ export class IssueGeneratorService {
     ];
 
     if (finding.file) {
-      parts.push(`File: ${finding.file}${finding.line != null ? `:${finding.line}` : ''}`);
+      parts.push(
+        `File: ${finding.file}${finding.line != null ? `:${finding.line}` : ''}`,
+      );
     }
 
     if (finding.affected_locations?.length) {
@@ -172,7 +172,13 @@ export class IssueGeneratorService {
     }
 
     if (finding.diff_context?.snippet) {
-      parts.push('', 'Code context:', '```', finding.diff_context.snippet, '```');
+      parts.push(
+        '',
+        'Code context:',
+        '```',
+        finding.diff_context.snippet,
+        '```',
+      );
     }
 
     if (prMeta) {

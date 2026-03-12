@@ -1,7 +1,4 @@
-import {
-  type TraceStep,
-  truncateRawOutputForTrace,
-} from 'shared';
+import { type TraceStep, truncateRawOutputForTrace } from 'shared';
 
 /**
  * Agent names for trace steps. Order: Code Quality, Architecture, Performance, Security.

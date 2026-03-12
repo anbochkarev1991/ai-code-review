@@ -5,7 +5,6 @@ import type {
   ParsedDiff,
   ParsedFile,
   DiffStats,
-  DiffFileStatus,
 } from '../types';
 
 const IGNORE_PATTERNS: RegExp[] = [

@@ -3,7 +3,6 @@ import { createHash } from 'crypto';
 import type {
   AgentOutput,
   AgentResult,
-  Finding,
   PerformanceSummary,
   PRMetadata,
   ReviewEngineOptions,
@@ -20,6 +19,7 @@ import { ArchitectureAgent } from '../agents/architecture.agent';
 import { CodeQualityAgent } from '../agents/code-quality.agent';
 import { PerformanceAgent } from '../agents/performance.agent';
 import { SecurityAgent } from '../agents/security.agent';
+import { AiSummaryGeneratorService } from '../ai-summary-generator.service';
 import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
 import { buildTraceStep, TRACE_AGENT_NAMES } from '../trace.utils';
@@ -59,6 +59,7 @@ export class ReviewOrchestrator {
     private readonly securityAgent: SecurityAgent,
     private readonly aggregator: DeterministicAggregator,
     private readonly resultFormatter: ResultFormatter,
+    private readonly aiSummaryGenerator: AiSummaryGeneratorService,
   ) {}
 
   async runReview(
@@ -71,9 +72,18 @@ export class ReviewOrchestrator {
     const pipelineStart = Date.now();
 
     const allAgents: AgentDefinition[] = [
-      { name: TRACE_AGENT_NAMES[0], run: () => this.codeQualityAgent.run(files) },
-      { name: TRACE_AGENT_NAMES[1], run: () => this.architectureAgent.run(files) },
-      { name: TRACE_AGENT_NAMES[2], run: () => this.performanceAgent.run(files) },
+      {
+        name: TRACE_AGENT_NAMES[0],
+        run: () => this.codeQualityAgent.run(files),
+      },
+      {
+        name: TRACE_AGENT_NAMES[1],
+        run: () => this.architectureAgent.run(files),
+      },
+      {
+        name: TRACE_AGENT_NAMES[2],
+        run: () => this.performanceAgent.run(files),
+      },
       { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(files) },
     ];
 
@@ -85,8 +95,10 @@ export class ReviewOrchestrator {
 
     const trace = agentResults.map((r) => this.buildTrace(r));
 
-    const validOutputs = agentResults
-      .filter((r): r is AgentResult & { output: AgentOutput } => r.status === 'ok' && !!r.output);
+    const validOutputs = agentResults.filter(
+      (r): r is AgentResult & { output: AgentOutput } =>
+        r.status === 'ok' && !!r.output,
+    );
 
     if (validOutputs.length === 0) {
       return {
@@ -96,7 +108,8 @@ export class ReviewOrchestrator {
       };
     }
 
-    const status: ReviewStatus = validOutputs.length === agents.length ? 'complete' : 'partial';
+    const status: ReviewStatus =
+      validOutputs.length === agents.length ? 'complete' : 'partial';
 
     if (validOutputs.length < agents.length) {
       const failedNames = agentResults
@@ -117,7 +130,10 @@ export class ReviewOrchestrator {
     const pipelineEnd = Date.now();
     const totalDurationMs = pipelineEnd - pipelineStart;
 
-    const performance = this.buildPerformanceSummary(agentResults, totalDurationMs);
+    const performance = this.buildPerformanceSummary(
+      agentResults,
+      totalDurationMs,
+    );
     const signature = this.computeSignature(diff, status);
     const reviewMetadata = this.buildReviewMetadata(diff, status);
 
@@ -131,6 +147,14 @@ export class ReviewOrchestrator {
     result.signature = signature;
     result.performance = performance;
     result.review_metadata = reviewMetadata;
+
+    const aiSummary = await this.aiSummaryGenerator.generate(
+      aggregated.findings,
+      aggregated.review_summary,
+    );
+    if (aiSummary) {
+      result.ai_review_summary = aiSummary;
+    }
 
     return { status, result, trace };
   }
@@ -153,9 +177,10 @@ export class ReviewOrchestrator {
         agent_name: agents[i].name,
         status: 'error' as const,
         duration_ms: 0,
-        error_message: result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason),
+        error_message:
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason),
         retried: false,
       };
     });
@@ -192,7 +217,11 @@ export class ReviewOrchestrator {
       const retryStart = Date.now();
 
       try {
-        const result = await this.withTimeout(agent.run(), timeoutMs, agent.name);
+        const result = await this.withTimeout(
+          agent.run(),
+          timeoutMs,
+          agent.name,
+        );
         return {
           agent_name: agent.name,
           status: 'ok',
@@ -204,7 +233,8 @@ export class ReviewOrchestrator {
           retried: true,
         };
       } catch (retryError) {
-        const errorMessage = retryError instanceof Error ? retryError.message : String(retryError);
+        const errorMessage =
+          retryError instanceof Error ? retryError.message : String(retryError);
         const isTimeout = errorMessage.includes('timed out');
         return {
           agent_name: agent.name,
@@ -263,23 +293,23 @@ export class ReviewOrchestrator {
     return {
       total_duration_ms: totalDurationMs,
       agents_parallel: agentCount,
-      avg_agent_latency_ms: agentCount > 0
-        ? Math.round(totalLatency / agentCount)
-        : 0,
+      avg_agent_latency_ms:
+        agentCount > 0 ? Math.round(totalLatency / agentCount) : 0,
       per_agent_latency: perAgent,
     };
   }
 
-  computeSignature(diff: string, status: ReviewStatus = 'complete'): ReviewSignature {
+  computeSignature(
+    diff: string,
+    status: ReviewStatus = 'complete',
+  ): ReviewSignature {
     const hashInput = JSON.stringify({
       diff,
       agent_versions: AGENT_VERSIONS,
       engine_version: ENGINE_VERSION,
     });
 
-    const reviewHash = createHash('sha256')
-      .update(hashInput)
-      .digest('hex');
+    const reviewHash = createHash('sha256').update(hashInput).digest('hex');
 
     return {
       review_hash: reviewHash,
@@ -289,16 +319,17 @@ export class ReviewOrchestrator {
     };
   }
 
-  private buildReviewMetadata(diff: string, status: ReviewStatus): ReviewMetadata {
+  private buildReviewMetadata(
+    diff: string,
+    status: ReviewStatus,
+  ): ReviewMetadata {
     const hashInput = JSON.stringify({
       diff,
       agent_versions: AGENT_VERSIONS,
       engine_version: ENGINE_VERSION,
     });
 
-    const reviewHash = createHash('sha256')
-      .update(hashInput)
-      .digest('hex');
+    const reviewHash = createHash('sha256').update(hashInput).digest('hex');
 
     return {
       review_hash: reviewHash,
@@ -319,8 +350,14 @@ export class ReviewOrchestrator {
         ms,
       );
       promise
-        .then((val) => { clearTimeout(timer); resolve(val); })
-        .catch((err) => { clearTimeout(timer); reject(err); });
+        .then((val) => {
+          clearTimeout(timer);
+          resolve(val);
+        })
+        .catch((err: unknown) => {
+          clearTimeout(timer);
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
     });
   }
 

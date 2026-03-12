@@ -1,4 +1,5 @@
 export type {
+  AiReviewSummary,
   Profile,
   MeResponse,
   Plan,

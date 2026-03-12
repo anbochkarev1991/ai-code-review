@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type {
   GetReviewResponse,
@@ -43,7 +40,10 @@ export interface ReviewRunRow {
  */
 @Injectable()
 export class ReviewRunsRepository {
-  async create(params: CreateReviewRunParams, userJwt: string): Promise<string> {
+  async create(
+    params: CreateReviewRunParams,
+    userJwt: string,
+  ): Promise<string> {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -78,14 +78,17 @@ export class ReviewRunsRepository {
         `Failed to create review run: ${error.message}`,
       );
     }
-    return data.id;
+    return data.id as string;
   }
 
   /**
    * Fetches one review run by id. Uses user JWT for RLS so only the owner can fetch.
    * Returns null if not found or not owned by the authenticated user.
    */
-  async findById(id: string, userJwt: string): Promise<GetReviewResponse | null> {
+  async findById(
+    id: string,
+    userJwt: string,
+  ): Promise<GetReviewResponse | null> {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {

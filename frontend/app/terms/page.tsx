@@ -19,7 +19,7 @@ export default function TermsPage() {
                 Agreement to Terms
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">
-                By accessing or using AI Code Review Assistant ("the Service"), you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the Service.
+                By accessing or using AI Code Review Assistant (&quot;the Service&quot;), you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the Service.
               </p>
             </section>
 
@@ -51,7 +51,7 @@ export default function TermsPage() {
                 Disclaimer
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">
-                The Service is provided "as is" without warranties of any kind. We do not guarantee that the AI-generated code reviews will be error-free or suitable for your specific needs.
+                The Service is provided &quot;as is&quot; without warranties of any kind. We do not guarantee that the AI-generated code reviews will be error-free or suitable for your specific needs.
               </p>
             </section>
 

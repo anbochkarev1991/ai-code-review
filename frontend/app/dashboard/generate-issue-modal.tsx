@@ -31,7 +31,7 @@ function getSeverityBadgeClass(severity: Finding["severity"]): string {
 
 const markdownComponents: Components = {
   // Custom rendering for task lists (checkboxes) - remarkGfm creates these
-  input: ({ node, ...props }) => {
+  input: ({ ...props }) => {
     const { checked } = props as { checked?: boolean };
     return (
       <input
@@ -45,18 +45,18 @@ const markdownComponents: Components = {
     );
   },
   // Headings with proper hierarchy and spacing
-  h2: ({ node, children, ...props }) => (
+  h2: ({ children, ...props }) => (
     <h2 className="!mt-8 !mb-4 !text-lg !font-semibold !text-zinc-900 dark:!text-zinc-100 !border-b !border-zinc-200 dark:!border-zinc-700 !pb-2 first:!mt-0" {...props}>
       {children}
     </h2>
   ),
-  h3: ({ node, children, ...props }) => (
+  h3: ({ children, ...props }) => (
     <h3 className="!mt-6 !mb-3 !text-base !font-semibold !text-zinc-900 dark:!text-zinc-100" {...props}>
       {children}
     </h3>
   ),
   // Paragraphs with proper spacing
-  p: ({ node, children, ...props }) => (
+  p: ({ children, ...props }) => (
     <p className="!my-3 !text-sm !text-zinc-700 dark:!text-zinc-300 !leading-relaxed !break-words" {...props}>
       {children}
     </p>
@@ -64,9 +64,12 @@ const markdownComponents: Components = {
   // List items - handle both regular and task lists
   li: ({ node, children, ...props }) => {
     // Check if this is a task list item by looking at the first child
-    const firstChild = (node as any)?.children?.[0];
-    const isTaskItem = firstChild?.type === "input" || 
-      (firstChild?.type === "paragraph" && firstChild?.children?.[0]?.type === "input");
+    type MdNode = { children?: Array<{ type?: string; children?: Array<{ type?: string }> }> };
+    const firstChild = (node as MdNode)?.children?.[0];
+    const isTaskItem =
+      firstChild?.type === "input" ||
+      (firstChild?.type === "paragraph" &&
+        firstChild?.children?.[0]?.type === "input");
     
     return (
       <li className={`!my-1.5 !text-sm !text-zinc-700 dark:!text-zinc-300 !leading-relaxed !break-words ${isTaskItem ? "!flex !items-start" : ""}`} {...props}>
@@ -75,7 +78,7 @@ const markdownComponents: Components = {
     );
   },
   // Unordered lists - CSS handles task list styling, but we ensure proper spacing
-  ul: ({ node, children, ...props }) => {
+  ul: ({ children, ...props }) => {
     return (
       <ul className="!my-3 !space-y-1.5 !list-disc !pl-5" {...props}>
         {children}
@@ -83,14 +86,14 @@ const markdownComponents: Components = {
     );
   },
   // Ordered lists
-  ol: ({ node, children, ...props }) => (
+  ol: ({ children, ...props }) => (
     <ol className="!my-3 !space-y-1.5 !list-decimal !pl-5" {...props}>
       {children}
     </ol>
   ),
-  // Inline code
-  code: ({ node, children, ...props }) => {
-    const inline = (props as any).inline;
+  // Inline code (react-markdown passes inline via ExtraProps)
+  code: ({ children, ...props }) => {
+    const inline = "inline" in props && Boolean((props as { inline?: boolean }).inline);
     if (inline) {
       return (
         <code className="!text-xs !bg-zinc-100 dark:!bg-zinc-800 !text-zinc-900 dark:!text-zinc-100 !px-1.5 !py-0.5 !rounded !font-mono !break-all" {...props}>
@@ -105,25 +108,25 @@ const markdownComponents: Components = {
     );
   },
   // Code blocks
-  pre: ({ node, children, ...props }) => (
+  pre: ({ children, ...props }) => (
     <pre className="!my-4 !bg-zinc-900 dark:!bg-zinc-950 !border !border-zinc-700 !rounded-lg !p-4 !overflow-x-auto !text-xs" {...props}>
       {children}
     </pre>
   ),
   // Strong/bold text
-  strong: ({ node, children, ...props }) => (
+  strong: ({ children, ...props }) => (
     <strong className="!font-semibold !text-zinc-900 dark:!text-zinc-100" {...props}>
       {children}
     </strong>
   ),
   // Blockquotes
-  blockquote: ({ node, children, ...props }) => (
+  blockquote: ({ children, ...props }) => (
     <blockquote className="!my-3 !border-l-4 !border-zinc-300 dark:!border-zinc-600 !pl-4 !italic !text-zinc-700 dark:!text-zinc-300 !break-words" {...props}>
       {children}
     </blockquote>
   ),
   // Links
-  a: ({ node, children, ...props }) => (
+  a: ({ children, ...props }) => (
     <a className="!text-blue-600 dark:!text-blue-400 !no-underline hover:!underline !break-all" {...props}>
       {children}
     </a>

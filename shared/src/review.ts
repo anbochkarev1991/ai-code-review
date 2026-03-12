@@ -211,6 +211,14 @@ export interface ReviewSummary {
   text: string;
 }
 
+// ── AI Review Summary ──
+
+export interface AiReviewSummary {
+  overall_assessment: string;
+  key_concerns: string[];
+  recommendation: string;
+}
+
 // ── Review result ──
 
 export interface ReviewMetadata {
@@ -226,6 +234,7 @@ export interface ReviewResult {
   /** @deprecated Use review_summary.text instead */
   summary: string;
   review_summary?: ReviewSummary;
+  ai_review_summary?: AiReviewSummary;
   execution_metadata?: ExecutionMetadata;
   pr_metadata?: PRMetadata;
   signature?: ReviewSignature;

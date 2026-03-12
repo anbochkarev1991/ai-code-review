@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import type { PostReviewsResponse, ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
+import { AiReviewSummaryBlock } from "./ai-review-summary-block";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummary } from "./review-summary";
 import { ReviewTrace } from "./review-trace";
@@ -64,7 +65,7 @@ export function RunReviewButton({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch((_err: unknown) => ({}));
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ?? `Failed to run review: ${response.statusText}`
         );
@@ -132,6 +133,14 @@ export function RunReviewButton({
         <div className="flex w-full flex-col gap-4">
           {result && (
             <>
+              {result.ai_review_summary && (
+                <>
+                  <AiReviewSummaryBlock
+                    aiReviewSummary={result.ai_review_summary}
+                  />
+                  <div className="border-t border-zinc-200 dark:border-zinc-700" />
+                </>
+              )}
               <ReviewSummary
                 summary={result.summary}
                 findings={result.findings}

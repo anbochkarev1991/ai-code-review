@@ -167,7 +167,7 @@ export class GitHubService {
       throw new UnauthorizedException('GitHub account not connected');
     }
 
-    return data.access_token;
+    return data.access_token as string;
   }
 
   async listRepos(

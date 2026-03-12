@@ -7,7 +7,8 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     title: 'Test finding',
     severity: 'medium',
     category: 'code-quality',
-    message: 'Some test finding message that is long enough for similarity checks',
+    message:
+      'Some test finding message that is long enough for similarity checks',
     confidence: 0.8,
     file: 'src/app.ts',
     line: 10,
@@ -57,7 +58,9 @@ describe('FindingNormalizer', () => {
     });
 
     it('defaults undefined confidence to 0.5', () => {
-      const result = normalizer.normalize([makeFinding({ confidence: undefined })]);
+      const result = normalizer.normalize([
+        makeFinding({ confidence: undefined }),
+      ]);
       expect(result[0].confidence).toBe(0.5);
     });
 
@@ -178,7 +181,9 @@ describe('FindingNormalizer', () => {
         }),
       ];
       const result = normalizer.normalize(findings);
-      expect(result[0].categories).toEqual(expect.arrayContaining(['security', 'code-quality']));
+      expect(result[0].categories).toEqual(
+        expect.arrayContaining(['security', 'code-quality']),
+      );
     });
 
     it('merges findings with similar suggested_fix', () => {
@@ -190,7 +195,8 @@ describe('FindingNormalizer', () => {
           line: 10,
           title: 'Unsafe database call detected',
           message: 'Unsafe database access',
-          suggested_fix: 'Use parameterized queries for all SQL statements to prevent injection',
+          suggested_fix:
+            'Use parameterized queries for all SQL statements to prevent injection',
         }),
         makeFinding({
           id: 'b-1',
@@ -199,7 +205,8 @@ describe('FindingNormalizer', () => {
           line: 11,
           title: 'Raw SQL detected',
           message: 'Unparameterized query found',
-          suggested_fix: 'Use parameterized queries for all SQL statements to prevent security issues',
+          suggested_fix:
+            'Use parameterized queries for all SQL statements to prevent security issues',
         }),
       ];
       const result = normalizer.normalize(findings);
@@ -208,8 +215,16 @@ describe('FindingNormalizer', () => {
 
     it('respects line delta <= 3', () => {
       const findings = [
-        makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected here in code' }),
-        makeFinding({ file: 'src/a.ts', line: 13, message: 'same issue detected here in code' }),
+        makeFinding({
+          file: 'src/a.ts',
+          line: 10,
+          message: 'same issue detected here in code',
+        }),
+        makeFinding({
+          file: 'src/a.ts',
+          line: 13,
+          message: 'same issue detected here in code',
+        }),
       ];
       const result = normalizer.normalize(findings);
       expect(result.length).toBe(1);
@@ -217,8 +232,16 @@ describe('FindingNormalizer', () => {
 
     it('does NOT merge findings on different files', () => {
       const findings = [
-        makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected' }),
-        makeFinding({ file: 'src/b.ts', line: 10, message: 'same issue detected' }),
+        makeFinding({
+          file: 'src/a.ts',
+          line: 10,
+          message: 'same issue detected',
+        }),
+        makeFinding({
+          file: 'src/b.ts',
+          line: 10,
+          message: 'same issue detected',
+        }),
       ];
       const result = normalizer.normalize(findings);
       expect(result.length).toBe(2);
@@ -226,8 +249,16 @@ describe('FindingNormalizer', () => {
 
     it('does NOT merge findings with distant lines (> 3)', () => {
       const findings = [
-        makeFinding({ file: 'src/a.ts', line: 10, message: 'same issue detected here in code' }),
-        makeFinding({ file: 'src/a.ts', line: 100, message: 'same issue detected here in code' }),
+        makeFinding({
+          file: 'src/a.ts',
+          line: 10,
+          message: 'same issue detected here in code',
+        }),
+        makeFinding({
+          file: 'src/a.ts',
+          line: 100,
+          message: 'same issue detected here in code',
+        }),
       ];
       const result = normalizer.normalize(findings);
       expect(result.length).toBe(2);
@@ -364,16 +395,21 @@ describe('FindingNormalizer', () => {
 
   describe('diff context attachment', () => {
     it('attaches diff context when finding is inside a hunk', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/app.ts',
-        hunks: [{
-          startLine: 5,
-          endLine: 15,
-          content: ' line5\n line6\n line7\n line8\n line9\n+line10\n line11\n line12\n line13\n line14\n line15',
-          addedLines: ['line10'],
-          removedLines: [],
-        }],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/app.ts',
+          hunks: [
+            {
+              startLine: 5,
+              endLine: 15,
+              content:
+                ' line5\n line6\n line7\n line8\n line9\n+line10\n line11\n line12\n line13\n line14\n line15',
+              addedLines: ['line10'],
+              removedLines: [],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
         [makeFinding({ file: 'src/app.ts', line: 10 })],
         diffFiles,
@@ -383,47 +419,55 @@ describe('FindingNormalizer', () => {
     });
 
     it('corrects approximate AI line to most relevant line using keywords from finding', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/api.ts',
-        hunks: [{
-          startLine: 1,
-          endLine: 30,
-          content: [
-            '+import { UserService } from "./user.service";',
-            '+',
-            '+const db = getDb();',
-            '+',
-            '+function validateInput(data: string) {',
-            '+  return data.length > 0;',
-            '+}',
-            '+',
-            '+async function fetchUser(userId: string) {',
-            '+  const query = `SELECT * FROM users WHERE id = \'${userId}\'`;',
-            '+  return db.execute(query);',
-            '+}',
-          ].join('\n'),
-          addedLines: [
-            'import { UserService } from "./user.service";',
-            'const db = getDb();',
-            'function validateInput(data: string) {',
-            '  return data.length > 0;',
-            '}',
-            'async function fetchUser(userId: string) {',
-            '  const query = `SELECT * FROM users WHERE id = \'${userId}\'`;',
-            '  return db.execute(query);',
-            '}',
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/api.ts',
+          hunks: [
+            {
+              startLine: 1,
+              endLine: 30,
+              content: [
+                '+import { UserService } from "./user.service";',
+                '+',
+                '+const db = getDb();',
+                '+',
+                '+function validateInput(data: string) {',
+                '+  return data.length > 0;',
+                '+}',
+                '+',
+                '+async function fetchUser(userId: string) {',
+                "+  const query = `SELECT * FROM users WHERE id = '${userId}'`;",
+                '+  return db.execute(query);',
+                '+}',
+              ].join('\n'),
+              addedLines: [
+                'import { UserService } from "./user.service";',
+                'const db = getDb();',
+                'function validateInput(data: string) {',
+                '  return data.length > 0;',
+                '}',
+                'async function fetchUser(userId: string) {',
+                "  const query = `SELECT * FROM users WHERE id = '${userId}'`;",
+                '  return db.execute(query);',
+                '}',
+              ],
+              removedLines: [],
+            },
           ],
-          removedLines: [],
-        }],
-      })];
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/api.ts',
-          line: 5,
-          title: 'SQL injection in fetchUser',
-          message: 'The userId is concatenated directly into the query string. Use parameterized queries.',
-          suggested_fix: 'Use parameterized queries with db.execute(sql, [userId])',
-        })],
+        [
+          makeFinding({
+            file: 'src/api.ts',
+            line: 5,
+            title: 'SQL injection in fetchUser',
+            message:
+              'The userId is concatenated directly into the query string. Use parameterized queries.',
+            suggested_fix:
+              'Use parameterized queries with db.execute(sql, [userId])',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].diff_context).toBeDefined();
@@ -432,23 +476,29 @@ describe('FindingNormalizer', () => {
     });
 
     it('falls back to AI line when no keyword match found in search window', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/empty.ts',
-        hunks: [{
-          startLine: 1,
-          endLine: 10,
-          content: '+const x = 1;\n+const y = 2;\n+const z = 3;',
-          addedLines: ['const x = 1;', 'const y = 2;', 'const z = 3;'],
-          removedLines: [],
-        }],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/empty.ts',
+          hunks: [
+            {
+              startLine: 1,
+              endLine: 10,
+              content: '+const x = 1;\n+const y = 2;\n+const z = 3;',
+              addedLines: ['const x = 1;', 'const y = 2;', 'const z = 3;'],
+              removedLines: [],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/empty.ts',
-          line: 2,
-          title: 'Unrelated issue',
-          message: 'Some problem with NonExistentClass and other symbols',
-        })],
+        [
+          makeFinding({
+            file: 'src/empty.ts',
+            line: 2,
+            title: 'Unrelated issue',
+            message: 'Some problem with NonExistentClass and other symbols',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].diff_context).toBeDefined();
@@ -457,36 +507,42 @@ describe('FindingNormalizer', () => {
     });
 
     it('prioritises CamelCase identifiers over generic words', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/service.ts',
-        hunks: [{
-          startLine: 1,
-          endLine: 10,
-          content: [
-            '+import { Logger } from "winston";',
-            '+const logger = new Logger();',
-            '+function processOrder(order: Order) {',
-            '+  const UserService = getUserService();',
-            '+  return UserService.validate(order);',
-            '+}',
-          ].join('\n'),
-          addedLines: [
-            'import { Logger } from "winston";',
-            'const logger = new Logger();',
-            'function processOrder(order: Order) {',
-            '  const UserService = getUserService();',
-            '  return UserService.validate(order);',
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/service.ts',
+          hunks: [
+            {
+              startLine: 1,
+              endLine: 10,
+              content: [
+                '+import { Logger } from "winston";',
+                '+const logger = new Logger();',
+                '+function processOrder(order: Order) {',
+                '+  const UserService = getUserService();',
+                '+  return UserService.validate(order);',
+                '+}',
+              ].join('\n'),
+              addedLines: [
+                'import { Logger } from "winston";',
+                'const logger = new Logger();',
+                'function processOrder(order: Order) {',
+                '  const UserService = getUserService();',
+                '  return UserService.validate(order);',
+              ],
+              removedLines: [],
+            },
           ],
-          removedLines: [],
-        }],
-      })];
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/service.ts',
-          line: 1,
-          title: 'Missing validation in UserService',
-          message: 'UserService.validate does not check for null order.',
-        })],
+        [
+          makeFinding({
+            file: 'src/service.ts',
+            line: 1,
+            title: 'Missing validation in UserService',
+            message: 'UserService.validate does not check for null order.',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].diff_context).toBeDefined();
@@ -494,32 +550,41 @@ describe('FindingNormalizer', () => {
     });
 
     it('corrects line from approximate location across multiple hunks', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/multi.ts',
-        hunks: [
-          {
-            startLine: 5,
-            endLine: 8,
-            content: '+const a = 1;\n+const b = 2;',
-            addedLines: ['const a = 1;', 'const b = 2;'],
-            removedLines: [],
-          },
-          {
-            startLine: 40,
-            endLine: 45,
-            content: '+function dangerousEval(input: string) {\n+  return eval(input);\n+}',
-            addedLines: ['function dangerousEval(input: string) {', '  return eval(input);', '}'],
-            removedLines: [],
-          },
-        ],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/multi.ts',
+          hunks: [
+            {
+              startLine: 5,
+              endLine: 8,
+              content: '+const a = 1;\n+const b = 2;',
+              addedLines: ['const a = 1;', 'const b = 2;'],
+              removedLines: [],
+            },
+            {
+              startLine: 40,
+              endLine: 45,
+              content:
+                '+function dangerousEval(input: string) {\n+  return eval(input);\n+}',
+              addedLines: [
+                'function dangerousEval(input: string) {',
+                '  return eval(input);',
+                '}',
+              ],
+              removedLines: [],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/multi.ts',
-          line: 38,
-          title: 'Dangerous eval usage',
-          message: 'dangerousEval calls eval() directly on untrusted input.',
-        })],
+        [
+          makeFinding({
+            file: 'src/multi.ts',
+            line: 38,
+            title: 'Dangerous eval usage',
+            message: 'dangerousEval calls eval() directly on untrusted input.',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].diff_context).toBeDefined();
@@ -528,16 +593,20 @@ describe('FindingNormalizer', () => {
     });
 
     it('does not crash when diff contains only removed lines', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/removed.ts',
-        hunks: [{
-          startLine: 10,
-          endLine: 10,
-          content: '-const old = true;',
-          addedLines: [],
-          removedLines: ['const old = true;'],
-        }],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/removed.ts',
+          hunks: [
+            {
+              startLine: 10,
+              endLine: 10,
+              content: '-const old = true;',
+              addedLines: [],
+              removedLines: ['const old = true;'],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
         [makeFinding({ file: 'src/removed.ts', line: 10 })],
         diffFiles,
@@ -546,23 +615,29 @@ describe('FindingNormalizer', () => {
     });
 
     it('does not mark as outside_diff when AI line is near a hunk within correction radius', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/nearby.ts',
-        hunks: [{
-          startLine: 50,
-          endLine: 55,
-          content: '+const criticalFunction = () => {};',
-          addedLines: ['const criticalFunction = () => {};'],
-          removedLines: [],
-        }],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/nearby.ts',
+          hunks: [
+            {
+              startLine: 50,
+              endLine: 55,
+              content: '+const criticalFunction = () => {};',
+              addedLines: ['const criticalFunction = () => {};'],
+              removedLines: [],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/nearby.ts',
-          line: 65,
-          title: 'Issue in criticalFunction',
-          message: 'criticalFunction lacks error handling.',
-        })],
+        [
+          makeFinding({
+            file: 'src/nearby.ts',
+            line: 65,
+            title: 'Issue in criticalFunction',
+            message: 'criticalFunction lacks error handling.',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].outside_diff).toBeUndefined();
@@ -571,23 +646,29 @@ describe('FindingNormalizer', () => {
     });
 
     it('marks as outside_diff when AI line is far beyond correction radius', () => {
-      const diffFiles = [makeDiffFile({
-        path: 'src/far.ts',
-        hunks: [{
-          startLine: 10,
-          endLine: 15,
-          content: '+const x = 1;',
-          addedLines: ['const x = 1;'],
-          removedLines: [],
-        }],
-      })];
+      const diffFiles = [
+        makeDiffFile({
+          path: 'src/far.ts',
+          hunks: [
+            {
+              startLine: 10,
+              endLine: 15,
+              content: '+const x = 1;',
+              addedLines: ['const x = 1;'],
+              removedLines: [],
+            },
+          ],
+        }),
+      ];
       const result = normalizer.normalize(
-        [makeFinding({
-          file: 'src/far.ts',
-          line: 200,
-          title: 'Some issue',
-          message: 'Too far from any diff hunk.',
-        })],
+        [
+          makeFinding({
+            file: 'src/far.ts',
+            line: 200,
+            title: 'Some issue',
+            message: 'Too far from any diff hunk.',
+          }),
+        ],
         diffFiles,
       );
       expect(result[0].outside_diff).toBe(true);
@@ -644,9 +725,27 @@ describe('FindingNormalizer', () => {
   describe('sorting', () => {
     it('sorts by severity (highest first), then consensus, then confidence', () => {
       const findings = [
-        makeFinding({ id: 'low', severity: 'low', confidence: 0.85, file: 'src/a.ts', message: 'A specific low severity issue in code' }),
-        makeFinding({ id: 'critical', severity: 'critical', confidence: 0.8, file: 'src/b.ts', message: 'A specific critical severity issue in code' }),
-        makeFinding({ id: 'high', severity: 'high', confidence: 0.7, file: 'src/c.ts', message: 'A specific high severity issue in code' }),
+        makeFinding({
+          id: 'low',
+          severity: 'low',
+          confidence: 0.85,
+          file: 'src/a.ts',
+          message: 'A specific low severity issue in code',
+        }),
+        makeFinding({
+          id: 'critical',
+          severity: 'critical',
+          confidence: 0.8,
+          file: 'src/b.ts',
+          message: 'A specific critical severity issue in code',
+        }),
+        makeFinding({
+          id: 'high',
+          severity: 'high',
+          confidence: 0.7,
+          file: 'src/c.ts',
+          message: 'A specific high severity issue in code',
+        }),
       ];
       const result = normalizer.normalize(findings);
       expect(result.map((f) => f.id)).toEqual(['critical', 'high', 'low']);

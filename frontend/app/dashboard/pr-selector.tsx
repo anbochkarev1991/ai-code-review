@@ -53,7 +53,7 @@ export function PRSelector({
           setError("Failed to load pull requests.");
         }
       })
-      .catch((_err: unknown) => {
+      .catch(() => {
         if (!cancelled) {
           setError("Failed to load pull requests.");
         }

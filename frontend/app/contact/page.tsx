@@ -11,7 +11,7 @@ export default function ContactPage() {
 
           <div className="prose prose-zinc dark:prose-invert max-w-none">
             <p className="mb-6 text-zinc-600 dark:text-zinc-400">
-              We'd love to hear from you! Whether you have a question, feedback, or need support, we're here to help.
+              We&apos;d love to hear from you! Whether you have a question, feedback, or need support, we&apos;re here to help.
             </p>
 
             <section className="mb-8">
@@ -36,13 +36,13 @@ export default function ContactPage() {
                 Support
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">
-                If you're experiencing technical issues or have questions about using the service, please include:
+                If you&apos;re experiencing technical issues or have questions about using the service, please include:
               </p>
               <ul className="list-disc list-inside space-y-1 text-zinc-600 dark:text-zinc-400 ml-4 mt-2">
                 <li>A description of the issue or question</li>
                 <li>Steps to reproduce (if applicable)</li>
                 <li>Your account email (if logged in)</li>
-                <li>Any error messages you've encountered</li>
+                <li>Any error messages you&apos;ve encountered</li>
               </ul>
             </section>
 

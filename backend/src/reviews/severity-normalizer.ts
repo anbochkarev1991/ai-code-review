@@ -71,9 +71,13 @@ export class SeverityNormalizer {
     const after = this.countSeverities(result);
 
     const downgradedCount =
-      Math.max(0, (before.high - afterDowngrade.high) + (before.critical - afterDowngrade.critical))
-      + Math.max(0, (afterBoost.high - after.high));
-    const upgradedCount = Math.max(0, (afterBoost.high - afterDowngrade.high));
+      Math.max(
+        0,
+        before.high -
+          afterDowngrade.high +
+          (before.critical - afterDowngrade.critical),
+      ) + Math.max(0, afterBoost.high - after.high);
+    const upgradedCount = Math.max(0, afterBoost.high - afterDowngrade.high);
     const mergedRootCauseCount = Math.max(0, findings.length - result.length);
 
     return {
@@ -155,13 +159,14 @@ export class SeverityNormalizer {
       (f) => f.severity === 'high' && f.consensus_level === 'multi-agent',
     ).length;
 
-    const maxHighAllowed = Math.max(
-      MAX_HIGH_PER_REVIEW,
-      multiAgentHighCount,
-    );
+    const maxHighAllowed = Math.max(MAX_HIGH_PER_REVIEW, multiAgentHighCount);
 
     const highIndices = findings
-      .map((f, i) => ({ confidence: f.confidence, index: i, isMultiAgent: f.consensus_level === 'multi-agent' }))
+      .map((f, i) => ({
+        confidence: f.confidence,
+        index: i,
+        isMultiAgent: f.consensus_level === 'multi-agent',
+      }))
       .filter((item, i) => findings[i].severity === 'high')
       .sort((a, b) => {
         if (a.isMultiAgent !== b.isMultiAgent) return a.isMultiAgent ? 1 : -1;
@@ -199,10 +204,7 @@ export class SeverityNormalizer {
       let merged = false;
       for (const group of groups) {
         const primary = group[0];
-        if (
-          primary.severity !== 'high' &&
-          primary.severity !== 'critical'
-        ) {
+        if (primary.severity !== 'high' && primary.severity !== 'critical') {
           continue;
         }
         if (this.isSameRootCause(primary, finding)) {
@@ -282,13 +284,16 @@ export class SeverityNormalizer {
       confidence: bestConfidence,
       impact: bestImpact ?? primary.impact,
       suggested_fix: bestFix ?? primary.suggested_fix,
-      agent_name: agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
+      agent_name:
+        agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
       merged_agents: agentList.length > 1 ? agentList : primary.merged_agents,
       consensus_level: consensus,
     };
   }
 
-  private countSeverities(findings: Finding[]): Record<FindingSeverity, number> {
+  private countSeverities(
+    findings: Finding[],
+  ): Record<FindingSeverity, number> {
     const counts: Record<FindingSeverity, number> = {
       critical: 0,
       high: 0,
