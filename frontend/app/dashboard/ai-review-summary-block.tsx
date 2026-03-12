@@ -22,6 +22,8 @@ function getSeverityBadgeClass(severityLabel: string): string {
   }
 }
 
+const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
+
 function parseConcern(concern: string): {
   severity?: string;
   title: string;
@@ -39,6 +41,35 @@ function parseConcern(concern: string): {
     return { severity: match[1], title: rest || concern };
   }
   return { title: concern.trim() };
+}
+
+function groupConcernsBySeverity(concerns: string[], maxTotal = 5) {
+  const parsed = concerns.map(parseConcern);
+  const bySeverity = new Map<string, string[]>();
+  const seen = new Set<string>();
+  let total = 0;
+
+  for (const { severity, title } of parsed) {
+    if (total >= maxTotal) break;
+    const key = title.toLowerCase().trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    total++;
+    const group = severity ?? "OTHER";
+    const list = bySeverity.get(group) ?? [];
+    list.push(title);
+    bySeverity.set(group, list);
+  }
+
+  const ordered: { severity: string; items: string[] }[] = [];
+  for (const s of SEVERITY_ORDER) {
+    const items = bySeverity.get(s);
+    if (items?.length) ordered.push({ severity: s, items });
+  }
+  const other = bySeverity.get("OTHER");
+  if (other?.length) ordered.push({ severity: "OTHER", items: other });
+
+  return ordered;
 }
 
 export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockProps) {
@@ -72,39 +103,30 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
         )}
 
         {key_concerns.length > 0 && (
-          <section className="flex flex-col gap-2">
+          <section className="flex flex-col gap-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Key Concerns
             </span>
-            <ul className="flex flex-col gap-3">
-              {key_concerns.map((concern, i) => {
-                const { severity, title, explanation } = parseConcern(concern);
-                return (
-                  <li
-                    key={i}
-                    className="flex flex-col gap-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 px-3 py-2.5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      {severity && (
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 ${getSeverityBadgeClass(severity)}`}
-                        >
-                          {severity}
-                        </span>
-                      )}
-                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                        {title}
-                      </span>
-                    </div>
-                    {explanation && (
-                      <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400 pl-0">
-                        {explanation}
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="flex flex-col gap-4">
+              {groupConcernsBySeverity(key_concerns).map((group) => (
+                <div key={group.severity} className="flex flex-col gap-1.5">
+                  {group.severity !== "OTHER" && (
+                    <span
+                      className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap shrink-0 w-fit ${getSeverityBadgeClass(group.severity)}`}
+                    >
+                      {group.severity.charAt(0) +
+                        group.severity.slice(1).toLowerCase() +
+                        " priority issues"}
+                    </span>
+                  )}
+                  <ul className="list-disc list-inside flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+                    {group.items.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
