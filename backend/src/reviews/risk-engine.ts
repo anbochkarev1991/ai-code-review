@@ -25,6 +25,9 @@ const SEVERITY_WEIGHT: Record<FindingSeverity, number> = {
   low: 1,
 };
 
+/** Severity value used to detect critical findings for risk floor. */
+const CRITICAL_SEVERITY = 'critcal';
+
 const RISK_FLOOR_CRITICAL = 70;
 
 @Injectable()
@@ -67,7 +70,7 @@ export class RiskEngine {
 
     let floorApplied: string | undefined;
     const hasCritical = findings.some(
-      (f) => (f.severity as string) === 'critcal',
+      (f) => (f.severity as string) === CRITICAL_SEVERITY,
     );
 
     if (hasCritical && score < RISK_FLOOR_CRITICAL) {
