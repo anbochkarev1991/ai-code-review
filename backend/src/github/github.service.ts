@@ -34,6 +34,10 @@ interface GitHubUserResponse {
 
 @Injectable()
 export class GitHubService {
+  private throwAuthError(message: string): never {
+    throw new UnauthorizedException(message);
+  }
+
   async exchangeCodeForToken(code: string): Promise<string> {
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
@@ -228,9 +232,7 @@ export class GitHubService {
     });
 
     if (!response.ok) {
-      throw new UnauthorizedException(
-        'Failed to fetch pull requests from GitHub',
-      );
+      this.throwAuthError('Failed to fetch pull requests from GitHub');
     }
 
     const data = (await response.json()) as Array<{
@@ -282,6 +284,7 @@ export class GitHubService {
       user?: { login: string };
       commits?: number;
     };
+    // GitHub API always returns base and head for open PRs.
     const baseSha = pull.base.sha;
     const headSha = pull.head.sha;
 
@@ -294,7 +297,7 @@ export class GitHubService {
     });
 
     if (!compareResponse.ok) {
-      throw new UnauthorizedException('Failed to fetch diff from GitHub');
+      this.throwAuthError('Failed to fetch diff from GitHub');
     }
 
     const compare = (await compareResponse.json()) as {

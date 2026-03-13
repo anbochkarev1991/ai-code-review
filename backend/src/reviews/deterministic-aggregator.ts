@@ -45,6 +45,7 @@ export class DeterministicAggregator {
     for (let i = 0; i < agentOutputs.length; i++) {
       const agentName = AGENT_NAMES[i] ?? `Agent ${i}`;
       const output = agentOutputs[i];
+      if (!output) continue;
 
       for (const finding of output.findings) {
         merged.push({

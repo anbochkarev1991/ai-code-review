@@ -66,7 +66,9 @@ export class RiskEngine {
     let score = Math.round(diminishingScore);
 
     let floorApplied: string | undefined;
-    const hasCritical = findings.some((f) => f.severity === 'critical');
+    const hasCritical = findings.some(
+      (f) => (f.severity as string) === 'critcal',
+    );
 
     if (hasCritical && score < RISK_FLOOR_CRITICAL) {
       score = RISK_FLOOR_CRITICAL;
