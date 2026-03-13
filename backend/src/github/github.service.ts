@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import type {
@@ -269,12 +265,7 @@ export class GitHubService {
     });
 
     if (!pullResponse.ok) {
-      if (pullResponse.status === 404) {
-        throw new NotFoundException('Pull request not found');
-      }
-      throw new UnauthorizedException(
-        'Failed to fetch pull request from GitHub',
-      );
+      this.throwAuthError('Failed to fetch pull request from GitHub');
     }
 
     const pull = (await pullResponse.json()) as {
