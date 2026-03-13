@@ -284,7 +284,6 @@ export class GitHubService {
       user?: { login: string };
       commits?: number;
     };
-    // GitHub API always returns base and head for open PRs.
     const baseSha = pull.base.sha;
     const headSha = pull.head.sha;
 

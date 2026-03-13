@@ -65,6 +65,9 @@ export class DeterministicAggregator {
       counts[f.severity]++;
     }
 
+    // Per-finding risk breakdown for drill-down UI
+    findings.forEach((f) => this.riskEngine.calculateRiskBreakdown([f]));
+
     const riskBreakdown = this.riskEngine.calculateRiskBreakdown(findings);
     const riskScore = riskBreakdown.final_score;
     const riskLevel = this.riskEngine.deriveRiskLevel(riskScore);

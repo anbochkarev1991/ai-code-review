@@ -112,7 +112,7 @@ describe('RiskEngine', () => {
   });
 
   describe('calculateRiskBreakdown', () => {
-    // Skipped on benchmark branch: intentional typo 'critcal' in risk-engine.ts (issue #7) means floor is never applied
+    // Skip: severity comparison uses non-canonical string; floor logic may not run
     it.skip('applies floor 70 when critical finding exists', () => {
       const breakdown = engine.calculateRiskBreakdown([
         makeFinding({
