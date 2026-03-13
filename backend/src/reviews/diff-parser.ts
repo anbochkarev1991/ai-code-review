@@ -254,12 +254,22 @@ export class DiffParser {
   }
 
   /**
+   * Preamble shown to all agents so they stay diff-scoped.
+   * Reduces speculative findings based on code outside the diff.
+   */
+  private static readonly DIFF_SCOPE_PREAMBLE = `You are reviewing only the changed hunks below. For each finding:
+- Use only file paths and line numbers that appear in these hunks (or immediately adjacent context lines).
+- Do not report issues that rely on code outside this diff; if you cannot justify a finding from the changed lines or their immediate context, omit it.
+- Prefer fewer, precise findings grounded in the diff over speculative ones.`;
+
+  /**
    * Formats ParsedFile[] into a structured prompt string for agents.
    * Each file is presented with its path, language, status, and hunks.
+   * Prepends diff-scope instructions so agents stay diff-first.
    */
   formatForPrompt(files: ParsedFile[], tokenBudget?: number): string {
-    const sections: string[] = [];
-    let totalChars = 0;
+    const sections: string[] = [DiffParser.DIFF_SCOPE_PREAMBLE];
+    let totalChars = DiffParser.DIFF_SCOPE_PREAMBLE.length;
     const charBudget = tokenBudget ? tokenBudget * 4 : Infinity;
 
     for (const file of files) {

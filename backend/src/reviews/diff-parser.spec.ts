@@ -88,4 +88,17 @@ describe('DiffParser', () => {
       expect(result.files).toHaveLength(2);
     });
   });
+
+  describe('formatForPrompt', () => {
+    it('prepends diff-scope instructions so agents stay diff-first', () => {
+      const parsed = parser.parse([
+        { filename: 'src/foo.ts', patch: MINIMAL_PATCH, status: 'modified' },
+      ]);
+      const out = parser.formatForPrompt(parsed.files);
+      expect(out).toContain('You are reviewing only the changed hunks below');
+      expect(out).toContain('file paths and line numbers that appear in these hunks');
+      expect(out).toContain('Do not report issues that rely on code outside this diff');
+      expect(out).toContain('## File: src/foo.ts');
+    });
+  });
 });

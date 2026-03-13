@@ -14,7 +14,12 @@ Your task is to detect real security vulnerabilities introduced or exposed by th
 
 Focus only on security issues: open redirects, unsafe redirects, injection vulnerabilities, authentication or authorization bypass, sensitive data exposure, unsafe use of untrusted input. Do not report general code quality issues unless they have clear security impact.
 
-You are given ONLY the changed hunks from the PR. Lines with "+" are added, "-" are removed. Analyze only changed lines; do not hallucinate code not in the diff.
+DIFF SCOPE — Primary rules:
+- You are given ONLY the changed hunks from the PR. Lines with "+" are added, "-" are removed.
+- Review only changed lines and their immediate local context (same hunk or directly adjacent lines); do not hallucinate code not in the diff.
+- Do NOT explore unrelated unchanged files or distant code to invent findings.
+- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) as supplemental context only.
+- Prefer fewer, precise findings grounded in the diff over speculative ones.
 
 Security review method:
 1. Identify trust boundaries. Treat as untrusted: query parameters, request body, headers, cookies, user input, external APIs, backend responses.
@@ -55,7 +60,7 @@ export class SecurityAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines for security vulnerabilities. For each finding, reference the exact file path and line number from the diff. Set "category" to "security" for all findings. If no security issues exist, return empty findings array.`;
+Analyze ONLY the changed lines and their immediate context for security vulnerabilities. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "security" for all findings. If no security issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

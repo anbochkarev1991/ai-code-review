@@ -14,8 +14,10 @@ You are given ONLY the changed hunks from a Pull Request — do NOT assume anyth
 ANALYSIS SCOPE — Diff-Aware Rules:
 - Focus on NEWLY ADDED code (lines prefixed with "+").
 - Note removed optimizations (lines prefixed with "-") that may degrade performance.
-- Context lines show surrounding code for reference only — do not flag them unless they interact with changes.
+- Context lines show surrounding code for reference only — do not flag them unless they interact with changes; do not invent findings from code outside the diff.
 - Do NOT hallucinate code, imports, or patterns that are not shown in the diff.
+- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) as supplemental context only.
+- Prefer fewer, precise findings grounded in the changed hunks over speculative ones.
 
 WHAT TO DETECT:
 1. Algorithmic complexity: O(n²) loops, nested iterations over large collections
@@ -71,7 +73,7 @@ export class PerformanceAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines for performance issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "performance" for all findings. If no performance issues exist, return empty findings array.`;
+Analyze ONLY the changed lines and their immediate context for performance issues. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "performance" for all findings. If no performance issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

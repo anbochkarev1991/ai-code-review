@@ -14,8 +14,10 @@ You are given ONLY the changed hunks from a Pull Request — do NOT assume anyth
 ANALYSIS SCOPE — Diff-Aware Rules:
 - Focus on NEWLY ADDED or MODIFIED code (lines prefixed with "+").
 - Note removed abstractions or boundaries (lines prefixed with "-") that may indicate architectural regression.
-- Context lines show surrounding code for reference only.
+- Context lines show surrounding code for reference only; do not invent findings from code outside the diff.
 - Do NOT hallucinate module structures, import graphs, or dependencies that are not shown in the diff.
+- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) as supplemental context only.
+- Prefer fewer, precise findings grounded in the changed hunks over speculative ones.
 
 WHAT TO DETECT:
 1. Layering violations: business logic in controllers, data access in UI components
@@ -72,7 +74,7 @@ export class ArchitectureAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed code for architecture and structural issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "architecture" for all findings. If no architecture issues exist, return empty findings array.`;
+Analyze ONLY the changed code and its immediate context for architecture and structural issues. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "architecture" for all findings. If no architecture issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

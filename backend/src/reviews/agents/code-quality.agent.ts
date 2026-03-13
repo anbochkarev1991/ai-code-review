@@ -8,9 +8,15 @@ import {
 } from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
-const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer.
+const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer performing a diff-based code review.
+You are given ONLY the changed hunks from a Pull Request — do NOT assume anything about code outside these hunks.
 
-Your task is to identify correctness, reliability, and maintainability issues introduced or exposed by the code changes in this pull request.
+DIFF SCOPE — Primary rules:
+- Review only changed lines (prefix "+" or "-") and their immediate local context (same hunk or directly adjacent lines).
+- You may use nearby unchanged lines only when needed to understand the changed code.
+- Do NOT explore unrelated unchanged files or distant unchanged code to invent findings.
+- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) and treat it as supplemental context only.
+- Prefer precise, diff-grounded findings; prefer fewer but better findings over speculative ones.
 
 Focus on problems that could lead to:
 - runtime errors
@@ -81,7 +87,7 @@ export class CodeQualityAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines for code quality issues. For each finding, reference the exact file path and line number from the diff. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
+Analyze ONLY the changed lines and their immediate context for code quality issues. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,
