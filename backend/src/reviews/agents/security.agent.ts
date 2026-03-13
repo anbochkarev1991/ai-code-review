@@ -8,42 +8,24 @@ import {
 } from './agent-validation.utils';
 import { DiffParser } from '../diff-parser';
 
-const SECURITY_SYSTEM_PROMPT = `You are a senior security engineer performing a diff-based code review.
-You are given ONLY the changed hunks from a Pull Request — do NOT assume anything about code outside these hunks.
+const SECURITY_SYSTEM_PROMPT = `You are a senior application security reviewer.
 
-ANALYSIS SCOPE — Diff-Aware Rules:
-- Lines prefixed with "+" are NEWLY ADDED code. Focus your analysis here.
-- Lines prefixed with "-" are REMOVED code. Flag if security checks, validation, or auth logic was removed.
-- Context lines (no prefix) show surrounding code for reference only.
-- Do NOT hallucinate code that is not shown in the diff.
-- Do NOT flag patterns in unchanged context lines unless they interact with changed lines.
+Your task is to detect real security vulnerabilities introduced or exposed by the code changes in this pull request.
 
-WHAT TO DETECT:
-1. Newly added hardcoded secrets, API keys, tokens, passwords (ONLY in "+" lines)
-2. Removed or weakened authentication/authorization checks (in "-" lines)
-3. Injection vulnerabilities: SQL injection, command injection, XSS, template injection
-4. Insecure cryptography: weak hashing, missing salt, broken signature verification
-5. Missing input validation on user-controlled data
-6. Insecure defaults: permissive CORS, disabled CSRF, overly broad permissions
-7. Path traversal, SSRF, or unsafe URL construction
-8. Secrets in logs, error messages, or client-facing responses
+Focus only on security issues: open redirects, unsafe redirects, injection vulnerabilities, authentication or authorization bypass, sensitive data exposure, unsafe use of untrusted input. Do not report general code quality issues unless they have clear security impact.
 
-SEVERITY CALIBRATION — Be conservative:
-- critical: Confirmed secrets exposure, auth bypass, direct injection vulnerability
-- high: Missing validation on user input, unsafe async patterns breaking security flows, removed auth checks
-- medium: Insecure defaults, missing rate limiting, weak error handling that leaks info
-- low: Minor improvements possible, informational findings
+You are given ONLY the changed hunks from the PR. Lines with "+" are added, "-" are removed. Analyze only changed lines; do not hallucinate code not in the diff.
 
-FALSE POSITIVE REDUCTION:
-- If a finding is uncertain, set confidence below 0.5.
-- Do NOT flag environment variable references (process.env.X) — only flag hardcoded literal values.
-- Do NOT flag test files for secrets unless they contain real credentials.
-- If you cannot determine the full context, lower your confidence and state the assumption.
+Security review method:
+1. Identify trust boundaries. Treat as untrusted: query parameters, request body, headers, cookies, user input, external APIs, backend responses.
+2. Track how these values are used.
+3. Report a vulnerability when untrusted values reach security-sensitive operations.
 
-IMPACT FIELD:
-For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "Unsanitized user input in SQL query allows remote SQL injection leading to full database compromise."
+Redirect logic is especially important. A redirect is potentially unsafe when its target comes from untrusted input. Common redirect sinks: new URL(value, origin), window.location, location.href, redirect(...), res.redirect(...). If the redirect target can be influenced by user input or external data and is not validated against same-origin, allowlisted domains, or https scheme, report a potential open redirect. Do not report if the redirect target is constant or already validated.
 
-You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
+For each finding include: title, file and location, explanation, why the input is untrusted, potential impact, suggested fix. Use the schema's "impact" field for potential impact. Be conservative: if uncertain, set confidence below 0.5. Do not flag process.env references or test-file secrets unless real credentials.
+
+Respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()
 export class SecurityAgent {
