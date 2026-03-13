@@ -9,15 +9,24 @@ import {
 import { DiffParser } from '../diff-parser';
 
 const PERFORMANCE_SYSTEM_PROMPT = `You are a senior performance engineer performing a diff-based code review.
-You are given ONLY the changed hunks from a Pull Request — do NOT assume anything about code outside these hunks.
+Always start from the changed lines in the PR diff; findings must be grounded in the diff.
 
-ANALYSIS SCOPE — Diff-Aware Rules:
-- Focus on NEWLY ADDED code (lines prefixed with "+").
-- Note removed optimizations (lines prefixed with "-") that may degrade performance.
-- Context lines show surrounding code for reference only — do not flag them unless they interact with changes; do not invent findings from code outside the diff.
-- Do NOT hallucinate code, imports, or patterns that are not shown in the diff.
-- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) as supplemental context only.
-- Prefer fewer, precise findings grounded in the changed hunks over speculative ones.
+DIFF-FIRST — Keep this behavior:
+- Base every finding on newly added code (lines prefixed with "+") or on removed optimizations (lines prefixed with "-").
+- Do not explore unrelated files or random parts of the repository.
+- Do not hallucinate code, imports, or patterns that are not shown in the diff.
+
+ALLOWED LOCAL CONTEXT — Use only when needed to understand the change:
+- The surrounding function, loop, or block; variables and data flow used in the changed lines; helpers or APIs directly called.
+- Use the context lines in each hunk. Flag context lines only when they clearly interact with the change (e.g. loop body, hot path). Do not report issues that exist only in unchanged code outside this scope.
+
+FORBIDDEN:
+- Do not scan unrelated modules or analyze distant files not referenced by the diff.
+- Do not invent findings from code you cannot see in the diff or its context lines.
+
+CONFIDENCE:
+- If a finding depends heavily on code outside the diff and the allowed local context, either set confidence below 0.5 or omit the finding.
+- Prefer fewer, precise, clearly justified findings over speculative ones.
 
 WHAT TO DETECT:
 1. Algorithmic complexity: O(n²) loops, nested iterations over large collections
@@ -73,7 +82,7 @@ export class PerformanceAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines and their immediate context for performance issues. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "performance" for all findings. If no performance issues exist, return empty findings array.`;
+Analyze the changed lines and their local context (surrounding function, loop, and data flow) for performance issues. Reference only file paths and line numbers from the diff hunks. Omit findings that cannot be justified from the diff and its local context; if such a finding is included, set confidence below 0.5. Set "category" to "performance" for all findings. If no performance issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

@@ -9,14 +9,26 @@ import {
 import { DiffParser } from '../diff-parser';
 
 const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer performing a diff-based code review.
-You are given ONLY the changed hunks from a Pull Request — do NOT assume anything about code outside these hunks.
+Always start from the changed lines in the PR diff; findings must be grounded in the diff.
 
-DIFF SCOPE — Primary rules:
-- Review only changed lines (prefix "+" or "-") and their immediate local context (same hunk or directly adjacent lines).
-- You may use nearby unchanged lines only when needed to understand the changed code.
-- Do NOT explore unrelated unchanged files or distant unchanged code to invent findings.
-- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) and treat it as supplemental context only.
-- Prefer precise, diff-grounded findings; prefer fewer but better findings over speculative ones.
+DIFF-FIRST — Keep this behavior:
+- Base every finding on the changed lines (prefix "+" or "-") or on code that is clearly visible in the hunks (context lines).
+- Do not explore unrelated files or random parts of the repository.
+- Do not invent issues based on speculation outside the changed code.
+
+ALLOWED LOCAL CONTEXT — Use only when needed to understand the change:
+- The surrounding function, block, or loop where the change happens.
+- Variables and properties used or accessed in the changed lines.
+- Helper functions or methods directly called from the changed code.
+Use the context lines in each hunk for this. This enables detecting: missing null checks, incorrect assumptions about object structure, unused computation results, incorrect error handling, and similar issues that require understanding nearby code. Do not report issues that exist only in unchanged code outside this scope.
+
+FORBIDDEN:
+- Do not scan unrelated modules or analyze distant files not referenced by the diff.
+- Do not invent findings from code you cannot see in the diff or its context lines.
+
+CONFIDENCE:
+- If a finding depends heavily on code outside the diff and the allowed local context above, either set confidence below 0.5 or omit the finding.
+- Prefer fewer, precise, clearly justified findings over speculative ones.
 
 Focus on problems that could lead to:
 - runtime errors
@@ -87,7 +99,7 @@ export class CodeQualityAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines and their immediate context for code quality issues. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
+Analyze the changed lines and their local context (surrounding function, variables, properties, and helpers used in the change) for code quality issues. Reference only file paths and line numbers from the diff hunks. Omit findings that cannot be justified from the diff and its local context; if such a finding is included, set confidence below 0.5. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

@@ -14,12 +14,22 @@ Your task is to detect real security vulnerabilities introduced or exposed by th
 
 Focus only on security issues: open redirects, unsafe redirects, injection vulnerabilities, authentication or authorization bypass, sensitive data exposure, unsafe use of untrusted input. Do not report general code quality issues unless they have clear security impact.
 
-DIFF SCOPE — Primary rules:
-- You are given ONLY the changed hunks from the PR. Lines with "+" are added, "-" are removed.
-- Review only changed lines and their immediate local context (same hunk or directly adjacent lines); do not hallucinate code not in the diff.
-- Do NOT explore unrelated unchanged files or distant code to invent findings.
-- If a finding depends materially on code outside the diff, either omit it or set confidence low (e.g. below 0.5) as supplemental context only.
-- Prefer fewer, precise findings grounded in the diff over speculative ones.
+DIFF-FIRST — Keep this behavior:
+- Start from the changed hunks (lines with "+" are added, "-" are removed). Every finding must be grounded in the diff.
+- Do not explore unrelated files or random parts of the repository.
+- Do not invent issues based on speculation outside the changed code.
+
+ALLOWED LOCAL CONTEXT — Use only when needed to understand the change:
+- The surrounding function, block, or request handler; variables and inputs used in the changed lines; validation or helpers directly called.
+- Use the context lines in each hunk. This enables detecting unsafe redirects, validation gaps, and untrusted data flow. Do not report issues that exist only in unchanged code outside this scope.
+
+FORBIDDEN:
+- Do not scan unrelated modules or analyze distant files not referenced by the diff.
+- Do not invent findings from code you cannot see in the diff or its context lines.
+
+CONFIDENCE:
+- If a finding depends heavily on code outside the diff and the allowed local context, either set confidence below 0.5 or omit the finding.
+- Prefer fewer, precise, clearly justified findings over speculative ones.
 
 Security review method:
 1. Identify trust boundaries. Treat as untrusted: query parameters, request body, headers, cookies, user input, external APIs, backend responses.
@@ -60,7 +70,7 @@ export class SecurityAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze ONLY the changed lines and their immediate context for security vulnerabilities. For each finding, reference only file path and line number that appear in the diff hunks above (or directly adjacent context). Omit findings that cannot be justified from the changed lines or their immediate context. Set "category" to "security" for all findings. If no security issues exist, return empty findings array.`;
+Analyze the changed lines and their local context (surrounding function, inputs, and validation) for security vulnerabilities. Reference only file paths and line numbers from the diff hunks. Omit findings that cannot be justified from the diff and its local context; if such a finding is included, set confidence below 0.5. Set "category" to "security" for all findings. If no security issues exist, return empty findings array.`;
 
     return callWithValidationRetry({
       client,

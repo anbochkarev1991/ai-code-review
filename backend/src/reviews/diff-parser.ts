@@ -254,18 +254,30 @@ export class DiffParser {
   }
 
   /**
-   * Preamble shown to all agents so they stay diff-scoped.
-   * Reduces speculative findings based on code outside the diff.
+   * Preamble shown to all agents: diff-first with limited local context.
+   * Findings must be grounded in the diff; context lines allow reasoning about surrounding code.
    */
-  private static readonly DIFF_SCOPE_PREAMBLE = `You are reviewing only the changed hunks below. For each finding:
-- Use only file paths and line numbers that appear in these hunks (or immediately adjacent context lines).
-- Do not report issues that rely on code outside this diff; if you cannot justify a finding from the changed lines or their immediate context, omit it.
-- Prefer fewer, precise findings grounded in the diff over speculative ones.`;
+  private static readonly DIFF_SCOPE_PREAMBLE = `You are reviewing the changed hunks below (diff-first analysis with limited local context).
+
+DIFF-FIRST:
+- Start from the changed lines (prefix "+" or "-"). Every finding must be grounded in the diff.
+- Use only file paths and line numbers that appear in these hunks or their immediate context lines.
+- Do not explore unrelated files or distant parts of the repository.
+
+ALLOWED LOCAL CONTEXT (use only to understand the change):
+- The surrounding function, block, or loop where the change lives.
+- Variables and properties used or accessed in the changed lines.
+- Helper functions or methods directly called from the changed code.
+Use the context lines in each hunk for this. Do not invent or assume code that is not in the diff or these context lines.
+
+CONFIDENCE:
+- If a finding depends heavily on code that is neither in the diff nor in the visible context lines, either set confidence below 0.5 or omit the finding.
+- Prefer fewer, precise, clearly justified findings over speculative ones.`;
 
   /**
    * Formats ParsedFile[] into a structured prompt string for agents.
    * Each file is presented with its path, language, status, and hunks.
-   * Prepends diff-scope instructions so agents stay diff-first.
+   * Prepends diff-first + local-context instructions for all agents.
    */
   formatForPrompt(files: ParsedFile[], tokenBudget?: number): string {
     const sections: string[] = [DiffParser.DIFF_SCOPE_PREAMBLE];
