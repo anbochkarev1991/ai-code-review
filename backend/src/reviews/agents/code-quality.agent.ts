@@ -40,13 +40,26 @@ Focus on problems that could lead to:
 
 Do not report purely stylistic preferences or formatting issues.
 
+NULL/UNDEFINED AND RUNTIME CORRECTNESS — Explicitly check for:
+
+1. Property access on values that may be undefined or null.
+   Example: \`pull.base.sha\` — verify that \`pull\` (and if relevant \`pull.base\`) is guaranteed to exist before accessing. If the value can be undefined or null (e.g. from an API, optional parameter, or conditional), flag missing guards.
+
+2. Iterating over values that may be undefined or null.
+   Example: \`for (const f of output.findings)\` — verify that \`output.findings\` is always defined (e.g. array) before iteration. If it can be undefined, iteration will throw at runtime; flag missing checks (e.g. optional chaining, default array, or explicit if).
+
+3. Calling methods on values that may be undefined or null.
+   Example: \`data.url.trim()\` — verify that \`data.url\` cannot be undefined or null before calling \`.trim()\`. Same for any method call on a property or variable that might be missing; flag missing validation or guards.
+
+For each of these patterns, inspect the changed lines and their surrounding function/block to see where values come from (arguments, API response, previous assignment). Report a finding only when the code assumes existence without a visible guarantee.
+
 Review method:
 
 1. Examine assumptions the code makes about data and objects.
-Check whether values might be null, undefined, malformed, or missing.
+Check whether values might be null, undefined, malformed, or missing. Apply the three patterns above: property access, iteration, and method calls on possibly undefined values.
 
 2. Verify that property access, iteration, and method calls are safe.
-Look for cases where the code assumes an object structure without validating it.
+For every property access (e.g. \`obj.prop\`), iteration (e.g. \`for...of array\`), or method call (e.g. \`value.method()\`) in the changed code, confirm the base value is guaranteed to exist or is guarded; otherwise report it.
 
 3. Check error handling paths.
 Ensure that errors are properly handled, surfaced, or propagated rather than silently ignored.
