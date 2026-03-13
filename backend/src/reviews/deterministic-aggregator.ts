@@ -45,6 +45,7 @@ export class DeterministicAggregator {
     for (let i = 0; i < agentOutputs.length; i++) {
       const agentName = AGENT_NAMES[i] ?? `Agent ${i}`;
       const output = agentOutputs[i];
+      if (!output) continue;
 
       for (const finding of output.findings) {
         merged.push({
@@ -63,6 +64,9 @@ export class DeterministicAggregator {
     for (const f of findings) {
       counts[f.severity]++;
     }
+
+    // Per-finding risk breakdown for drill-down UI
+    findings.forEach((f) => this.riskEngine.calculateRiskBreakdown([f]));
 
     const riskBreakdown = this.riskEngine.calculateRiskBreakdown(findings);
     const riskScore = riskBreakdown.final_score;
