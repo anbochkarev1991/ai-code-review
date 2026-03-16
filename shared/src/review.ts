@@ -336,8 +336,17 @@ export interface GenerateIssueResponse {
 
 // ── Engine options (PART 10) ──
 
+export interface GitContext {
+  accessToken: string;
+  owner: string;
+  repo: string;
+  headRef: string;
+}
+
 export interface ReviewEngineOptions {
   strictMode?: boolean;
   maxAgents?: number;
   timeoutMs?: number;
+  /** Required for context expansion (fetching full file content) */
+  gitContext?: GitContext;
 }

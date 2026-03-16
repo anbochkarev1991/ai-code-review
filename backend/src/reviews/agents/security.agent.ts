@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { AGENT_OUTPUT_SCHEMA_PROMPT } from 'shared';
-import type { ParsedFile } from '../../types';
+import type { ExpandedFile } from '../../types';
 import {
   callWithValidationRetry,
   type CallWithValidationRetryResult,
 } from './agent-validation.utils';
-import { DiffParser } from '../diff-parser';
+import { AgentContextShaper } from '../agent-context-shaper';
 
 const SECURITY_SYSTEM_PROMPT = `You are a senior application security reviewer.
 
@@ -31,6 +31,8 @@ CONFIDENCE:
 - If a finding depends heavily on code outside the diff and the allowed local context, either set confidence below 0.5 or omit the finding.
 - Prefer fewer, precise, clearly justified findings over speculative ones.
 
+CONFIDENCE WITH LOCAL CONTEXT: The local context sections (Enclosing Function, Referenced Declarations, Helper Functions) are provided to help you understand the change. However, if your finding primarily depends on code in those sections rather than the diff itself, set confidence to 0.5 or below. Findings must still be grounded in the changed lines.
+
 Security review method:
 1. Identify trust boundaries. Treat as untrusted: query parameters, request body, headers, cookies, user input, external APIs, backend responses.
 2. Track how these values are used.
@@ -46,7 +48,7 @@ Respond with valid JSON only, no markdown, no code fence. Match the given schema
 export class SecurityAgent {
   private client: OpenAI | null = null;
 
-  constructor(private readonly diffParser: DiffParser) {}
+  constructor(private readonly contextShaper: AgentContextShaper) {}
 
   private getClient(): OpenAI {
     if (!this.client) {
@@ -59,11 +61,15 @@ export class SecurityAgent {
     return this.client;
   }
 
-  async run(files: ParsedFile[]): Promise<CallWithValidationRetryResult> {
+  async run(files: ExpandedFile[]): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
-    const diffContent = this.diffParser.formatForPrompt(files, 3500);
+    const diffContent = this.contextShaper.formatForAgent(
+      files,
+      'security',
+      4500,
+    );
 
     const userPrompt = `Respond with a single JSON object matching this schema: ${AGENT_OUTPUT_SCHEMA_PROMPT}
 

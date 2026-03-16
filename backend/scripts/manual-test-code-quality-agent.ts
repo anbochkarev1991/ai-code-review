@@ -4,11 +4,11 @@
  * Requires OPENAI_API_KEY in env.
  */
 
-import type { ParsedFile } from '../src/types';
+import type { ExpandedFile } from '../src/types';
 import { CodeQualityAgent } from '../src/reviews/agents/code-quality.agent';
-import { DiffParser } from '../src/reviews/diff-parser';
+import { AgentContextShaper } from '../src/reviews/agent-context-shaper';
 
-const SAMPLE_FILES: ParsedFile[] = [
+const SAMPLE_FILES: ExpandedFile[] = [
   {
     path: 'src/utils.ts',
     status: 'modified',
@@ -38,6 +38,38 @@ const SAMPLE_FILES: ParsedFile[] = [
         removedLines: [],
       },
     ],
+    expandedHunks: [
+      {
+        hunk: {
+          startLine: 1,
+          endLine: 10,
+          content: `+export function processData(data: any) {
++  const x = 42;
++  let result;
++  for (let i = 0; i < data.length; i++) {
++    result = data[i];
++  }
++  return result;
++}`,
+          addedLines: [
+            'export function processData(data: any) {',
+            '  const x = 42;',
+            '  let result;',
+            '  for (let i = 0; i < data.length; i++) {',
+            '    result = data[i];',
+            '  }',
+            '  return result;',
+            '}',
+          ],
+          removedLines: [],
+        },
+        localContext: {
+          enclosingFunction: null,
+          referencedDeclarations: [],
+          calledHelpers: [],
+        },
+      },
+    ],
   },
 ];
 
@@ -47,8 +79,8 @@ async function main() {
     process.exit(1);
   }
 
-  const diffParser = new DiffParser();
-  const agent = new CodeQualityAgent(diffParser);
+  const contextShaper = new AgentContextShaper();
+  const agent = new CodeQualityAgent(contextShaper);
   console.log('Running Code Quality Agent on sample parsed files...');
   const result = await agent.run(SAMPLE_FILES);
   console.log('Result (JSON matching schema):');

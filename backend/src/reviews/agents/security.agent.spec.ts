@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SecurityAgent } from './security.agent';
-import { DiffParser } from '../diff-parser';
-import type { ParsedFile } from '../../types';
+import { AgentContextShaper } from '../agent-context-shaper';
+import type { ExpandedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -16,7 +16,7 @@ jest.mock('openai', () => ({
   },
 }));
 
-const SAMPLE_FILES: ParsedFile[] = [
+const SAMPLE_FILES: ExpandedFile[] = [
   {
     path: 'src/login.ts',
     status: 'modified',
@@ -28,6 +28,22 @@ const SAMPLE_FILES: ParsedFile[] = [
         content: '+const password = "hardcoded123";',
         addedLines: ['const password = "hardcoded123";'],
         removedLines: [],
+      },
+    ],
+    expandedHunks: [
+      {
+        hunk: {
+          startLine: 1,
+          endLine: 5,
+          content: '+const password = "hardcoded123";',
+          addedLines: ['const password = "hardcoded123";'],
+          removedLines: [],
+        },
+        localContext: {
+          enclosingFunction: null,
+          referencedDeclarations: [],
+          calledHelpers: [],
+        },
       },
     ],
   },
@@ -42,7 +58,7 @@ describe('SecurityAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SecurityAgent, DiffParser],
+      providers: [SecurityAgent, AgentContextShaper],
     }).compile();
 
     agent = module.get(SecurityAgent);
@@ -55,8 +71,8 @@ describe('SecurityAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const diffParser = new DiffParser();
-      const freshAgent = new SecurityAgent(diffParser);
+      const contextShaper = new AgentContextShaper();
+      const freshAgent = new SecurityAgent(contextShaper);
       await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );

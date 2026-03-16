@@ -38,6 +38,8 @@ export interface DiffResponse {
   pr_title?: string;
   pr_author?: string;
   commit_count?: number;
+  /** Head SHA of the PR branch (for fetching file content at PR state) */
+  head_sha?: string;
 }
 
 // ── Structured diff types for agent consumption ──
@@ -72,4 +74,26 @@ export interface DiffStats {
 export interface ParsedDiff {
   files: ParsedFile[];
   stats: DiffStats;
+}
+
+// ── Context expansion types for agent prompts ──
+
+export interface ExpandedContext {
+  /** Full text of the enclosing function/method/block */
+  enclosingFunction: string | null;
+  /** Nearby variable/const/let declarations referenced by changed code */
+  referencedDeclarations: string[];
+  /** Bodies of helper functions called from changed code (same file only) */
+  calledHelpers: string[];
+}
+
+export interface ExpandedHunk {
+  hunk: DiffHunk;
+  localContext: ExpandedContext;
+}
+
+export interface ExpandedFile extends ParsedFile {
+  expandedHunks: ExpandedHunk[];
+  /** Full file source (internal use only, not sent to agents) */
+  fullSource?: string;
 }

@@ -13,13 +13,14 @@ import type {
   TraceStep,
 } from 'shared';
 import { ENGINE_VERSION, AGENT_VERSIONS } from 'shared';
-import type { ParsedFile } from '../../types';
+import type { ExpandedFile, ParsedFile } from '../../types';
 import type { CallWithValidationRetryResult } from '../agents/agent-validation.utils';
 import { ArchitectureAgent } from '../agents/architecture.agent';
 import { CodeQualityAgent } from '../agents/code-quality.agent';
 import { PerformanceAgent } from '../agents/performance.agent';
 import { SecurityAgent } from '../agents/security.agent';
 import { AiSummaryGeneratorService } from '../ai-summary-generator.service';
+import { ContextBuilder } from '../context-builder';
 import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
 import { buildTraceStep, TRACE_AGENT_NAMES } from '../trace.utils';
@@ -57,6 +58,7 @@ export class ReviewOrchestrator {
     private readonly architectureAgent: ArchitectureAgent,
     private readonly performanceAgent: PerformanceAgent,
     private readonly securityAgent: SecurityAgent,
+    private readonly contextBuilder: ContextBuilder,
     private readonly aggregator: DeterministicAggregator,
     private readonly resultFormatter: ResultFormatter,
     private readonly aiSummaryGenerator: AiSummaryGeneratorService,
@@ -71,20 +73,27 @@ export class ReviewOrchestrator {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const pipelineStart = Date.now();
 
+    const expandedFiles: ExpandedFile[] = options.gitContext
+      ? await this.contextBuilder.expand(files, options.gitContext)
+      : this.contextBuilder.toExpandedFiles(files);
+
     const allAgents: AgentDefinition[] = [
       {
         name: TRACE_AGENT_NAMES[0],
-        run: () => this.codeQualityAgent.run(files),
+        run: () => this.codeQualityAgent.run(expandedFiles),
       },
       {
         name: TRACE_AGENT_NAMES[1],
-        run: () => this.architectureAgent.run(files),
+        run: () => this.architectureAgent.run(expandedFiles),
       },
       {
         name: TRACE_AGENT_NAMES[2],
-        run: () => this.performanceAgent.run(files),
+        run: () => this.performanceAgent.run(expandedFiles),
       },
-      { name: TRACE_AGENT_NAMES[3], run: () => this.securityAgent.run(files) },
+      {
+        name: TRACE_AGENT_NAMES[3],
+        run: () => this.securityAgent.run(expandedFiles),
+      },
     ];
 
     const agents = options.maxAgents
@@ -123,7 +132,7 @@ export class ReviewOrchestrator {
     const agentOutputs: AgentOutput[] = validOutputs.map((r) => r.output);
     const aggregated = this.aggregator.aggregate(
       agentOutputs,
-      files,
+      expandedFiles,
       options.strictMode,
     );
 

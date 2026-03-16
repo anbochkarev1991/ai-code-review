@@ -4,20 +4,14 @@
  * Requires OPENAI_API_KEY in env.
  */
 
-import type { ParsedFile } from '../src/types';
+import type { ExpandedFile } from '../src/types';
 import { PerformanceAgent } from '../src/reviews/agents/performance.agent';
-import { DiffParser } from '../src/reviews/diff-parser';
+import { AgentContextShaper } from '../src/reviews/agent-context-shaper';
 
-const SAMPLE_FILES: ParsedFile[] = [
-  {
-    path: 'src/api.ts',
-    status: 'modified',
-    language: 'typescript',
-    hunks: [
-      {
-        startLine: 10,
-        endLine: 25,
-        content: `+async function loadUsers() {
+const HUNK = {
+  startLine: 10,
+  endLine: 25,
+  content: `+async function loadUsers() {
 +  const users = await db.query('SELECT * FROM users');
 +  const results = [];
 +  for (const user of users) {
@@ -26,18 +20,34 @@ const SAMPLE_FILES: ParsedFile[] = [
 +  }
 +  return results;
 +}`,
-        addedLines: [
-          'async function loadUsers() {',
-          "  const users = await db.query('SELECT * FROM users');",
-          '  const results = [];',
-          '  for (const user of users) {',
-          '    const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',
-          '    results.push({ ...user, profile });',
-          '  }',
-          '  return results;',
-          '}',
-        ],
-        removedLines: [],
+  addedLines: [
+    'async function loadUsers() {',
+    "  const users = await db.query('SELECT * FROM users');",
+    '  const results = [];',
+    '  for (const user of users) {',
+    '    const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',
+    '    results.push({ ...user, profile });',
+    '  }',
+    '  return results;',
+    '}',
+  ],
+  removedLines: [] as string[],
+};
+
+const SAMPLE_FILES: ExpandedFile[] = [
+  {
+    path: 'src/api.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [HUNK],
+    expandedHunks: [
+      {
+        hunk: HUNK,
+        localContext: {
+          enclosingFunction: null,
+          referencedDeclarations: [],
+          calledHelpers: [],
+        },
       },
     ],
   },
@@ -49,8 +59,8 @@ async function main() {
     process.exit(1);
   }
 
-  const diffParser = new DiffParser();
-  const agent = new PerformanceAgent(diffParser);
+  const contextShaper = new AgentContextShaper();
+  const agent = new PerformanceAgent(contextShaper);
   console.log('Running Performance Agent on sample parsed files...');
   const result = await agent.run(SAMPLE_FILES);
   console.log('Result (JSON matching schema):');

@@ -257,7 +257,7 @@ export class DiffParser {
    * Preamble shown to all agents: diff-first with limited local context.
    * Findings must be grounded in the diff; context lines allow reasoning about surrounding code.
    */
-  private static readonly DIFF_SCOPE_PREAMBLE = `You are reviewing the changed hunks below (diff-first analysis with limited local context).
+  static readonly DIFF_SCOPE_PREAMBLE = `You are reviewing the changed hunks below (diff-first analysis with limited local context).
 
 DIFF-FIRST:
 - Start from the changed lines (prefix "+" or "-"). Every finding must be grounded in the diff.
@@ -272,7 +272,9 @@ Use the context lines in each hunk for this. Do not invent or assume code that i
 
 CONFIDENCE:
 - If a finding depends heavily on code that is neither in the diff nor in the visible context lines, either set confidence below 0.5 or omit the finding.
-- Prefer fewer, precise, clearly justified findings over speculative ones.`;
+- Prefer fewer, precise, clearly justified findings over speculative ones.
+
+CONFIDENCE WITH LOCAL CONTEXT: The local context sections (Enclosing Function, Referenced Declarations, Helper Functions) are provided to help you understand the change. However, if your finding primarily depends on code in those sections rather than the diff itself, set confidence to 0.5 or below. Findings must still be grounded in the changed lines.`;
 
   /**
    * Formats ParsedFile[] into a structured prompt string for agents.

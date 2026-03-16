@@ -322,6 +322,45 @@ export class GitHubService {
       pr_title: pull.title,
       pr_author: pull.user?.login,
       commit_count: pull.commits,
+      head_sha: headSha,
     };
+  }
+
+  /**
+   * Fetches the full file content from GitHub Contents API.
+   * Used by the review engine to expand diff hunks with surrounding context.
+   *
+   * @param accessToken - GitHub OAuth token
+   * @param owner - Repository owner
+   * @param repo - Repository name
+   * @param path - File path (e.g. "src/utils.ts")
+   * @param ref - Git ref (branch, SHA, or tag, e.g. "main" or commit SHA)
+   * @returns Decoded file content or null on error (404, non-file, etc.)
+   */
+  async getFileContent(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string,
+  ): Promise<string | null> {
+    const encodedPath = path
+      .split('/')
+      .map((p) => encodeURIComponent(p))
+      .join('/');
+    const url = `${GITHUB_PULLS_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github.raw',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.text();
   }
 }

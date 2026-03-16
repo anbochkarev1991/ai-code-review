@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module';
 import { GitHubModule } from '../github/github.module';
 import { AiSummaryGeneratorService } from './ai-summary-generator.service';
+import { AgentContextShaper } from './agent-context-shaper';
 import { ArchitectureAgent } from './agents/architecture.agent';
 import { CodeQualityAgent } from './agents/code-quality.agent';
 import { PerformanceAgent } from './agents/performance.agent';
 import { SecurityAgent } from './agents/security.agent';
-import { DiffParser } from './diff-parser';
+import { ContextBuilder } from './context-builder';
 import { DeterministicAggregator } from './deterministic-aggregator';
+import { DiffParser } from './diff-parser';
 import { FindingNormalizer } from './finding-normalizer';
 import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
@@ -26,6 +28,8 @@ import { SeverityNormalizer } from './severity-normalizer';
     ReviewsService,
     ReviewRunsRepository,
     DiffParser,
+    ContextBuilder,
+    AgentContextShaper,
     FindingNormalizer,
     RiskEngine,
     DeterministicAggregator,

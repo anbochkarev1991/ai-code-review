@@ -25,6 +25,8 @@ export interface RunPipelineParams {
   commitCount?: number | null;
   prDiff: string;
   prFiles: import('shared').DiffFile[];
+  accessToken: string;
+  headSha: string | null;
 }
 
 @Injectable()
@@ -86,6 +88,8 @@ export class ReviewsService {
       commitCount: diffResponse.commit_count ?? null,
       prDiff: diffResponse.diff,
       prFiles: diffResponse.files,
+      accessToken,
+      headSha: diffResponse.head_sha ?? null,
     });
   }
 
@@ -100,7 +104,11 @@ export class ReviewsService {
       commitCount,
       prDiff,
       prFiles,
+      accessToken,
+      headSha,
     } = params;
+
+    const [owner, repo] = repoFullName.split('/');
 
     const parsedDiff = this.diffParser.parse(prFiles);
 
@@ -155,6 +163,12 @@ export class ReviewsService {
       parsedDiff.files,
       prMetadata,
       prDiff,
+      {
+        gitContext:
+          owner && repo && headSha
+            ? { accessToken, owner, repo, headRef: headSha }
+            : undefined,
+      },
     );
 
     if (engineResult.status === 'failed') {

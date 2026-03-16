@@ -4,20 +4,14 @@
  * Requires OPENAI_API_KEY in env.
  */
 
-import type { ParsedFile } from '../src/types';
+import type { ExpandedFile } from '../src/types';
 import { ArchitectureAgent } from '../src/reviews/agents/architecture.agent';
-import { DiffParser } from '../src/reviews/diff-parser';
+import { AgentContextShaper } from '../src/reviews/agent-context-shaper';
 
-const SAMPLE_FILES: ParsedFile[] = [
-  {
-    path: 'src/api/users.controller.ts',
-    status: 'modified',
-    language: 'typescript',
-    hunks: [
-      {
-        startLine: 1,
-        endLine: 12,
-        content: `+import { createClient } from '@supabase/supabase-js';
+const HUNK = {
+  startLine: 1,
+  endLine: 12,
+  content: `+import { createClient } from '@supabase/supabase-js';
 +
 +export class UsersController {
 +  async getUser(id: string) {
@@ -26,18 +20,34 @@ const SAMPLE_FILES: ParsedFile[] = [
 +    return data;
 +  }
 +}`,
-        addedLines: [
-          "import { createClient } from '@supabase/supabase-js';",
-          '',
-          'export class UsersController {',
-          '  async getUser(id: string) {',
-          "    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);",
-          "    const { data } = await supabase.from('users').select('*').eq('id', id).single();",
-          '    return data;',
-          '  }',
-          '}',
-        ],
-        removedLines: [],
+  addedLines: [
+    "import { createClient } from '@supabase/supabase-js';",
+    '',
+    'export class UsersController {',
+    '  async getUser(id: string) {',
+    "    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);",
+    "    const { data } = await supabase.from('users').select('*').eq('id', id).single();",
+    '    return data;',
+    '  }',
+    '}',
+  ],
+  removedLines: [] as string[],
+};
+
+const SAMPLE_FILES: ExpandedFile[] = [
+  {
+    path: 'src/api/users.controller.ts',
+    status: 'modified',
+    language: 'typescript',
+    hunks: [HUNK],
+    expandedHunks: [
+      {
+        hunk: HUNK,
+        localContext: {
+          enclosingFunction: null,
+          referencedDeclarations: [],
+          calledHelpers: [],
+        },
       },
     ],
   },
@@ -49,8 +59,8 @@ async function main() {
     process.exit(1);
   }
 
-  const diffParser = new DiffParser();
-  const agent = new ArchitectureAgent(diffParser);
+  const contextShaper = new AgentContextShaper();
+  const agent = new ArchitectureAgent(contextShaper);
   console.log('Running Architecture Agent on sample parsed files...');
   const result = await agent.run(SAMPLE_FILES);
   console.log('Result (JSON matching schema):');

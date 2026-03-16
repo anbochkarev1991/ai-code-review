@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PerformanceAgent } from './performance.agent';
-import { DiffParser } from '../diff-parser';
-import type { ParsedFile } from '../../types';
+import { AgentContextShaper } from '../agent-context-shaper';
+import type { ExpandedFile } from '../../types';
 
 const mockCreate = jest.fn();
 
@@ -16,7 +16,7 @@ jest.mock('openai', () => ({
   },
 }));
 
-const SAMPLE_FILES: ParsedFile[] = [
+const SAMPLE_FILES: ExpandedFile[] = [
   {
     path: 'src/api.ts',
     status: 'modified',
@@ -35,6 +35,27 @@ const SAMPLE_FILES: ParsedFile[] = [
         removedLines: [],
       },
     ],
+    expandedHunks: [
+      {
+        hunk: {
+          startLine: 10,
+          endLine: 20,
+          content:
+            '+for (const user of users) {\n+  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);\n+}',
+          addedLines: [
+            'for (const user of users) {',
+            '  const profile = await db.query(`SELECT * FROM profiles WHERE user_id = ${user.id}`);',
+            '}',
+          ],
+          removedLines: [],
+        },
+        localContext: {
+          enclosingFunction: null,
+          referencedDeclarations: [],
+          calledHelpers: [],
+        },
+      },
+    ],
   },
 ];
 
@@ -47,7 +68,7 @@ describe('PerformanceAgent', () => {
     process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-test' };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PerformanceAgent, DiffParser],
+      providers: [PerformanceAgent, AgentContextShaper],
     }).compile();
 
     agent = module.get(PerformanceAgent);
@@ -60,8 +81,8 @@ describe('PerformanceAgent', () => {
   describe('run', () => {
     it('throws when OPENAI_API_KEY is not set', async () => {
       delete process.env.OPENAI_API_KEY;
-      const diffParser = new DiffParser();
-      const freshAgent = new PerformanceAgent(diffParser);
+      const contextShaper = new AgentContextShaper();
+      const freshAgent = new PerformanceAgent(contextShaper);
       await expect(freshAgent.run(SAMPLE_FILES)).rejects.toThrow(
         'OPENAI_API_KEY is required',
       );
