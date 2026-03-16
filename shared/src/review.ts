@@ -100,6 +100,8 @@ export interface Finding {
   false_positive_risk?: FalsePositiveRisk;
   outside_diff?: boolean;
   diff_context?: DiffContext;
+  /** Human-readable root cause label from LLM cross-file deduplication */
+  root_cause?: string;
 }
 
 // ── Risk breakdown (PART 1) ──

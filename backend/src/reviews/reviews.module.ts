@@ -10,6 +10,7 @@ import { SecurityAgent } from './agents/security.agent';
 import { ContextBuilder } from './context-builder';
 import { DeterministicAggregator } from './deterministic-aggregator';
 import { DiffParser } from './diff-parser';
+import { FindingDeduplicatorService } from './finding-deduplicator.service';
 import { FindingNormalizer } from './finding-normalizer';
 import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
@@ -28,6 +29,7 @@ import { SeverityNormalizer } from './severity-normalizer';
     ReviewsService,
     ReviewRunsRepository,
     DiffParser,
+    FindingDeduplicatorService,
     ContextBuilder,
     AgentContextShaper,
     FindingNormalizer,

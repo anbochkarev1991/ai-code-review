@@ -130,7 +130,7 @@ export class ReviewOrchestrator {
     }
 
     const agentOutputs: AgentOutput[] = validOutputs.map((r) => r.output);
-    const aggregated = this.aggregator.aggregate(
+    const aggregated = await this.aggregator.aggregate(
       agentOutputs,
       expandedFiles,
       options.strictMode,

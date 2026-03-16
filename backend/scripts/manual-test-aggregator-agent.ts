@@ -1,13 +1,14 @@
 /**
  * Manual test for Deterministic Aggregator (replaces LLM-based AggregatorAgent).
  * Run with: npx ts-node -r tsconfig-paths/register scripts/manual-test-aggregator-agent.ts
- * No OPENAI_API_KEY needed — aggregation is deterministic.
+ * No OPENAI_API_KEY needed — aggregation is deterministic; LLM dedup skips when unset.
  */
 
 import { type AgentOutput } from 'shared';
 import { DeterministicAggregator } from '../src/reviews/deterministic-aggregator';
-import { RiskEngine } from '../src/reviews/risk-engine';
+import { FindingDeduplicatorService } from '../src/reviews/finding-deduplicator.service';
 import { FindingNormalizer } from '../src/reviews/finding-normalizer';
+import { RiskEngine } from '../src/reviews/risk-engine';
 
 const MOCK_OUTPUTS: AgentOutput[] = [
   {
@@ -80,13 +81,18 @@ const MOCK_OUTPUTS: AgentOutput[] = [
   },
 ];
 
-function main() {
+async function main() {
   const riskEngine = new RiskEngine();
   const findingNormalizer = new FindingNormalizer();
-  const aggregator = new DeterministicAggregator(riskEngine, findingNormalizer);
+  const findingDeduplicator = new FindingDeduplicatorService();
+  const aggregator = new DeterministicAggregator(
+    riskEngine,
+    findingNormalizer,
+    findingDeduplicator,
+  );
 
   console.log('Running Deterministic Aggregator on 4 mock outputs...');
-  const result = aggregator.aggregate(MOCK_OUTPUTS);
+  const result = await aggregator.aggregate(MOCK_OUTPUTS);
   console.log('Findings (merged, deduped, sorted):');
   console.log(JSON.stringify(result.findings, null, 2));
   console.log('\nReview Summary:');

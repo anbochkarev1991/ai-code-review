@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { AgentOutput, Finding, ParsedFile } from 'shared';
 import type { ReviewSummary } from '../types';
-import { RiskEngine } from './risk-engine';
+import { FindingDeduplicatorService } from './finding-deduplicator.service';
 import { FindingNormalizer } from './finding-normalizer';
+import { RiskEngine } from './risk-engine';
 
 const AGENT_NAMES = [
   'Code Quality',
@@ -21,22 +22,24 @@ export class DeterministicAggregator {
   constructor(
     private readonly riskEngine: RiskEngine,
     private readonly findingNormalizer: FindingNormalizer,
+    private readonly findingDeduplicator: FindingDeduplicatorService,
   ) {}
 
-  aggregate(
+  async aggregate(
     agentOutputs: AgentOutput[],
     diffFiles?: ParsedFile[],
     strictMode = false,
-  ): AggregatedResult {
+  ): Promise<AggregatedResult> {
     const allFindings = this.mergeFindings(agentOutputs);
     const normalized = this.findingNormalizer.normalize(
       allFindings,
       diffFiles,
       strictMode,
     );
-    const reviewSummary = this.buildSummary(normalized);
+    const deduplicated = await this.findingDeduplicator.deduplicate(normalized);
+    const reviewSummary = this.buildSummary(deduplicated);
 
-    return { findings: normalized, review_summary: reviewSummary };
+    return { findings: deduplicated, review_summary: reviewSummary };
   }
 
   private mergeFindings(agentOutputs: AgentOutput[]): Finding[] {
