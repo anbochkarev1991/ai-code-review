@@ -660,7 +660,7 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
 
   return (
     <div
-      className={`rounded-lg border ${isMultiAgent ? "border-emerald-300 dark:border-emerald-800" : "border-zinc-200 dark:border-zinc-800"} ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow`}
+      className={`rounded-lg border border-zinc-200 dark:border-zinc-800 ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm`}
     >
       <div className="p-4">
         <div className="flex flex-col gap-3">
