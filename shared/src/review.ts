@@ -211,6 +211,8 @@ export interface ReviewSummary {
   systemic_patterns?: string[];
   multi_agent_confirmed_count?: number;
   text: string;
+  /** Short severity-only risk one-liner (critical/high counts only). */
+  risk_summary?: string;
 }
 
 // ── AI Review Summary ──

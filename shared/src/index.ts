@@ -4,3 +4,4 @@ export * from './github';
 export * from './review';
 export * from './billing';
 export * from './merge-decision';
+export * from './risk-summary';

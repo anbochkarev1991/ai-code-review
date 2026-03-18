@@ -449,11 +449,18 @@ export function ReviewSummary({
               <DegradedAnalysisBanner agentsStatus={executionMetadata.agents_status} />
             )}
           </div>
-          {hasSummary && (
+          {(reviewSummary?.risk_summary || hasSummary) && (
             <div className="px-4 py-3">
-              <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
-                {displayText}
-              </p>
+              {reviewSummary?.risk_summary && (
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-2">
+                  {reviewSummary.risk_summary}
+                </p>
+              )}
+              {hasSummary && (
+                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
+                  {displayText}
+                </p>
+              )}
             </div>
           )}
           {executionMetadata && (
@@ -485,16 +492,23 @@ export function ReviewSummary({
         </div>
       )}
 
-      {hasSummary && (!findings || findings.length === 0) && (
+      {(hasSummary || reviewSummary?.risk_summary) && (!findings || findings.length === 0) && (
         <div className="flex w-full flex-col gap-3">
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Summary
           </h3>
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
             <div className="p-4">
-              <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
-                {displayText}
-              </p>
+              {reviewSummary?.risk_summary && (
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-2">
+                  {reviewSummary.risk_summary}
+                </p>
+              )}
+              {hasSummary && (
+                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
+                  {displayText}
+                </p>
+              )}
               {mergeRec && mergeStyle && (
                 <div className={`mt-3 flex items-center gap-2 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
                   <svg

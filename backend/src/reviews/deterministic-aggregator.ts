@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { AgentOutput, Finding, ParsedFile } from 'shared';
+import { riskSummaryFromCounts } from 'shared';
 import type { ReviewSummary } from '../types';
 import { FindingDeduplicatorService } from './finding-deduplicator.service';
 import { FindingNormalizer } from './finding-normalizer';
@@ -95,6 +96,13 @@ export class DeterministicAggregator {
       multiAgentConfirmedCount,
     });
 
+    const risk_summary = riskSummaryFromCounts({
+      critical_count: counts.critical,
+      high_count: counts.high,
+      medium_count: counts.medium,
+      low_count: counts.low,
+    });
+
     return {
       total_findings: findings.length,
       critical_count: counts.critical,
@@ -113,6 +121,7 @@ export class DeterministicAggregator {
       multi_agent_confirmed_count:
         multiAgentConfirmedCount > 0 ? multiAgentConfirmedCount : undefined,
       text,
+      risk_summary,
     };
   }
 
