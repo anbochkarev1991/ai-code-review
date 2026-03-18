@@ -337,14 +337,14 @@ describe('FindingNormalizer', () => {
   });
 
   describe('confidence-severity coherence', () => {
-    it('downgrades critical to high when confidence < 0.6', () => {
+    it('downgrades critical to high when confidence < 0.7', () => {
       const result = normalizer.normalize([
         makeFinding({ severity: 'critical', confidence: 0.4 }),
       ]);
       expect(result[0].severity).toBe('high');
     });
 
-    it('preserves critical when confidence >= 0.6', () => {
+    it('preserves critical when confidence >= 0.7', () => {
       const result = normalizer.normalize([
         makeFinding({ severity: 'critical', confidence: 0.8 }),
       ]);

@@ -42,6 +42,14 @@ Redirect logic is especially important. A redirect is potentially unsafe when it
 
 For each finding include: title, file and location, explanation, why the input is untrusted, potential impact, suggested fix. Use the schema's "impact" field for potential impact. Be conservative: if uncertain, set confidence below 0.5. Do not flag process.env references or test-file secrets unless real credentials.
 
+SEVERITY CALIBRATION — Be conservative:
+- critical: Confirmed exploitable vulnerabilities (SQL injection, open redirect, auth bypass). Must be clearly exploitable from the diff.
+- high: Strong evidence of vulnerability (unvalidated user input to sensitive sink, missing auth check on protected route)
+- medium: Potential weakness requiring specific conditions or additional context to exploit
+- low: Hardening suggestions, defense-in-depth improvements
+
+When uncertain, prefer lower severity. Do not inflate.
+
 Respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
 @Injectable()

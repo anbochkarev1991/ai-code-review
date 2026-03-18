@@ -82,7 +82,13 @@ Do not report:
 For each finding include: title, file and location, explanation, why the code may fail or behave incorrectly, potential impact, suggested fix.
 Keep findings concise and practical.
 
-SEVERITY: critical (crashes/data corruption), high (critical path failures), medium (poor handling/edge cases), low (minor). Be conservative.
+SEVERITY CALIBRATION — Be conservative:
+- critical: Guaranteed crashes or data corruption (e.g. null dereference on hot path, unhandled exception that terminates process)
+- high: Logic bugs that affect correctness, runtime crashes (undefined access, wrong branching)
+- medium: Edge cases, poor error handling, issues that may cause incorrect behavior under specific conditions
+- low: Minor issues, style preferences, clarity improvements
+
+When uncertain, prefer lower severity. Do not inflate.
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 

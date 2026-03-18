@@ -17,6 +17,8 @@ const SEVERITY_UPGRADE: Record<FindingSeverity, FindingSeverity> = {
 
 const MAX_HIGH_PER_REVIEW = 3;
 const LOW_CONFIDENCE_THRESHOLD = 0.75;
+const CRITICAL_CONFIDENCE_THRESHOLD = 0.75;
+const MULTI_AGENT_BOOST_CONFIDENCE_MIN = 0.8;
 const TOTAL_FINDINGS_OVERFLOW = 5;
 
 export interface SeverityNormalizationStats {
@@ -31,8 +33,9 @@ export interface SeverityNormalizationStats {
  * Post-processing layer that tames LLM severity inflation and boosts multi-agent consensus.
  *
  * Rules (applied in order):
+ * 0. If severity CRITICAL and confidence < 0.75 → downgrade to HIGH
  * 1. If confidence < 0.75 and severity HIGH → downgrade to MEDIUM
- * 2. If consensus_level = multi-agent → boost severity by one level (MEDIUM → HIGH)
+ * 2. If consensus_level = multi-agent and confidence >= 0.8 → boost severity by one level (MEDIUM → HIGH)
  * 3. Cap max HIGH findings per category at 3
  * 4. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (max 3 HIGH unless multi-agent agreed)
  * 5. Merge root cause findings (same file + category + overlapping title words)
@@ -44,6 +47,7 @@ export class SeverityNormalizer {
   normalize(findings: Finding[]): Finding[] {
     let result = [...findings];
 
+    result = this.downgradeCriticalByLowConfidence(result);
     result = this.downgradeByLowConfidence(result);
     result = this.boostMultiAgentConsensus(result);
     result = this.capHighPerCategory(result);
@@ -60,6 +64,7 @@ export class SeverityNormalizer {
     const before = this.countSeverities(findings);
 
     let result = [...findings];
+    result = this.downgradeCriticalByLowConfidence(result);
     result = this.downgradeByLowConfidence(result);
     const afterDowngrade = this.countSeverities(result);
     result = this.boostMultiAgentConsensus(result);
@@ -93,6 +98,21 @@ export class SeverityNormalizer {
   }
 
   /**
+   * Rule 0: If severity is CRITICAL and confidence < 0.75 → downgrade to HIGH.
+   */
+  private downgradeCriticalByLowConfidence(findings: Finding[]): Finding[] {
+    return findings.map((f) => {
+      if (
+        f.severity === 'critical' &&
+        f.confidence < CRITICAL_CONFIDENCE_THRESHOLD
+      ) {
+        return { ...f, severity: 'high' as FindingSeverity };
+      }
+      return f;
+    });
+  }
+
+  /**
    * Rule 1: If confidence < 0.75 and severity is HIGH → downgrade to MEDIUM.
    */
   private downgradeByLowConfidence(findings: Finding[]): Finding[] {
@@ -105,12 +125,16 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 2: If consensus_level = multi-agent, boost severity by one level.
-   * (MEDIUM → HIGH, LOW → MEDIUM, etc.)
+   * Rule 2: If consensus_level = multi-agent and confidence >= 0.8, boost severity by one level.
+   * (MEDIUM → HIGH, LOW → MEDIUM, etc.) Gated to avoid inflating speculative agreement.
    */
   private boostMultiAgentConsensus(findings: Finding[]): Finding[] {
     return findings.map((f) => {
-      if (f.consensus_level === 'multi-agent' && f.severity !== 'critical') {
+      if (
+        f.consensus_level === 'multi-agent' &&
+        f.confidence >= MULTI_AGENT_BOOST_CONFIDENCE_MIN &&
+        f.severity !== 'critical'
+      ) {
         return { ...f, severity: SEVERITY_UPGRADE[f.severity] };
       }
       return f;

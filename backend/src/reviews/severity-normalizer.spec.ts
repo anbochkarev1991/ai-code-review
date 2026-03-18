@@ -83,6 +83,23 @@ describe('SeverityNormalizer', () => {
     });
   });
 
+  describe('Rule 0: low-confidence CRITICAL downgrade', () => {
+    it('downgrades CRITICAL to HIGH then Rule 1 downgrades to MEDIUM when confidence < 0.75', () => {
+      const result = normalizer.normalize([
+        makeFinding({ severity: 'critical', confidence: 0.5 }),
+      ]);
+      // Rule 0: critical 0.5 → high; Rule 1: high 0.5 < 0.75 → medium
+      expect(result[0].severity).toBe('medium');
+    });
+
+    it('preserves CRITICAL when confidence >= 0.75', () => {
+      const result = normalizer.normalize([
+        makeFinding({ severity: 'critical', confidence: 0.8 }),
+      ]);
+      expect(result[0].severity).toBe('critical');
+    });
+  });
+
   describe('Rule 1: low-confidence HIGH downgrade', () => {
     it('downgrades HIGH to MEDIUM when confidence < 0.75', () => {
       const result = normalizer.normalize([
@@ -105,11 +122,11 @@ describe('SeverityNormalizer', () => {
       expect(result[0].severity).toBe('high');
     });
 
-    it('does not affect CRITICAL severity', () => {
+    it('does not affect MEDIUM or LOW (Rule 1 only applies to HIGH)', () => {
       const result = normalizer.normalize([
-        makeFinding({ severity: 'critical', confidence: 0.5 }),
+        makeFinding({ severity: 'medium', confidence: 0.5 }),
       ]);
-      expect(result[0].severity).toBe('critical');
+      expect(result[0].severity).toBe('medium');
     });
 
     it('does not affect MEDIUM severity', () => {
@@ -165,7 +182,18 @@ describe('SeverityNormalizer', () => {
       expect(result[0].severity).toBe('medium');
     });
 
-    it('interaction: low-confidence HIGH downgraded then multi-agent re-boosts', () => {
+    it('does not boost multi-agent when confidence < 0.8', () => {
+      const result = normalizer.normalize([
+        makeFinding({
+          severity: 'medium',
+          confidence: 0.79,
+          consensus_level: 'multi-agent' as ConsensusLevel,
+        }),
+      ]);
+      expect(result[0].severity).toBe('medium');
+    });
+
+    it('interaction: low-confidence HIGH downgraded; multi-agent with confidence < 0.8 not boosted', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'high',
@@ -173,8 +201,8 @@ describe('SeverityNormalizer', () => {
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
-      // Rule 1 downgrades HIGH->MEDIUM, Rule 2 boosts MEDIUM->HIGH
-      expect(result[0].severity).toBe('high');
+      // Rule 1 downgrades HIGH->MEDIUM; Rule 2 requires confidence >= 0.8, so no boost
+      expect(result[0].severity).toBe('medium');
     });
   });
 

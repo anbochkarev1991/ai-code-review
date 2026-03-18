@@ -373,7 +373,7 @@ export class FindingNormalizer {
   }
 
   private applyConfidenceSeverityCoherence(finding: Finding): Finding {
-    if (finding.severity === 'critical' && finding.confidence < 0.6) {
+    if (finding.severity === 'critical' && finding.confidence < 0.7) {
       return { ...finding, severity: 'high' };
     }
     return finding;
