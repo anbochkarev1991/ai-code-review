@@ -1,0 +1,133 @@
+"use client";
+
+import type {
+  Finding,
+  MergeRecommendation,
+  RiskLevel,
+} from "@/lib/types";
+
+export function FindingsStats({
+  findings,
+  multiAgentCount,
+}: {
+  findings: Finding[];
+  multiAgentCount?: number;
+}) {
+  const counts = {
+    critical: findings.filter((f: Finding) => f.severity === "critical").length,
+    high: findings.filter((f: Finding) => f.severity === "high").length,
+    medium: findings.filter((f: Finding) => f.severity === "medium").length,
+    low: findings.filter((f: Finding) => f.severity === "low").length,
+  };
+
+  const total = findings.length;
+
+  if (total === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      {counts.critical > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {counts.critical}
+          </span>
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">Critical</span>
+        </div>
+      )}
+      {counts.high > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-orange-600 dark:bg-orange-500" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {counts.high}
+          </span>
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">High</span>
+        </div>
+      )}
+      {counts.medium > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-yellow-500 dark:bg-yellow-400" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {counts.medium}
+          </span>
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">Medium</span>
+        </div>
+      )}
+      {counts.low > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-500" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {counts.low}
+          </span>
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">Low</span>
+        </div>
+      )}
+      {multiAgentCount !== undefined && multiAgentCount > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {multiAgentCount}
+          </span>
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent confirmed</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function getRiskLevelColor(level: RiskLevel): string {
+  switch (level) {
+    case "Critical":
+      return "text-red-600 dark:text-red-400";
+    case "High":
+      return "text-orange-600 dark:text-orange-400";
+    case "Moderate":
+      return "text-yellow-600 dark:text-yellow-400";
+    case "Low risk":
+      return "text-green-600 dark:text-green-400";
+    default:
+      return "text-zinc-600 dark:text-zinc-400";
+  }
+}
+
+export function getRiskScoreColor(score: number): string {
+  if (score >= 81) return "text-red-600 dark:text-red-400";
+  if (score >= 61) return "text-orange-600 dark:text-orange-400";
+  if (score >= 31) return "text-yellow-600 dark:text-yellow-400";
+  return "text-green-600 dark:text-green-400";
+}
+
+export function getMergeRecommendationStyle(rec: MergeRecommendation): {
+  bg: string;
+  text: string;
+  icon: string;
+} {
+  switch (rec) {
+    case "Merge blocked":
+      return {
+        bg: "bg-red-100 dark:bg-red-900/30",
+        text: "text-red-800 dark:text-red-300",
+        icon: "M6 18L18 6M6 6l12 12",
+      };
+    case "Merge with caution":
+      return {
+        bg: "bg-yellow-100 dark:bg-yellow-900/30",
+        text: "text-yellow-800 dark:text-yellow-300",
+        icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
+      };
+    case "Safe to merge":
+      return {
+        bg: "bg-green-100 dark:bg-green-900/30",
+        text: "text-green-800 dark:text-green-300",
+        icon: "M5 13l4 4L19 7",
+      };
+    default:
+      return {
+        bg: "bg-zinc-100 dark:bg-zinc-800",
+        text: "text-zinc-800 dark:text-zinc-300",
+        icon: "M5 13l4 4L19 7",
+      };
+  }
+}

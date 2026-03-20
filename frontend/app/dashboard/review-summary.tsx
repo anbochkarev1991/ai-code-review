@@ -5,13 +5,17 @@ import type {
   Finding,
   PRMetadata,
   ReviewSummary as ReviewSummaryType,
-  RiskLevel,
-  MergeRecommendation,
   PerformanceSummary as PerformanceSummaryType,
   ReviewSignature,
   ReviewStatus,
   ReviewMetadata,
 } from "@/lib/types";
+import {
+  FindingsStats,
+  getMergeRecommendationStyle,
+  getRiskLevelColor,
+  getRiskScoreColor,
+} from "@/app/dashboard/review-summary-shared";
 
 interface ReviewSummaryProps {
   summary: string;
@@ -23,6 +27,8 @@ interface ReviewSummaryProps {
   signature?: ReviewSignature;
   reviewStatus?: ReviewStatus;
   reviewMetadata?: ReviewMetadata;
+  /** `main`: overview metrics live in `ReviewSummarySidebar`; `full`: legacy stacked overview. */
+  variant?: "full" | "main";
 }
 
 function formatDuration(ms: number): string {
@@ -38,126 +44,6 @@ function formatTokens(tokens: number): string {
     return `${(tokens / 1000).toFixed(1)}k`;
   }
   return tokens.toString();
-}
-
-function FindingsStats({ findings, multiAgentCount }: { findings: Finding[]; multiAgentCount?: number }) {
-  const counts = {
-    critical: findings.filter((f: Finding) => f.severity === "critical").length,
-    high: findings.filter((f: Finding) => f.severity === "high").length,
-    medium: findings.filter((f: Finding) => f.severity === "medium").length,
-    low: findings.filter((f: Finding) => f.severity === "low").length,
-  };
-
-  const total = findings.length;
-
-  if (total === 0) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-4">
-      {counts.critical > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {counts.critical}
-          </span>
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">Critical</span>
-        </div>
-      )}
-      {counts.high > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-orange-600 dark:bg-orange-500" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {counts.high}
-          </span>
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">High</span>
-        </div>
-      )}
-      {counts.medium > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-yellow-500 dark:bg-yellow-400" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {counts.medium}
-          </span>
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">Medium</span>
-        </div>
-      )}
-      {counts.low > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-500" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {counts.low}
-          </span>
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">Low</span>
-        </div>
-      )}
-      {multiAgentCount !== undefined && multiAgentCount > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {multiAgentCount}
-          </span>
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent confirmed</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function getRiskLevelColor(level: RiskLevel): string {
-  switch (level) {
-    case "Critical":
-      return "text-red-600 dark:text-red-400";
-    case "High":
-      return "text-orange-600 dark:text-orange-400";
-    case "Moderate":
-      return "text-yellow-600 dark:text-yellow-400";
-    case "Low risk":
-      return "text-green-600 dark:text-green-400";
-    default:
-      return "text-zinc-600 dark:text-zinc-400";
-  }
-}
-
-function getRiskScoreColor(score: number): string {
-  if (score >= 81) return "text-red-600 dark:text-red-400";
-  if (score >= 61) return "text-orange-600 dark:text-orange-400";
-  if (score >= 31) return "text-yellow-600 dark:text-yellow-400";
-  return "text-green-600 dark:text-green-400";
-}
-
-function getMergeRecommendationStyle(rec: MergeRecommendation): {
-  bg: string;
-  text: string;
-  icon: string;
-} {
-  switch (rec) {
-    case "Merge blocked":
-      return {
-        bg: "bg-red-100 dark:bg-red-900/30",
-        text: "text-red-800 dark:text-red-300",
-        icon: "M6 18L18 6M6 6l12 12",
-      };
-    case "Merge with caution":
-      return {
-        bg: "bg-yellow-100 dark:bg-yellow-900/30",
-        text: "text-yellow-800 dark:text-yellow-300",
-        icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
-      };
-    case "Safe to merge":
-      return {
-        bg: "bg-green-100 dark:bg-green-900/30",
-        text: "text-green-800 dark:text-green-300",
-        icon: "M5 13l4 4L19 7",
-      };
-    default:
-      return {
-        bg: "bg-zinc-100 dark:bg-zinc-800",
-        text: "text-zinc-800 dark:text-zinc-300",
-        icon: "M5 13l4 4L19 7",
-      };
-  }
 }
 
 function PRMetadataBar({ prMetadata }: { prMetadata: PRMetadata }) {
@@ -354,6 +240,10 @@ function ExecutionBar({ executionMetadata, performance }: { executionMetadata: E
   );
 }
 
+function hasDegradedAgents(agentsStatus: Record<string, string>): boolean {
+  return Object.values(agentsStatus).some((s) => s !== "ok");
+}
+
 export function ReviewSummary({
   summary,
   findings,
@@ -364,6 +254,7 @@ export function ReviewSummary({
   signature,
   reviewStatus,
   reviewMetadata,
+  variant = "main",
 }: ReviewSummaryProps) {
   const displayText = reviewSummary?.text ?? summary;
   const hasSummary = displayText && displayText.trim() !== "";
@@ -371,84 +262,102 @@ export function ReviewSummary({
   const mergeStyle = mergeRec ? getMergeRecommendationStyle(mergeRec) : null;
   const isPartial = reviewStatus === "partial" || reviewMetadata?.review_status === "partial";
 
+  const systemicPatterns = reviewSummary?.systemic_patterns ?? [];
+  const showSystemic = systemicPatterns.length > 0;
+  const showDegraded =
+    executionMetadata?.agents_status &&
+    hasDegradedAgents(executionMetadata.agents_status);
+  const showMainVariantHeader =
+    variant === "main" && (showSystemic || showDegraded);
+
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       {isPartial && <PartialReviewBanner />}
 
       {prMetadata && <PRMetadataBar prMetadata={prMetadata} />}
 
       {findings && findings.length > 0 && (
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
-          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Overview
-              </h3>
-              {reviewSummary && (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`text-sm font-bold ${getRiskScoreColor(reviewSummary.risk_score)}`}
-                    >
-                      {reviewSummary.risk_score}/100
-                    </span>
-                    {reviewSummary.risk_level && (
+          {variant === "full" && (
+            <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  Overview
+                </h3>
+                {reviewSummary && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
                       <span
-                        className={`text-xs font-medium ${getRiskLevelColor(reviewSummary.risk_level)}`}
+                        className={`text-sm font-bold ${getRiskScoreColor(reviewSummary.risk_score)}`}
                       >
-                        {reviewSummary.risk_level}
+                        {reviewSummary.risk_score}/100
+                      </span>
+                      {reviewSummary.risk_level && (
+                        <span
+                          className={`text-xs font-medium ${getRiskLevelColor(reviewSummary.risk_level)}`}
+                        >
+                          {reviewSummary.risk_level}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <FindingsStats
+                findings={findings}
+                multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
+              />
+
+              {mergeRec && mergeStyle && (
+                <div className={`mt-3 flex flex-col gap-1 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className={`h-4 w-4 shrink-0 ${mergeStyle.text}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d={mergeStyle.icon}
+                      />
+                    </svg>
+                    <span className={`text-sm font-semibold ${mergeStyle.text}`}>
+                      {mergeRec}
+                    </span>
+                    {reviewSummary?.primary_risk_category && (
+                      <span className={`text-xs ${mergeStyle.text} opacity-75`}>
+                        — Primary risk: {reviewSummary.primary_risk_category}
                       </span>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
-            <FindingsStats
-              findings={findings}
-              multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
-            />
-
-            {mergeRec && mergeStyle && (
-              <div className={`mt-3 flex flex-col gap-1 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
-                <div className="flex items-center gap-2">
-                  <svg
-                    className={`h-4 w-4 shrink-0 ${mergeStyle.text}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d={mergeStyle.icon}
-                    />
-                  </svg>
-                  <span className={`text-sm font-semibold ${mergeStyle.text}`}>
-                    {mergeRec}
-                  </span>
-                  {reviewSummary?.primary_risk_category && (
-                    <span className={`text-xs ${mergeStyle.text} opacity-75`}>
-                      — Primary risk: {reviewSummary.primary_risk_category}
+                  {reviewSummary?.merge_explanation && (
+                    <span className={`text-xs ${mergeStyle.text} opacity-80 ml-6`}>
+                      {reviewSummary.merge_explanation}
                     </span>
                   )}
                 </div>
-                {reviewSummary?.merge_explanation && (
-                  <span className={`text-xs ${mergeStyle.text} opacity-80 ml-6`}>
-                    {reviewSummary.merge_explanation}
-                  </span>
-                )}
-              </div>
-            )}
+              )}
 
-            {reviewSummary?.systemic_patterns && reviewSummary.systemic_patterns.length > 0 && (
-              <SystemicPatternsBanner patterns={reviewSummary.systemic_patterns} />
-            )}
+              {showSystemic && <SystemicPatternsBanner patterns={systemicPatterns} />}
 
-            {executionMetadata?.agents_status && (
-              <DegradedAnalysisBanner agentsStatus={executionMetadata.agents_status} />
-            )}
-          </div>
+              {executionMetadata?.agents_status && (
+                <DegradedAnalysisBanner agentsStatus={executionMetadata.agents_status} />
+              )}
+            </div>
+          )}
+
+          {variant === "main" && showMainVariantHeader && (
+            <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
+              {showSystemic && <SystemicPatternsBanner patterns={systemicPatterns} />}
+              {showDegraded && executionMetadata?.agents_status && (
+                <DegradedAnalysisBanner agentsStatus={executionMetadata.agents_status} />
+              )}
+            </div>
+          )}
+
           {(reviewSummary?.risk_summary || hasSummary) && (
             <div className="px-4 py-3">
               {reviewSummary?.risk_summary && (
@@ -494,9 +403,11 @@ export function ReviewSummary({
 
       {(hasSummary || reviewSummary?.risk_summary) && (!findings || findings.length === 0) && (
         <div className="flex w-full flex-col gap-3">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Summary
-          </h3>
+          {variant === "full" && (
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              Summary
+            </h3>
+          )}
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
             <div className="p-4">
               {reviewSummary?.risk_summary && (
@@ -509,7 +420,7 @@ export function ReviewSummary({
                   {displayText}
                 </p>
               )}
-              {mergeRec && mergeStyle && (
+              {variant === "full" && mergeRec && mergeStyle && (
                 <div className={`mt-3 flex items-center gap-2 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
                   <svg
                     className={`h-4 w-4 shrink-0 ${mergeStyle.text}`}

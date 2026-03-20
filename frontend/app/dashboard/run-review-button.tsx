@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import type { PostReviewsResponse, ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
 import { AiReviewSummaryBlock } from "./ai-review-summary-block";
 import { ReviewFindingsList } from "./review-findings-list";
+import { ReviewSummarySidebar } from "./review-summary-sidebar";
 import { ReviewSummary } from "./review-summary";
 import { ReviewTrace } from "./review-trace";
 import { useUsage } from "./usage-context";
@@ -134,31 +135,37 @@ export function RunReviewButton({
           {result && (
             <>
               {result.ai_review_summary && (
-                <>
-                  <AiReviewSummaryBlock
-                    aiReviewSummary={result.ai_review_summary}
+                <AiReviewSummaryBlock
+                  aiReviewSummary={result.ai_review_summary}
+                />
+              )}
+              <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                <div className="order-2 min-w-0 flex-1 md:order-1">
+                  <ReviewSummary
+                    summary={result.summary}
+                    findings={result.findings}
+                    executionMetadata={result.execution_metadata}
+                    reviewSummary={result.review_summary}
+                    prMetadata={result.pr_metadata}
+                    performance={result.performance}
+                    signature={result.signature}
+                    reviewStatus={reviewStatus ?? undefined}
+                    reviewMetadata={result.review_metadata}
+                    variant="main"
                   />
-                  <div className="border-t border-zinc-200 dark:border-zinc-700" />
-                </>
-              )}
-              <ReviewSummary
-                summary={result.summary}
-                findings={result.findings}
-                executionMetadata={result.execution_metadata}
-                reviewSummary={result.review_summary}
-                prMetadata={result.pr_metadata}
-                performance={result.performance}
-                signature={result.signature}
-                reviewStatus={reviewStatus ?? undefined}
-                reviewMetadata={result.review_metadata}
-              />
-              {result.findings.length > 0 && (
-                <div className="border-t border-zinc-200 dark:border-zinc-700 mt-4" />
-              )}
-              <ReviewFindingsList
-                findings={result.findings}
-                accessToken={accessToken}
-              />
+                  <div className="mt-8">
+                    <ReviewFindingsList
+                      findings={result.findings}
+                      accessToken={accessToken}
+                    />
+                  </div>
+                </div>
+                <ReviewSummarySidebar
+                  summary={result.summary}
+                  findings={result.findings}
+                  reviewSummary={result.review_summary}
+                />
+              </div>
             </>
           )}
           {trace && <ReviewTrace trace={trace} />}
