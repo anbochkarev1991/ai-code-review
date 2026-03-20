@@ -146,6 +146,8 @@ export function computeSeverity(finding: Finding): FindingSeverity {
 
   let base: FindingSeverity = 'medium';
 
+  let s: FindingSeverity;
+
   if (
     impact === 'high' &&
     likelihood === 'high' &&
@@ -162,7 +164,7 @@ export function computeSeverity(finding: Finding): FindingSeverity {
     base = 'medium';
   }
 
-  let s = base;
+  s = base;
 
   if (confidence < 0.8) {
     s = capAtMost(s, 'medium');
