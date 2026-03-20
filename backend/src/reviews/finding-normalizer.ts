@@ -16,25 +16,6 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   low: 1,
 };
 
-const SEVERITY_DOWNGRADE: Record<FindingSeverity, FindingSeverity> = {
-  critical: 'high',
-  high: 'medium',
-  medium: 'low',
-  low: 'low',
-};
-
-const UNCERTAINTY_PHRASES = [
-  'might',
-  'possibly',
-  'perhaps',
-  'could potentially',
-  'may or may not',
-  'not entirely sure',
-  'uncertain',
-  'unclear whether',
-  'hard to tell',
-];
-
 const LINE_PROXIMITY_THRESHOLD = 3;
 const JACCARD_SIMILARITY_THRESHOLD = 0.5;
 const TITLE_SIMILARITY_THRESHOLD = 0.4;
@@ -65,8 +46,6 @@ export class FindingNormalizer {
 
     result = this.consolidateFindings(result);
 
-    result = result.map((f) => this.applyConfidenceSeverityCoherence(f));
-    result = result.map((f) => this.applyUncertaintyDowngrade(f));
     result = result.map((f) => this.enforceQuality(f));
 
     result = result.map((f) => this.assignFalsePositiveRisk(f));
@@ -92,7 +71,7 @@ export class FindingNormalizer {
   private clampConfidence(finding: Finding): Finding {
     const raw = finding.confidence;
     if (raw === undefined || raw === null || isNaN(raw)) {
-      return { ...finding, confidence: 0.5 };
+      return { ...finding, confidence: 0.7 };
     }
     const clamped = Math.max(0, Math.min(1, raw));
     if (clamped !== raw) {
@@ -366,32 +345,6 @@ export class FindingNormalizer {
         ...finding,
         outside_diff: true,
         confidence: finding.confidence * OUTSIDE_DIFF_MULTIPLIER,
-      };
-    }
-
-    return finding;
-  }
-
-  private applyConfidenceSeverityCoherence(finding: Finding): Finding {
-    if (finding.severity === 'critical' && finding.confidence < 0.7) {
-      return { ...finding, severity: 'high' };
-    }
-    return finding;
-  }
-
-  private applyUncertaintyDowngrade(finding: Finding): Finding {
-    const message = finding.message.toLowerCase();
-
-    if (finding.confidence >= 0.8) return finding;
-
-    const hasUncertainty = UNCERTAINTY_PHRASES.some((phrase) =>
-      message.includes(phrase),
-    );
-
-    if (hasUncertainty) {
-      return {
-        ...finding,
-        severity: SEVERITY_DOWNGRADE[finding.severity],
       };
     }
 

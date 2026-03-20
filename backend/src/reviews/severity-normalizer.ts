@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Finding, FindingSeverity } from 'shared';
+import { applyFindingSeverity } from './severity-classifier';
 
 const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   critical: 4,
@@ -16,8 +17,6 @@ const SEVERITY_UPGRADE: Record<FindingSeverity, FindingSeverity> = {
 };
 
 const MAX_HIGH_PER_REVIEW = 3;
-const LOW_CONFIDENCE_THRESHOLD = 0.75;
-const CRITICAL_CONFIDENCE_THRESHOLD = 0.75;
 const MULTI_AGENT_BOOST_CONFIDENCE_MIN = 0.8;
 const TOTAL_FINDINGS_OVERFLOW = 5;
 
@@ -30,15 +29,14 @@ export interface SeverityNormalizationStats {
 }
 
 /**
- * Post-processing layer that tames LLM severity inflation and boosts multi-agent consensus.
+ * Post-processing layer that assigns severity deterministically, then tames inflation and merges.
  *
  * Rules (applied in order):
- * 0. If severity CRITICAL and confidence < 0.75 → downgrade to HIGH
- * 1. If confidence < 0.75 and severity HIGH → downgrade to MEDIUM
- * 2. If consensus_level = multi-agent and confidence >= 0.8 → boost severity by one level (MEDIUM → HIGH)
- * 3. Cap max HIGH findings per category at 3
- * 4. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (max 3 HIGH unless multi-agent agreed)
- * 5. Merge root cause findings (same file + category + overlapping title words)
+ * 0. Deterministic severity from inferred impact, likelihood, and confidence (see severity-classifier)
+ * 1. If consensus_level = multi-agent and confidence >= 0.8 → boost severity by one level (MEDIUM → HIGH)
+ * 2. Cap max HIGH findings per category at 3
+ * 3. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (max 3 HIGH unless multi-agent agreed)
+ * 4. Merge root cause findings (same file + category + overlapping title words)
  *
  * All rules are deterministic.
  */
@@ -47,8 +45,7 @@ export class SeverityNormalizer {
   normalize(findings: Finding[]): Finding[] {
     let result = [...findings];
 
-    result = this.downgradeCriticalByLowConfidence(result);
-    result = this.downgradeByLowConfidence(result);
+    result = result.map((f) => applyFindingSeverity(f));
     result = this.boostMultiAgentConsensus(result);
     result = this.capHighPerCategory(result);
     result = this.downgradeOverflowFindings(result);
@@ -64,9 +61,8 @@ export class SeverityNormalizer {
     const before = this.countSeverities(findings);
 
     let result = [...findings];
-    result = this.downgradeCriticalByLowConfidence(result);
-    result = this.downgradeByLowConfidence(result);
-    const afterDowngrade = this.countSeverities(result);
+    result = result.map((f) => applyFindingSeverity(f));
+    const afterClassifier = this.countSeverities(result);
     result = this.boostMultiAgentConsensus(result);
     const afterBoost = this.countSeverities(result);
     result = this.capHighPerCategory(result);
@@ -79,10 +75,10 @@ export class SeverityNormalizer {
       Math.max(
         0,
         before.high -
-          afterDowngrade.high +
-          (before.critical - afterDowngrade.critical),
+          afterClassifier.high +
+          (before.critical - afterClassifier.critical),
       ) + Math.max(0, afterBoost.high - after.high);
-    const upgradedCount = Math.max(0, afterBoost.high - afterDowngrade.high);
+    const upgradedCount = Math.max(0, afterBoost.high - afterClassifier.high);
     const mergedRootCauseCount = Math.max(0, findings.length - result.length);
 
     return {
@@ -98,34 +94,7 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 0: If severity is CRITICAL and confidence < 0.75 → downgrade to HIGH.
-   */
-  private downgradeCriticalByLowConfidence(findings: Finding[]): Finding[] {
-    return findings.map((f) => {
-      if (
-        f.severity === 'critical' &&
-        f.confidence < CRITICAL_CONFIDENCE_THRESHOLD
-      ) {
-        return { ...f, severity: 'high' as FindingSeverity };
-      }
-      return f;
-    });
-  }
-
-  /**
-   * Rule 1: If confidence < 0.75 and severity is HIGH → downgrade to MEDIUM.
-   */
-  private downgradeByLowConfidence(findings: Finding[]): Finding[] {
-    return findings.map((f) => {
-      if (f.severity === 'high' && f.confidence < LOW_CONFIDENCE_THRESHOLD) {
-        return { ...f, severity: 'medium' as FindingSeverity };
-      }
-      return f;
-    });
-  }
-
-  /**
-   * Rule 2: If consensus_level = multi-agent and confidence >= 0.8, boost severity by one level.
+   * Rule 1: If consensus_level = multi-agent and confidence >= 0.8, boost severity by one level.
    * (MEDIUM → HIGH, LOW → MEDIUM, etc.) Gated to avoid inflating speculative agreement.
    */
   private boostMultiAgentConsensus(findings: Finding[]): Finding[] {
@@ -142,7 +111,7 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 3: Max 3 HIGH findings per category.
+   * Rule 2: Max 3 HIGH findings per category.
    */
   private capHighPerCategory(findings: Finding[]): Finding[] {
     const highByCategory = new Map<string, number>();
@@ -173,7 +142,7 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 4: If total findings > 5, enforce max 3 HIGH unless multi-agent agreed.
+   * Rule 3: If total findings > 5, enforce max 3 HIGH unless multi-agent agreed.
    * Multi-agent consensus findings are exempt from overflow downgrade.
    */
   private downgradeOverflowFindings(findings: Finding[]): Finding[] {
@@ -214,7 +183,7 @@ export class SeverityNormalizer {
   }
 
   /**
-   * Rule 5: Merge root cause findings (same file + category + overlapping title).
+   * Rule 4: Merge root cause findings (same file + category + overlapping title).
    */
   private mergeRootCauseFindings(findings: Finding[]): Finding[] {
     const groups: Finding[][] = [];

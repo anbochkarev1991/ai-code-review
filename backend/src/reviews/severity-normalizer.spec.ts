@@ -83,77 +83,87 @@ describe('SeverityNormalizer', () => {
     });
   });
 
-  describe('Rule 0: low-confidence CRITICAL downgrade', () => {
-    it('downgrades CRITICAL to HIGH then Rule 1 downgrades to MEDIUM when confidence < 0.75', () => {
+  describe('Deterministic severity classifier (Rule 0)', () => {
+    it('downgrades inflated CRITICAL to MEDIUM when confidence < 0.8', () => {
       const result = normalizer.normalize([
-        makeFinding({ severity: 'critical', confidence: 0.5 }),
+        makeFinding({
+          severity: 'critical',
+          confidence: 0.5,
+          category: 'security',
+          impact: 'Potential issue.',
+        }),
       ]);
-      // Rule 0: critical 0.5 → high; Rule 1: high 0.5 < 0.75 → medium
       expect(result[0].severity).toBe('medium');
     });
 
-    it('preserves CRITICAL when confidence >= 0.75', () => {
+    it('preserves CRITICAL when impact high, likelihood high, confidence >= 0.8', () => {
       const result = normalizer.normalize([
-        makeFinding({ severity: 'critical', confidence: 0.8 }),
+        makeFinding({
+          severity: 'critical',
+          confidence: 0.96,
+          category: 'security',
+          impact: 'SQL injection leading to full database compromise.',
+          message: 'User input reaches the query unsanitized.',
+        }),
       ]);
       expect(result[0].severity).toBe('critical');
     });
-  });
 
-  describe('Rule 1: low-confidence HIGH downgrade', () => {
-    it('downgrades HIGH to MEDIUM when confidence < 0.75', () => {
+    it('assigns HIGH when impact high and confidence in [0.8, 0.95)', () => {
       const result = normalizer.normalize([
-        makeFinding({ severity: 'high', confidence: 0.6 }),
+        makeFinding({
+          severity: 'high',
+          confidence: 0.9,
+          category: 'security',
+          impact: 'Authentication bypass on protected routes.',
+          message: 'Missing authorization check.',
+        }),
+      ]);
+      expect(result[0].severity).toBe('high');
+    });
+
+    it('caps at MEDIUM when confidence < 0.8 even if agent said HIGH', () => {
+      const result = normalizer.normalize([
+        makeFinding({
+          severity: 'high',
+          confidence: 0.75,
+          category: 'security',
+          impact: 'Remote code execution.',
+          message: 'Clear evidence in diff.',
+        }),
       ]);
       expect(result[0].severity).toBe('medium');
     });
 
-    it('preserves HIGH when confidence >= 0.75', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'high', confidence: 0.75 }),
-      ]);
-      expect(result[0].severity).toBe('high');
-    });
-
-    it('preserves HIGH when confidence is exactly 0.75', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'high', confidence: 0.75 }),
-      ]);
-      expect(result[0].severity).toBe('high');
-    });
-
-    it('does not affect MEDIUM or LOW (Rule 1 only applies to HIGH)', () => {
+    it('leaves MEDIUM and LOW as MEDIUM after classifier when not stylistic', () => {
       const result = normalizer.normalize([
         makeFinding({ severity: 'medium', confidence: 0.5 }),
       ]);
       expect(result[0].severity).toBe('medium');
     });
-
-    it('does not affect MEDIUM severity', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'medium', confidence: 0.3 }),
-      ]);
-      expect(result[0].severity).toBe('medium');
-    });
   });
 
-  describe('Rule 2: multi-agent consensus boost', () => {
+  describe('Rule 1: multi-agent consensus boost', () => {
     it('boosts MEDIUM to HIGH when consensus_level = multi-agent', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'medium',
           confidence: 0.8,
+          category: 'security',
+          message: 'Concrete issue in the diff without stylistic keywords.',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
       expect(result[0].severity).toBe('high');
     });
 
-    it('boosts LOW to MEDIUM when consensus_level = multi-agent', () => {
+    it('boosts LOW to MEDIUM when consensus_level = multi-agent (stylistic LOW)', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'low',
           confidence: 0.8,
+          category: 'code-quality',
+          message: 'Naming convention for the helper should use camelCase.',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
@@ -164,7 +174,10 @@ describe('SeverityNormalizer', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'critical',
-          confidence: 0.9,
+          confidence: 0.96,
+          category: 'security',
+          impact: 'SQL injection leading to compromise.',
+          message: 'Untrusted input in query.',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
@@ -193,61 +206,67 @@ describe('SeverityNormalizer', () => {
       expect(result[0].severity).toBe('medium');
     });
 
-    it('interaction: low-confidence HIGH downgraded; multi-agent with confidence < 0.8 not boosted', () => {
+    it('interaction: classifier caps below 0.8; multi-agent cannot boost without confidence >= 0.8', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'high',
           confidence: 0.6,
+          category: 'security',
+          impact: 'Issue.',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
-      // Rule 1 downgrades HIGH->MEDIUM; Rule 2 requires confidence >= 0.8, so no boost
       expect(result[0].severity).toBe('medium');
     });
   });
 
-  describe('Rule 3: max 3 HIGH per category', () => {
+  describe('Rule 2: max 3 HIGH per category', () => {
     it('keeps top 3 by confidence and downgrades the rest', () => {
       const findings = [
         makeFinding({
           id: 'h1',
           severity: 'high',
-          confidence: 0.95,
+          confidence: 0.92,
           category: 'security',
           file: 'a.ts',
           title: 'Unique finding about SQL injection',
+          message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
           id: 'h2',
           severity: 'high',
-          confidence: 0.9,
+          confidence: 0.91,
           category: 'security',
           file: 'b.ts',
           title: 'Unique finding about XSS vulnerability',
+          message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
           id: 'h3',
           severity: 'high',
-          confidence: 0.85,
+          confidence: 0.9,
           category: 'security',
           file: 'c.ts',
           title: 'Unique finding about CSRF attack',
+          message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
           id: 'h4',
           severity: 'high',
-          confidence: 0.8,
+          confidence: 0.89,
           category: 'security',
           file: 'd.ts',
           title: 'Unique finding about auth bypass',
+          message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
           id: 'h5',
           severity: 'high',
-          confidence: 0.78,
+          confidence: 0.88,
           category: 'security',
           file: 'e.ts',
           title: 'Unique finding about path traversal',
+          message: 'Clear vulnerability in changed lines.',
         }),
       ];
 
@@ -264,10 +283,11 @@ describe('SeverityNormalizer', () => {
         makeFinding({
           id: 's1',
           severity: 'high',
-          confidence: 0.95,
+          confidence: 0.9,
           category: 'security',
           file: 'a.ts',
           title: 'Security issue one',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: 's2',
@@ -276,14 +296,16 @@ describe('SeverityNormalizer', () => {
           category: 'security',
           file: 'b.ts',
           title: 'Security issue two',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: 'p1',
           severity: 'high',
-          confidence: 0.95,
+          confidence: 0.9,
           category: 'performance',
           file: 'c.ts',
           title: 'Performance issue one',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: 'p2',
@@ -292,58 +314,63 @@ describe('SeverityNormalizer', () => {
           category: 'performance',
           file: 'd.ts',
           title: 'Performance issue two',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: 'p3',
           severity: 'high',
-          confidence: 0.85,
+          confidence: 0.9,
           category: 'performance',
           file: 'e.ts',
           title: 'Performance issue three',
+          message: 'Clear issue in diff.',
         }),
       ];
 
       const result = normalizer.normalize(findings);
       const allHigh = result.filter((f) => f.severity === 'high');
-      // 5 total = at overflow threshold, all should stay HIGH (per-category cap is 3, none exceed)
       expect(allHigh.length).toBe(5);
     });
   });
 
-  describe('Rule 4: overflow downgrade (total > 5)', () => {
+  describe('Rule 3: overflow downgrade (total > 5)', () => {
     it('downgrades lowest-confidence single-agent HIGHs when total findings > 5', () => {
       const findings = [
         makeFinding({
           id: '1',
           severity: 'high',
-          confidence: 0.95,
+          confidence: 0.92,
           file: 'a.ts',
           category: 'security',
           title: 'SQL injection vulnerability',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: '2',
           severity: 'high',
-          confidence: 0.9,
+          confidence: 0.91,
           file: 'b.ts',
           category: 'performance',
           title: 'Memory leak issue',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: '3',
           severity: 'high',
-          confidence: 0.85,
+          confidence: 0.9,
           file: 'c.ts',
           category: 'architecture',
           title: 'Circular dependency',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: '4',
           severity: 'high',
-          confidence: 0.8,
+          confidence: 0.89,
           file: 'd.ts',
           category: 'code-quality',
           title: 'Missing error handling',
+          message: 'Clear issue in diff.',
         }),
         makeFinding({
           id: '5',
@@ -372,20 +399,23 @@ describe('SeverityNormalizer', () => {
           confidence: 0.9,
           category: 'security',
           file: 'a.ts',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '2',
           severity: 'high',
-          confidence: 0.8,
+          confidence: 0.89,
           category: 'performance',
           file: 'b.ts',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '3',
           severity: 'high',
-          confidence: 0.85,
+          confidence: 0.88,
           category: 'architecture',
           file: 'c.ts',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '4',
@@ -411,35 +441,40 @@ describe('SeverityNormalizer', () => {
         makeFinding({
           id: '1',
           severity: 'high',
-          confidence: 0.95,
+          confidence: 0.96,
           file: 'a.ts',
           category: 'security',
           title: 'SQL injection',
+          message: 'Untrusted input in query string.',
+          impact: 'SQL injection leading to data compromise.',
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
         makeFinding({
           id: '2',
           severity: 'high',
-          confidence: 0.9,
+          confidence: 0.91,
           file: 'b.ts',
           category: 'performance',
           title: 'Memory leak',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '3',
           severity: 'high',
-          confidence: 0.85,
+          confidence: 0.9,
           file: 'c.ts',
           category: 'architecture',
           title: 'Circular dep',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '4',
           severity: 'high',
-          confidence: 0.8,
+          confidence: 0.89,
           file: 'd.ts',
           category: 'code-quality',
           title: 'Error handling',
+          message: 'Clear issue.',
         }),
         makeFinding({
           id: '5',
@@ -462,7 +497,7 @@ describe('SeverityNormalizer', () => {
     });
   });
 
-  describe('Rule 5: root cause merging', () => {
+  describe('Rule 4: root cause merging', () => {
     it('merges HIGH findings with same file + category + overlapping title', () => {
       const findings = [
         makeFinding({
@@ -698,13 +733,15 @@ describe('SeverityNormalizer', () => {
       expect(result.length).toBe(1);
     });
 
-    it('handles all LOW findings', () => {
+    it('handles all stylistic LOW findings', () => {
       const findings = Array.from({ length: 10 }, (_, i) =>
         makeFinding({
           id: `l-${i}`,
           severity: 'low',
           confidence: 0.5,
           file: `f${i}.ts`,
+          category: 'code-quality',
+          message: 'Naming convention for the helper should use camelCase.',
         }),
       );
       const result = normalizer.normalize(findings);

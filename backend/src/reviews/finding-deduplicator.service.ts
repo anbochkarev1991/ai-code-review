@@ -40,7 +40,10 @@ interface LlmDedupResponse {
 
 function parseLlmResponse(content: string): LlmDedupResponse | null {
   try {
-    const stripped = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const stripped = content
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
     const parsed: unknown = JSON.parse(stripped);
     if (!parsed || typeof parsed !== 'object') return null;
     const o = parsed as Record<string, unknown>;
@@ -54,7 +57,9 @@ function parseLlmResponse(content: string): LlmDedupResponse | null {
           typeof (g as LlmGroup).root_cause === 'string' &&
           Array.isArray((g as LlmGroup).finding_ids),
       ),
-      ungrouped_ids: ungrouped_ids.filter((id): id is string => typeof id === 'string'),
+      ungrouped_ids: ungrouped_ids.filter(
+        (id): id is string => typeof id === 'string',
+      ),
     };
   } catch {
     return null;
@@ -137,7 +142,9 @@ export class FindingDeduplicatorService {
 
   private buildUserPrompt(findings: Finding[]): string {
     const lines = findings.map((f) => {
-      const loc = f.file ? ` (${f.file}${f.line != null ? `:${f.line}` : ''})` : '';
+      const loc = f.file
+        ? ` (${f.file}${f.line != null ? `:${f.line}` : ''})`
+        : '';
       const msg = (f.message ?? '').slice(0, 120);
       return `${f.id} | ${f.severity} | ${f.category} | ${f.title}${loc}\n   ${msg}`;
     });
@@ -261,7 +268,8 @@ Return valid JSON only.`;
       confidence: mergedConfidence,
       impact: bestImpact ?? primary.impact,
       suggested_fix: bestFix ?? primary.suggested_fix,
-      agent_name: agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
+      agent_name:
+        agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
       merged_agents: agentList.length > 1 ? agentList : undefined,
       merged_categories: categoryList.length > 1 ? categoryList : undefined,
       categories: categoryList.length > 0 ? categoryList : undefined,

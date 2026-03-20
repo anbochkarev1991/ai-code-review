@@ -57,11 +57,11 @@ describe('FindingNormalizer', () => {
       expect(result[0].confidence).toBe(0.3);
     });
 
-    it('defaults undefined confidence to 0.5', () => {
+    it('defaults undefined confidence to 0.7', () => {
       const result = normalizer.normalize([
         makeFinding({ confidence: undefined }),
       ]);
-      expect(result[0].confidence).toBe(0.5);
+      expect(result[0].confidence).toBe(0.7);
     });
 
     it('preserves valid confidence values within cap range', () => {
@@ -333,22 +333,6 @@ describe('FindingNormalizer', () => {
         makeFinding({ confidence: 0.8, agent_name: 'Security' }),
       ]);
       expect(result[0].false_positive_risk).toBe('medium');
-    });
-  });
-
-  describe('confidence-severity coherence', () => {
-    it('downgrades critical to high when confidence < 0.7', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'critical', confidence: 0.4 }),
-      ]);
-      expect(result[0].severity).toBe('high');
-    });
-
-    it('preserves critical when confidence >= 0.7', () => {
-      const result = normalizer.normalize([
-        makeFinding({ severity: 'critical', confidence: 0.8 }),
-      ]);
-      expect(result[0].severity).toBe('critical');
     });
   });
 
@@ -672,30 +656,6 @@ describe('FindingNormalizer', () => {
         diffFiles,
       );
       expect(result[0].outside_diff).toBe(true);
-    });
-  });
-
-  describe('uncertainty downgrade', () => {
-    it('downgrades severity when message contains uncertainty phrases', () => {
-      const result = normalizer.normalize([
-        makeFinding({
-          severity: 'high',
-          confidence: 0.6,
-          message: 'This might cause memory issues in production',
-        }),
-      ]);
-      expect(result[0].severity).toBe('medium');
-    });
-
-    it('does not downgrade when confidence >= 0.8', () => {
-      const result = normalizer.normalize([
-        makeFinding({
-          severity: 'high',
-          confidence: 0.85,
-          message: 'This might cause memory issues in production',
-        }),
-      ]);
-      expect(result[0].severity).toBe('high');
     });
   });
 

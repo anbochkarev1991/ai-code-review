@@ -53,7 +53,7 @@ export class DeterministicAggregator {
       for (const finding of output.findings) {
         merged.push({
           ...finding,
-          confidence: finding.confidence ?? 0.5,
+          confidence: finding.confidence ?? 0.7,
           agent_name: finding.agent_name ?? agentName,
         });
       }

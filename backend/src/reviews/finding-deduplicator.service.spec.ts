@@ -81,8 +81,16 @@ describe('FindingDeduplicatorService', () => {
         message: 'Input validation missing for checkout params',
         suggested_fix: 'Add validation for all inputs',
       }),
-      makeFinding({ id: 'arch-1', file: 'src/core.ts', message: 'Tight coupling' }),
-      makeFinding({ id: 'perf-1', file: 'src/db.ts', message: 'N+1 query risk' }),
+      makeFinding({
+        id: 'arch-1',
+        file: 'src/core.ts',
+        message: 'Tight coupling',
+      }),
+      makeFinding({
+        id: 'perf-1',
+        file: 'src/db.ts',
+        message: 'N+1 query risk',
+      }),
     ];
 
     mockCreate.mockResolvedValue({
@@ -203,7 +211,11 @@ describe('FindingDeduplicatorService', () => {
         file: 'src/billing.ts',
         message: 'Unparameterized query',
       }),
-      makeFinding({ id: 'arch-1', file: 'src/core.ts', message: 'Tight coupling' }),
+      makeFinding({
+        id: 'arch-1',
+        file: 'src/core.ts',
+        message: 'Tight coupling',
+      }),
       makeFinding({ id: 'perf-1', file: 'src/db.ts', message: 'N+1 risk' }),
     ];
 
@@ -251,7 +263,11 @@ describe('FindingDeduplicatorService', () => {
         file: 'src/b.ts',
         message: 'Input not validated',
       }),
-      makeFinding({ id: 'arch-1', file: 'src/core.ts', message: 'Tight coupling' }),
+      makeFinding({
+        id: 'arch-1',
+        file: 'src/core.ts',
+        message: 'Tight coupling',
+      }),
       makeFinding({ id: 'perf-1', file: 'src/db.ts', message: 'N+1 risk' }),
     ];
 
