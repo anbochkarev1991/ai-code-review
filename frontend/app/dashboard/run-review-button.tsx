@@ -134,14 +134,14 @@ export function RunReviewButton({
         <div className="flex w-full flex-col gap-4">
           {result && (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-stretch">
-              <div className="md:col-start-2 md:row-start-1 md:h-full md:min-h-0">
+              <div className="md:col-start-2 md:row-start-1 md:flex md:h-full md:min-h-0 md:flex-col md:pb-6">
                 <ReviewSummarySidebar
                   summary={result.summary}
                   findings={result.findings}
                   reviewSummary={result.review_summary}
                 />
               </div>
-              <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1">
+              <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1 md:pb-6">
                 {result.ai_review_summary && (
                   <AiReviewSummaryBlock
                     aiReviewSummary={result.ai_review_summary}

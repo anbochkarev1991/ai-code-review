@@ -168,14 +168,14 @@ export default async function ReviewDetailPage({
 
             {review.result_snapshot && (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-stretch">
-                <div className="md:col-start-2 md:row-start-1 md:h-full md:min-h-0">
+                <div className="md:col-start-2 md:row-start-1 md:flex md:h-full md:min-h-0 md:flex-col md:pb-6">
                   <ReviewSummarySidebar
                     summary={review.result_snapshot.summary}
                     findings={review.result_snapshot.findings}
                     reviewSummary={review.result_snapshot.review_summary}
                   />
                 </div>
-                <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1">
+                <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1 md:pb-6">
                   {review.result_snapshot.ai_review_summary && (
                     <AiReviewSummaryBlock
                       aiReviewSummary={review.result_snapshot.ai_review_summary}
