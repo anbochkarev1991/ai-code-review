@@ -363,10 +363,10 @@ function getSeverityStyles(severity: Finding["severity"]): {
       };
     case "low":
       return {
-        badge: "bg-blue-600 text-white dark:bg-blue-500",
-        border: "border-l-blue-600 dark:border-l-blue-500",
-        accent: "text-blue-600 dark:text-blue-400",
-        bg: "bg-blue-50/50 dark:bg-blue-950/20",
+        badge: "bg-zinc-500 text-white dark:bg-zinc-400 dark:text-zinc-900",
+        border: "border-l-zinc-400 dark:border-l-zinc-500",
+        accent: "text-zinc-500 dark:text-zinc-400",
+        bg: "bg-zinc-100/50 dark:bg-zinc-800/30",
       };
     default:
       return {
@@ -418,14 +418,14 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
 
   return (
     <div
-      className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 px-4 py-3 bg-white dark:bg-zinc-900 ${severityStyles.border}`}
+      className={`rounded-md border border-zinc-200 dark:border-zinc-700 border-l-4 px-4 py-4 bg-white dark:bg-zinc-900 transition-all duration-200 hover:shadow-sm hover:border-zinc-300 dark:hover:border-zinc-600 ${severityStyles.border}`}
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <div className="flex items-start gap-2">
           <div className={`shrink-0 w-1 h-5 rounded-full ${severityStyles.bg} mt-0.5`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <h5 className="flex-1 min-w-0 font-medium text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
+              <h5 className="flex-1 min-w-0 font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
                 {finding.title}
               </h5>
               <span
@@ -450,22 +450,22 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
         </div>
 
         {finding.impact && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-            <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 shrink-0">
-              Impact:
-            </span>
-            <span className="text-xs text-amber-700 dark:text-amber-400">
+          <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3.5 py-2.5">
+            <p className="font-semibold text-[11px] uppercase tracking-wider text-amber-800 dark:text-amber-300 mb-1">
+              Impact
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed wrap-break-word">
               {finding.impact}
-            </span>
+            </p>
           </div>
         )}
 
         {(finding.suggested_fix || finding.suggestion) && (
-          <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2">
-            <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-0.5">
-              Suggested Fix
-            </div>
-            <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
+          <div className="rounded-md border border-zinc-200 dark:border-zinc-700 border-l-2 border-l-zinc-300 dark:border-l-zinc-600 bg-zinc-50 dark:bg-zinc-800/50 px-3.5 py-3">
+            <p className="font-semibold text-[11px] uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+              Suggested fix
+            </p>
+            <div className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
               {finding.suggested_fix || finding.suggestion}
             </div>
           </div>
@@ -660,16 +660,16 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
 
   return (
     <div
-      className={`rounded-lg border border-zinc-200 dark:border-zinc-800 ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm`}
+      className={`rounded-lg border border-zinc-200 dark:border-zinc-800 ${severityStyles.border} border-l-4 bg-white dark:bg-zinc-900 shadow-sm transition-all duration-200 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600`}
     >
-      <div className="p-4">
-        <div className="flex flex-col gap-3">
+      <div className="p-5">
+        <div className="flex flex-col gap-4">
           {/* Header */}
           <div className="flex items-start gap-2">
             <div className={`shrink-0 w-1 h-6 rounded-full ${severityStyles.bg} mt-0.5`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <h4 className="flex-1 min-w-0 font-semibold text-sm text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
+                <h4 className="flex-1 min-w-0 font-bold text-base text-zinc-900 dark:text-zinc-100 wrap-break-word pr-2">
                   {finding.title}
                 </h4>
                 <span
@@ -721,34 +721,19 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
 
           {/* Impact */}
           {finding.impact && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-              <svg
-                className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                  Impact:
-                </span>{" "}
-                <span className="text-xs text-amber-700 dark:text-amber-400">
-                  {finding.impact}
-                </span>
-              </div>
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3.5 py-2.5">
+              <p className="font-semibold text-[11px] uppercase tracking-wider text-amber-800 dark:text-amber-300 mb-1">
+                Impact
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed wrap-break-word">
+                {finding.impact}
+              </p>
             </div>
           )}
 
           {/* Suggested Fix */}
           {(finding.suggested_fix || finding.suggestion) && (
-            <div className="rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30 p-3">
+            <div className="rounded-md border border-zinc-200 dark:border-zinc-700 border-l-2 border-l-zinc-300 dark:border-l-zinc-600 bg-zinc-50 dark:bg-zinc-800/30 px-3.5 py-3">
               <div className="flex items-start gap-2">
                 <svg
                   className="h-4 w-4 shrink-0 mt-0.5 text-zinc-500 dark:text-zinc-400"
@@ -764,10 +749,10 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
                   />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Suggested Fix
-                  </div>
-                  <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
+                  <p className="font-semibold text-[11px] uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+                    Suggested fix
+                  </p>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed wrap-break-word">
                     {finding.suggested_fix || finding.suggestion}
                   </div>
                 </div>

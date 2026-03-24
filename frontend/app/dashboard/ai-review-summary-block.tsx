@@ -16,7 +16,7 @@ function getSeverityBadgeClass(severityLabel: string): string {
     case "MEDIUM":
       return "bg-yellow-500 text-white dark:bg-yellow-400";
     case "LOW":
-      return "bg-blue-600 text-white dark:bg-blue-500";
+      return "bg-zinc-500 text-white dark:bg-zinc-400 dark:text-zinc-900";
     default:
       return "bg-zinc-600 text-white dark:bg-zinc-500";
   }

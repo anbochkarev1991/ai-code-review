@@ -57,7 +57,7 @@ export function FindingsStats({
       )}
       {counts.low > 0 && (
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-500" />
+          <div className="h-2 w-2 rounded-full bg-zinc-500 dark:bg-zinc-400" />
           <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
             {counts.low}
           </span>
