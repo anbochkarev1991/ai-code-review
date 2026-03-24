@@ -99,6 +99,40 @@ export function getRiskScoreColor(score: number): string {
   return "text-green-600 dark:text-green-400";
 }
 
+/** Visual gauge theme: 0–30 green, 31–70 yellow, 71–100 red (distinct from getRiskScoreColor thresholds). */
+export interface RiskScoreTheme {
+  stroke: string;
+  track: string;
+  text: string;
+  label: string;
+}
+
+export function getRiskScoreTheme(score: number): RiskScoreTheme {
+  const clamped = Math.max(0, Math.min(100, score));
+  if (clamped <= 30) {
+    return {
+      stroke: "stroke-green-600 dark:stroke-green-400",
+      track: "stroke-zinc-200 dark:stroke-zinc-700",
+      text: "text-green-700 dark:text-green-300",
+      label: "text-green-700 dark:text-green-400",
+    };
+  }
+  if (clamped <= 70) {
+    return {
+      stroke: "stroke-amber-500 dark:stroke-amber-400",
+      track: "stroke-zinc-200 dark:stroke-zinc-700",
+      text: "text-amber-800 dark:text-amber-200",
+      label: "text-amber-800 dark:text-amber-300",
+    };
+  }
+  return {
+    stroke: "stroke-red-600 dark:stroke-red-500",
+    track: "stroke-zinc-200 dark:stroke-zinc-700",
+    text: "text-red-700 dark:text-red-300",
+    label: "text-red-700 dark:text-red-400",
+  };
+}
+
 export function getMergeRecommendationStyle(rec: MergeRecommendation): {
   bg: string;
   text: string;

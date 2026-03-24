@@ -4,12 +4,9 @@ import type {
   Finding,
   ReviewSummary as ReviewSummaryType,
 } from "@/lib/types";
-import {
-  FindingsStats,
-  getMergeRecommendationStyle,
-  getRiskLevelColor,
-  getRiskScoreColor,
-} from "@/app/dashboard/review-summary-shared";
+import { MergeDecisionBanner } from "@/app/dashboard/merge-decision-banner";
+import { RiskScoreGauge } from "@/app/dashboard/risk-score-gauge";
+import { FindingsStats } from "@/app/dashboard/review-summary-shared";
 
 interface ReviewSummarySidebarProps {
   summary: string;
@@ -25,7 +22,6 @@ export function ReviewSummarySidebar({
   const displayText = reviewSummary?.text ?? summary;
   const hasSummary = displayText.trim() !== "";
   const mergeRec = reviewSummary?.merge_recommendation;
-  const mergeStyle = mergeRec ? getMergeRecommendationStyle(mergeRec) : null;
 
   const riskSummary = reviewSummary?.risk_summary?.trim();
   const shortRecommendation = riskSummary
@@ -43,55 +39,21 @@ export function ReviewSummarySidebar({
             Summary
           </h3>
 
-          {mergeRec && mergeStyle && (
-            <div className={`mt-4 flex flex-col gap-1 rounded-lg px-3 py-2.5 ${mergeStyle.bg}`}>
-              <div className="flex items-start gap-2">
-                <svg
-                  className={`h-4 w-4 shrink-0 mt-0.5 ${mergeStyle.text}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d={mergeStyle.icon}
-                  />
-                </svg>
-                <div className="min-w-0 flex-1">
-                  <span className={`text-sm font-semibold ${mergeStyle.text}`}>
-                    {mergeRec}
-                  </span>
-                  {reviewSummary?.primary_risk_category && (
-                    <p className={`mt-1 text-xs ${mergeStyle.text} opacity-80`}>
-                      Primary risk: {reviewSummary.primary_risk_category}
-                    </p>
-                  )}
-                  {reviewSummary?.merge_explanation && (
-                    <p className={`mt-1 text-xs ${mergeStyle.text} opacity-85`}>
-                      {reviewSummary.merge_explanation}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+          {mergeRec && (
+            <MergeDecisionBanner
+              recommendation={mergeRec}
+              explanation={reviewSummary?.merge_explanation}
+              primaryRiskCategory={reviewSummary?.primary_risk_category}
+              className="mt-4"
+            />
           )}
 
           {reviewSummary && (
-            <div className="mt-4 flex flex-wrap items-baseline gap-2">
-              <span
-                className={`text-2xl font-bold tabular-nums ${getRiskScoreColor(reviewSummary.risk_score)}`}
-              >
-                {reviewSummary.risk_score}/100
-              </span>
-              {reviewSummary.risk_level && (
-                <span
-                  className={`text-sm font-medium ${getRiskLevelColor(reviewSummary.risk_level)}`}
-                >
-                  {reviewSummary.risk_level}
-                </span>
-              )}
+            <div className="mt-4 flex justify-center">
+              <RiskScoreGauge
+                score={reviewSummary.risk_score}
+                riskLevel={reviewSummary.risk_level}
+              />
             </div>
           )}
 

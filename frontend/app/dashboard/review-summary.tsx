@@ -10,11 +10,10 @@ import type {
   ReviewStatus,
   ReviewMetadata,
 } from "@/lib/types";
+import { RiskScoreGauge } from "@/app/dashboard/risk-score-gauge";
 import {
   FindingsStats,
   getMergeRecommendationStyle,
-  getRiskLevelColor,
-  getRiskScoreColor,
 } from "@/app/dashboard/review-summary-shared";
 
 interface ReviewSummaryProps {
@@ -285,22 +284,11 @@ export function ReviewSummary({
                   Overview
                 </h3>
                 {reviewSummary && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-sm font-bold ${getRiskScoreColor(reviewSummary.risk_score)}`}
-                      >
-                        {reviewSummary.risk_score}/100
-                      </span>
-                      {reviewSummary.risk_level && (
-                        <span
-                          className={`text-xs font-medium ${getRiskLevelColor(reviewSummary.risk_level)}`}
-                        >
-                          {reviewSummary.risk_level}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <RiskScoreGauge
+                    score={reviewSummary.risk_score}
+                    riskLevel={reviewSummary.risk_level}
+                    size={48}
+                  />
                 )}
               </div>
               <FindingsStats
