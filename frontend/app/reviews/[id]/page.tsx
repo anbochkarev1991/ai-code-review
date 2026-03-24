@@ -167,8 +167,8 @@ export default async function ReviewDetailPage({
             )}
 
             {review.result_snapshot && (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-start">
-                <div className="md:col-start-2 md:row-start-1">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-stretch">
+                <div className="md:col-start-2 md:row-start-1 md:h-full md:min-h-0">
                   <ReviewSummarySidebar
                     summary={review.result_snapshot.summary}
                     findings={review.result_snapshot.findings}

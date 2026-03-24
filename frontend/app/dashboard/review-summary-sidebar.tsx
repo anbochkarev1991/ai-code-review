@@ -32,7 +32,7 @@ export function ReviewSummarySidebar({
   const clampBody = !riskSummary && hasSummary;
 
   return (
-    <aside className="min-w-0">
+    <aside className="flex min-h-0 min-w-0 flex-col md:h-full">
       <div className="md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto">
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
           <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
