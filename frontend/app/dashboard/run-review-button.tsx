@@ -133,40 +133,38 @@ export function RunReviewButton({
       {(result || trace) && (
         <div className="flex w-full flex-col gap-4">
           {result && (
-            <>
-              {result.ai_review_summary && (
-                <AiReviewSummaryBlock
-                  aiReviewSummary={result.ai_review_summary}
-                />
-              )}
-              <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                <div className="order-2 min-w-0 flex-1 md:order-1">
-                  <ReviewSummary
-                    summary={result.summary}
-                    findings={result.findings}
-                    executionMetadata={result.execution_metadata}
-                    reviewSummary={result.review_summary}
-                    prMetadata={result.pr_metadata}
-                    performance={result.performance}
-                    signature={result.signature}
-                    reviewStatus={reviewStatus ?? undefined}
-                    reviewMetadata={result.review_metadata}
-                    variant="main"
-                  />
-                  <div className="mt-8">
-                    <ReviewFindingsList
-                      findings={result.findings}
-                      accessToken={accessToken}
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-start">
+              <div className="md:col-start-2 md:row-start-1">
                 <ReviewSummarySidebar
                   summary={result.summary}
                   findings={result.findings}
                   reviewSummary={result.review_summary}
                 />
               </div>
-            </>
+              <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1">
+                {result.ai_review_summary && (
+                  <AiReviewSummaryBlock
+                    aiReviewSummary={result.ai_review_summary}
+                  />
+                )}
+                <ReviewSummary
+                  summary={result.summary}
+                  findings={result.findings}
+                  executionMetadata={result.execution_metadata}
+                  reviewSummary={result.review_summary}
+                  prMetadata={result.pr_metadata}
+                  performance={result.performance}
+                  signature={result.signature}
+                  reviewStatus={reviewStatus ?? undefined}
+                  reviewMetadata={result.review_metadata}
+                  variant="main"
+                />
+                <ReviewFindingsList
+                  findings={result.findings}
+                  accessToken={accessToken}
+                />
+              </div>
+            </div>
           )}
           {trace && <ReviewTrace trace={trace} />}
         </div>

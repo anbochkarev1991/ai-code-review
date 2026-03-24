@@ -167,37 +167,35 @@ export default async function ReviewDetailPage({
             )}
 
             {review.result_snapshot && (
-              <div className="flex flex-col gap-8">
-                {review.result_snapshot.ai_review_summary && (
-                  <AiReviewSummaryBlock
-                    aiReviewSummary={review.result_snapshot.ai_review_summary}
-                  />
-                )}
-                <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                  <div className="order-2 min-w-0 flex-1 md:order-1">
-                    <ReviewSummary
-                      summary={review.result_snapshot.summary}
-                      findings={review.result_snapshot.findings}
-                      executionMetadata={review.result_snapshot.execution_metadata}
-                      reviewSummary={review.result_snapshot.review_summary}
-                      prMetadata={review.result_snapshot.pr_metadata}
-                      performance={review.result_snapshot.performance}
-                      signature={review.result_snapshot.signature}
-                      reviewStatus={review.status}
-                      reviewMetadata={review.result_snapshot.review_metadata}
-                      variant="main"
-                    />
-                    <div className="mt-8">
-                      <ReviewFindingsList
-                        findings={review.result_snapshot.findings}
-                        accessToken={session.access_token}
-                      />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-start">
+                <div className="md:col-start-2 md:row-start-1">
                   <ReviewSummarySidebar
                     summary={review.result_snapshot.summary}
                     findings={review.result_snapshot.findings}
                     reviewSummary={review.result_snapshot.review_summary}
+                  />
+                </div>
+                <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1">
+                  {review.result_snapshot.ai_review_summary && (
+                    <AiReviewSummaryBlock
+                      aiReviewSummary={review.result_snapshot.ai_review_summary}
+                    />
+                  )}
+                  <ReviewSummary
+                    summary={review.result_snapshot.summary}
+                    findings={review.result_snapshot.findings}
+                    executionMetadata={review.result_snapshot.execution_metadata}
+                    reviewSummary={review.result_snapshot.review_summary}
+                    prMetadata={review.result_snapshot.pr_metadata}
+                    performance={review.result_snapshot.performance}
+                    signature={review.result_snapshot.signature}
+                    reviewStatus={review.status}
+                    reviewMetadata={review.result_snapshot.review_metadata}
+                    variant="main"
+                  />
+                  <ReviewFindingsList
+                    findings={review.result_snapshot.findings}
+                    accessToken={session.access_token}
                   />
                 </div>
               </div>
