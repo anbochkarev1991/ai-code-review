@@ -32,6 +32,7 @@ export function UsageProvider({
   children,
 }: UsageProviderProps) {
   const [usage, setUsage] = useState<UsageResponse | null>(initialUsage);
+  const [refetchError, setRefetchError] = useState<Error | null>(null);
   const mountedRef = useRef(true);
 
   const pushUsage = useCallback((newUsage: UsageResponse) => {
@@ -54,9 +55,13 @@ export function UsageProvider({
       if (mountedRef.current) {
         console.debug("[UsageProvider] reconciled with server", data);
         setUsage(data);
+        setRefetchError(null);
       }
     } catch (err: unknown) {
       console.error("[UsageProvider] refetch failed", err);
+      if (mountedRef.current) {
+        setRefetchError(err instanceof Error ? err : new Error(String(err)));
+      }
     }
   }, [accessToken]);
 

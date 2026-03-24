@@ -42,8 +42,9 @@ export function UpgradeToProButton({ accessToken }: UpgradeToProButtonProps) {
       }
 
       const data = (await res.json()) as { url: string };
-      if (data?.url) {
-        window.location.href = data.url;
+      const url = (data.url as string)?.trim() ?? "";
+      if (url) {
+        window.location.href = url;
       } else {
         throw new Error("No checkout URL returned");
       }

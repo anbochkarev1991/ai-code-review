@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import type {
@@ -34,6 +30,10 @@ interface GitHubUserResponse {
 
 @Injectable()
 export class GitHubService {
+  private throwAuthError(message: string): never {
+    throw new UnauthorizedException(message);
+  }
+
   async exchangeCodeForToken(code: string): Promise<string> {
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
@@ -228,9 +228,7 @@ export class GitHubService {
     });
 
     if (!response.ok) {
-      throw new UnauthorizedException(
-        'Failed to fetch pull requests from GitHub',
-      );
+      this.throwAuthError('Failed to fetch pull requests from GitHub');
     }
 
     const data = (await response.json()) as Array<{
@@ -267,12 +265,7 @@ export class GitHubService {
     });
 
     if (!pullResponse.ok) {
-      if (pullResponse.status === 404) {
-        throw new NotFoundException('Pull request not found');
-      }
-      throw new UnauthorizedException(
-        'Failed to fetch pull request from GitHub',
-      );
+      this.throwAuthError('Failed to fetch pull request from GitHub');
     }
 
     const pull = (await pullResponse.json()) as {
@@ -294,7 +287,7 @@ export class GitHubService {
     });
 
     if (!compareResponse.ok) {
-      throw new UnauthorizedException('Failed to fetch diff from GitHub');
+      this.throwAuthError('Failed to fetch diff from GitHub');
     }
 
     const compare = (await compareResponse.json()) as {
