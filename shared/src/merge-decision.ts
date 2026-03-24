@@ -4,56 +4,80 @@
  * Both backend (risk engine) and frontend (UI display) import from here.
  * Rules are strict, deterministic, and documented for audit purposes.
  */
-import type { MergeRecommendation, MergeExplanation } from './review';
+import type {
+  MergeRecommendation,
+  MergeExplanation,
+  ReviewDecisionVerdict,
+} from './review';
 
 export interface MergeDecisionInput {
   critical_count: number;
   high_count: number;
+  /** Defaults to 0 when omitted (backward compat). */
+  medium_count?: number;
+  low_count?: number;
   risk_score: number;
 }
 
 export interface MergeDecision {
   recommendation: MergeRecommendation;
   explanation: MergeExplanation;
+  verdict: ReviewDecisionVerdict;
 }
 
 /**
  * Deterministic merge decision function.
  *
- * Priority order (first match wins):
- *   1. Any critical finding → Merge blocked
- *   2. 3+ high findings → Merge with caution
- *   3. risk_score >= 60 → Merge with caution
- *   4. Otherwise → Safe to merge
+ * Priority (first match wins):
+ *   1. Any critical finding → blocked
+ *   2. Any high finding → cannot be "safe"; merge with caution
+ *   3. risk_score >= 60 → merge with caution
+ *   4. Any medium finding (no high/critical above) → safe with warnings
+ *   5. Otherwise → safe to merge
  *
- * Invariant: "Merge blocked" always has risk_score >= 50 (enforced by risk engine floors).
+ * risk_summary and merge_explanation should both use this same explanation.
  */
 export function decideMerge(input: MergeDecisionInput): MergeDecision {
-  const { critical_count, high_count, risk_score } = input;
+  const critical_count = input.critical_count;
+  const high_count = input.high_count;
+  const medium_count = input.medium_count ?? 0;
+  const risk_score = input.risk_score;
 
   if (critical_count > 0) {
     return {
+      verdict: 'blocked',
       recommendation: 'Merge blocked',
-      explanation: `Blocked: ${critical_count} critical issue${critical_count === 1 ? '' : 's'} detected. Risk score elevated due to presence of critical security finding.`,
+      explanation: `Blocked due to ${critical_count} critical severity issue${critical_count === 1 ? '' : 's'}.`,
     };
   }
 
-  if (high_count >= 3) {
+  if (high_count > 0) {
     return {
+      verdict: 'warning',
       recommendation: 'Merge with caution',
-      explanation: `Merge with caution due to ${high_count} high severity findings.`,
+      explanation: `Merge with caution: ${high_count} high severity issue${high_count === 1 ? '' : 's'} — not safe to merge without review.`,
     };
   }
 
   if (risk_score >= 60) {
     return {
+      verdict: 'warning',
       recommendation: 'Merge with caution',
-      explanation: `Merge with caution — risk score ${risk_score}/100 exceeds safety threshold.`,
+      explanation: `Merge with caution — risk score ${risk_score}/100 is at or above the threshold (60).`,
+    };
+  }
+
+  if (medium_count > 0) {
+    return {
+      verdict: 'warning',
+      recommendation: 'Safe to merge with warnings',
+      explanation: `Safe to merge with warnings: ${medium_count} medium severity issue${medium_count === 1 ? '' : 's'}.`,
     };
   }
 
   return {
+    verdict: 'safe',
     recommendation: 'Safe to merge',
-    explanation: 'Low risk — safe to merge.',
+    explanation: 'No significant issues; safe to merge.',
   };
 }

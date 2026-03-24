@@ -6,6 +6,7 @@ import type {
   PRMetadata,
   ReviewResult,
 } from 'shared';
+import { RiskEngine } from './risk-engine';
 import { DiffParser } from './diff-parser';
 import { ReviewOrchestrator } from './engine/orchestrator';
 import { GitHubService } from '../github/github.service';
@@ -39,6 +40,7 @@ export class ReviewsService {
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
     private readonly severityNormalizer: SeverityNormalizer,
+    private readonly riskEngine: RiskEngine,
   ) {}
 
   async findOne(
@@ -193,12 +195,12 @@ export class ReviewsService {
     }
 
     const normalizedResult: ReviewResult | undefined = engineResult.result
-      ? {
+      ? this.syncReviewSummaryWithFindings({
           ...engineResult.result,
           findings: this.severityNormalizer.normalize(
             engineResult.result.findings,
           ),
-        }
+        })
       : undefined;
 
     const id = await this.reviewRunsRepository.create(
@@ -244,6 +246,7 @@ export class ReviewsService {
         merge_recommendation: 'Safe to merge',
         merge_explanation:
           'No reviewable code changes detected. All changed files were filtered out (lock files, build artifacts, binary files, etc.).',
+        decision_verdict: 'safe',
         text: 'No reviewable changes found. All changed files were filtered out (lock files, build artifacts, etc.).',
       },
       execution_metadata: {
@@ -292,6 +295,7 @@ export class ReviewsService {
         risk_level: 'Low risk',
         merge_recommendation: 'Safe to merge',
         merge_explanation: 'Documentation-only changes — no code to review.',
+        decision_verdict: 'safe',
         text: 'Only documentation/markdown changes detected. No code review needed. Recommendation: Safe to merge.',
       },
       execution_metadata: {
@@ -316,5 +320,52 @@ export class ReviewsService {
       userJwt,
     );
     return { id, status: 'complete', result_snapshot: result, trace: [] };
+  }
+
+  /** Recompute risk and merge fields from final findings (post SeverityNormalizer). */
+  private syncReviewSummaryWithFindings(result: ReviewResult): ReviewResult {
+    const { findings, review_summary: rs } = result;
+    if (!findings || !rs) return result;
+
+    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const f of findings) {
+      counts[f.severity]++;
+    }
+
+    const riskBreakdown = this.riskEngine.calculateRiskBreakdown(findings);
+    const riskScore = riskBreakdown.final_score;
+    const riskLevel = this.riskEngine.deriveRiskLevel(riskScore);
+    const mergeDecision = this.riskEngine.deriveMergeDecision(
+      riskScore,
+      counts.critical,
+      counts.high,
+      counts.medium,
+      counts.low,
+    );
+
+    const multiAgentConfirmedCount = findings.filter(
+      (f) => f.consensus_level === 'multi-agent',
+    ).length;
+
+    return {
+      ...result,
+      review_summary: {
+        ...rs,
+        total_findings: findings.length,
+        critical_count: counts.critical,
+        high_count: counts.high,
+        medium_count: counts.medium,
+        low_count: counts.low,
+        risk_score: riskScore,
+        risk_level: riskLevel,
+        risk_breakdown: riskBreakdown,
+        merge_recommendation: mergeDecision.recommendation,
+        merge_explanation: mergeDecision.explanation,
+        decision_verdict: mergeDecision.verdict,
+        risk_summary: mergeDecision.explanation,
+        multi_agent_confirmed_count:
+          multiAgentConfirmedCount > 0 ? multiAgentConfirmedCount : undefined,
+      },
+    };
   }
 }

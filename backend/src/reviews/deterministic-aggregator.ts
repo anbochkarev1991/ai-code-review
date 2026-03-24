@@ -75,6 +75,8 @@ export class DeterministicAggregator {
       riskScore,
       counts.critical,
       counts.high,
+      counts.medium,
+      counts.low,
     );
 
     const primaryRiskCategory = this.derivePrimaryRiskCategory(findings);
@@ -101,6 +103,7 @@ export class DeterministicAggregator {
       high_count: counts.high,
       medium_count: counts.medium,
       low_count: counts.low,
+      risk_score: riskScore,
     });
 
     return {
@@ -114,6 +117,7 @@ export class DeterministicAggregator {
       risk_breakdown: riskBreakdown,
       merge_recommendation: mergeDecision.recommendation,
       merge_explanation: mergeDecision.explanation,
+      decision_verdict: mergeDecision.verdict,
       primary_risk_category: primaryRiskCategory,
       most_severe_issue: mostSevereIssue,
       systemic_patterns:

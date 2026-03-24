@@ -397,13 +397,19 @@ function getFPRiskStyle(risk: string): { bg: string; text: string } {
   }
 }
 
-function MultiAgentBadge() {
+const AGENT_TOTAL = 4;
+
+function MultiAgentBadge({ agentCount }: { agentCount?: number }) {
+  const label =
+    agentCount != null && agentCount > 1
+      ? `Confirmed by ${agentCount} of ${AGENT_TOTAL} agents`
+      : "Multi-agent confirmed";
   return (
     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
       <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      Multi-agent confirmed
+      {label}
     </span>
   );
 }
@@ -440,7 +446,7 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                   {finding.category}
                 </span>
               )}
-              {isMultiAgent && <MultiAgentBadge />}
+              {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
             </div>
           </div>
         </div>
@@ -684,7 +690,7 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
                     {finding.category}
                   </span>
                 )}
-                {isMultiAgent && <MultiAgentBadge />}
+                {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
               </div>
             </div>
           </div>

@@ -176,6 +176,7 @@ export class FindingNormalizer {
       return {
         ...single,
         consensus_level: consensus,
+        agent_count: agents.size,
         categories: categories.size > 0 ? [...categories] : undefined,
         affected_locations: locations.length > 0 ? locations : undefined,
       };
@@ -240,6 +241,7 @@ export class FindingNormalizer {
       merged_categories: categoryList.length > 1 ? categoryList : undefined,
       categories: categoryList.length > 0 ? categoryList : undefined,
       consensus_level: consensus,
+      agent_count: agents.size,
       affected_locations: locations.length > 0 ? locations : undefined,
     };
   }

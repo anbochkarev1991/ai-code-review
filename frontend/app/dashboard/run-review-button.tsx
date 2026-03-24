@@ -133,7 +133,7 @@ export function RunReviewButton({
       {(result || trace) && (
         <div className="flex w-full flex-col gap-4">
           {result && (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-stretch">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-start">
               <div className="md:col-start-2 md:row-start-1 md:flex md:h-full md:min-h-0 md:flex-col md:pb-6">
                 <ReviewSummarySidebar
                   summary={result.summary}

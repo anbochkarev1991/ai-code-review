@@ -96,10 +96,14 @@ export class RiskEngine {
     riskScore: number,
     criticalCount: number,
     highCount: number,
+    mediumCount = 0,
+    lowCount = 0,
   ): MergeDecision {
     return decideMerge({
       critical_count: criticalCount,
       high_count: highCount,
+      medium_count: mediumCount,
+      low_count: lowCount,
       risk_score: riskScore,
     });
   }

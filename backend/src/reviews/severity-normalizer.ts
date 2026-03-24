@@ -281,6 +281,7 @@ export class SeverityNormalizer {
         agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
       merged_agents: agentList.length > 1 ? agentList : primary.merged_agents,
       consensus_level: consensus,
+      agent_count: agentList.length > 0 ? agentList.length : primary.agent_count,
     };
   }
 

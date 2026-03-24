@@ -11,10 +11,8 @@ import type {
   ReviewMetadata,
 } from "@/lib/types";
 import { RiskScoreGauge } from "@/app/dashboard/risk-score-gauge";
-import {
-  FindingsStats,
-  getMergeRecommendationStyle,
-} from "@/app/dashboard/review-summary-shared";
+import { FindingsStats } from "@/app/dashboard/review-summary-shared";
+import { MergeDecisionBanner } from "@/app/dashboard/merge-decision-banner";
 
 interface ReviewSummaryProps {
   summary: string;
@@ -258,7 +256,6 @@ export function ReviewSummary({
   const displayText = reviewSummary?.text ?? summary;
   const hasSummary = displayText && displayText.trim() !== "";
   const mergeRec = reviewSummary?.merge_recommendation;
-  const mergeStyle = mergeRec ? getMergeRecommendationStyle(mergeRec) : null;
   const isPartial = reviewStatus === "partial" || reviewMetadata?.review_status === "partial";
 
   const systemicPatterns = reviewSummary?.systemic_patterns ?? [];
@@ -296,37 +293,14 @@ export function ReviewSummary({
                 multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
               />
 
-              {mergeRec && mergeStyle && (
-                <div className={`mt-3 flex flex-col gap-1 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
-                  <div className="flex items-center gap-2">
-                    <svg
-                      className={`h-4 w-4 shrink-0 ${mergeStyle.text}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={mergeStyle.icon}
-                      />
-                    </svg>
-                    <span className={`text-sm font-semibold ${mergeStyle.text}`}>
-                      {mergeRec}
-                    </span>
-                    {reviewSummary?.primary_risk_category && (
-                      <span className={`text-xs ${mergeStyle.text} opacity-75`}>
-                        — Primary risk: {reviewSummary.primary_risk_category}
-                      </span>
-                    )}
-                  </div>
-                  {reviewSummary?.merge_explanation && (
-                    <span className={`text-xs ${mergeStyle.text} opacity-80 ml-6`}>
-                      {reviewSummary.merge_explanation}
-                    </span>
-                  )}
-                </div>
+              {mergeRec && (
+                <MergeDecisionBanner
+                  recommendation={mergeRec}
+                  verdict={reviewSummary?.decision_verdict}
+                  explanation={reviewSummary?.merge_explanation}
+                  primaryRiskCategory={reviewSummary?.primary_risk_category}
+                  className="mt-3"
+                />
               )}
 
               {showSystemic && <SystemicPatternsBanner patterns={systemicPatterns} />}
@@ -346,18 +320,11 @@ export function ReviewSummary({
             </div>
           )}
 
-          {(reviewSummary?.risk_summary || hasSummary) && (
+          {hasSummary && (
             <div className="px-4 py-3">
-              {reviewSummary?.risk_summary && (
-                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-2">
-                  {reviewSummary.risk_summary}
-                </p>
-              )}
-              {hasSummary && (
-                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
-                  {displayText}
-                </p>
-              )}
+              <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
+                {displayText}
+              </p>
             </div>
           )}
           {executionMetadata && (
@@ -389,7 +356,7 @@ export function ReviewSummary({
         </div>
       )}
 
-      {(hasSummary || reviewSummary?.risk_summary) && (!findings || findings.length === 0) && (
+      {hasSummary && (!findings || findings.length === 0) && (
         <div className="flex w-full flex-col gap-3">
           {variant === "full" && (
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -398,35 +365,19 @@ export function ReviewSummary({
           )}
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
             <div className="p-4">
-              {reviewSummary?.risk_summary && (
-                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-2">
-                  {reviewSummary.risk_summary}
-                </p>
-              )}
               {hasSummary && (
                 <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap wrap-break-word">
                   {displayText}
                 </p>
               )}
-              {variant === "full" && mergeRec && mergeStyle && (
-                <div className={`mt-3 flex items-center gap-2 rounded-md px-3 py-2 ${mergeStyle.bg}`}>
-                  <svg
-                    className={`h-4 w-4 shrink-0 ${mergeStyle.text}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d={mergeStyle.icon}
-                    />
-                  </svg>
-                  <span className={`text-sm font-semibold ${mergeStyle.text}`}>
-                    {mergeRec}
-                  </span>
-                </div>
+              {variant === "full" && mergeRec && (
+                <MergeDecisionBanner
+                  recommendation={mergeRec}
+                  verdict={reviewSummary?.decision_verdict}
+                  explanation={reviewSummary?.merge_explanation}
+                  primaryRiskCategory={reviewSummary?.primary_risk_category}
+                  className="mt-3"
+                />
               )}
             </div>
             {executionMetadata && (

@@ -132,10 +132,13 @@ export function AiReviewSummaryBlock({ aiReviewSummary }: AiReviewSummaryBlockPr
 
         <section className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Recommendation
+            AI narrative
           </span>
-          <p className="text-sm font-medium leading-relaxed text-zinc-800 dark:text-zinc-200 rounded-md px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
+          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 rounded-md px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
             {recommendation}
+          </p>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            Use the merge decision in the sidebar for the authoritative recommendation.
           </p>
         </section>
       </div>

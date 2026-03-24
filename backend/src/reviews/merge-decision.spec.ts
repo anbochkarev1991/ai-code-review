@@ -8,7 +8,7 @@ describe('decideMerge', () => {
       risk_score: 0,
     });
     expect(result.recommendation).toBe('Merge blocked');
-    expect(result.explanation).toContain('1 critical issue');
+    expect(result.explanation).toContain('critical severity issue');
   });
 
   it('blocks with multiple criticals', () => {
@@ -18,48 +18,36 @@ describe('decideMerge', () => {
       risk_score: 95,
     });
     expect(result.recommendation).toBe('Merge blocked');
-    expect(result.explanation).toContain('3 critical issues');
+    expect(result.explanation).toContain('3 critical severity issues');
   });
 
-  it('includes deterministic risk explanation for criticals', () => {
-    const result = decideMerge({
-      critical_count: 1,
-      high_count: 0,
-      risk_score: 70,
-    });
-    expect(result.explanation).toContain(
-      'Risk score elevated due to presence of critical security finding.',
-    );
-  });
-
-  it('caution when high_count >= 3 (no criticals)', () => {
+  it('caution when any high finding (no criticals)', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 3,
       risk_score: 10,
     });
     expect(result.recommendation).toBe('Merge with caution');
-    expect(result.explanation).toContain('3 high severity');
+    expect(result.explanation).toContain('high severity');
   });
 
-  it('caution when risk_score >= 60 (no criticals, < 3 high)', () => {
+  it('caution when risk_score >= 60 (no criticals, no high)', () => {
     const result = decideMerge({
       critical_count: 0,
-      high_count: 1,
+      high_count: 0,
       risk_score: 60,
     });
     expect(result.recommendation).toBe('Merge with caution');
-    expect(result.explanation).toContain('risk score 60/100');
+    expect(result.explanation).toContain('60/100');
   });
 
-  it('safe to merge when all thresholds are below', () => {
+  it('caution when high present even if score < 60', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 2,
       risk_score: 59,
     });
-    expect(result.recommendation).toBe('Safe to merge');
-    expect(result.explanation).toContain('Low risk');
+    expect(result.recommendation).toBe('Merge with caution');
   });
 
   it('safe to merge for zero findings', () => {
@@ -80,17 +68,8 @@ describe('decideMerge', () => {
     expect(result.recommendation).toBe('Merge blocked');
   });
 
-  it('high count (>=3) takes precedence over score < 60', () => {
-    const result = decideMerge({
-      critical_count: 0,
-      high_count: 4,
-      risk_score: 15,
-    });
-    expect(result.recommendation).toBe('Merge with caution');
-  });
-
   it('is deterministic — same input always same output', () => {
-    const input = { critical_count: 0, high_count: 2, risk_score: 45 };
+    const input = { critical_count: 0, high_count: 1, risk_score: 45 };
     const r1 = decideMerge(input);
     const r2 = decideMerge(input);
     const r3 = decideMerge(input);

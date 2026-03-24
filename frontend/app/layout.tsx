@@ -17,6 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AI Code Review Assistant",
   description: "Get comprehensive, AI-powered code reviews for your GitHub pull requests. Analyze code quality, architecture, performance, and security.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

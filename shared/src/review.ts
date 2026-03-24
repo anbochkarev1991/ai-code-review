@@ -8,7 +8,13 @@ export type FindingCategory = 'security' | 'performance' | 'architecture' | 'cod
 
 export type RiskLevel = 'Low risk' | 'Moderate' | 'High' | 'Critical';
 
-export type MergeRecommendation = 'Safe to merge' | 'Merge with caution' | 'Merge blocked';
+export type MergeRecommendation =
+  | 'Safe to merge'
+  | 'Safe to merge with warnings'
+  | 'Merge with caution'
+  | 'Merge blocked';
+
+export type ReviewDecisionVerdict = 'safe' | 'warning' | 'blocked';
 
 export type ReviewStatus = 'complete' | 'partial' | 'failed';
 
@@ -97,6 +103,8 @@ export interface Finding {
   merged_agents?: string[];
   merged_categories?: string[];
   consensus_level?: ConsensusLevel;
+  /** Number of distinct agents that contributed (after consolidation). */
+  agent_count?: number;
   false_positive_risk?: FalsePositiveRisk;
   outside_diff?: boolean;
   diff_context?: DiffContext;
@@ -206,12 +214,14 @@ export interface ReviewSummary {
   risk_breakdown?: RiskBreakdown;
   merge_recommendation: MergeRecommendation;
   merge_explanation: MergeExplanation;
+  /** Aligns with merge recommendation; omitted in older snapshots. */
+  decision_verdict?: ReviewDecisionVerdict;
   primary_risk_category?: string;
   most_severe_issue?: string;
   systemic_patterns?: string[];
   multi_agent_confirmed_count?: number;
   text: string;
-  /** Short severity-only risk one-liner (critical/high counts only). */
+  /** Deprecated: same as merge_explanation when present (kept for older snapshots). */
   risk_summary?: string;
 }
 

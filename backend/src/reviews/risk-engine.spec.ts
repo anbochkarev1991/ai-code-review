@@ -183,25 +183,24 @@ describe('RiskEngine', () => {
     it('blocks merge with multiple criticals', () => {
       const decision = engine.deriveMergeDecision(90, 3, 2);
       expect(decision.recommendation).toBe('Merge blocked');
-      expect(decision.explanation).toContain('3 critical issues');
+      expect(decision.explanation).toContain('3 critical severity issues');
     });
 
-    it('caution when 3+ high findings', () => {
+    it('caution when any high findings', () => {
       const decision = engine.deriveMergeDecision(20, 0, 3);
       expect(decision.recommendation).toBe('Merge with caution');
       expect(decision.explanation).toContain('high severity');
     });
 
-    it('caution when risk_score >= 60', () => {
-      const decision = engine.deriveMergeDecision(60, 0, 1);
+    it('caution when risk_score >= 60 and no high', () => {
+      const decision = engine.deriveMergeDecision(60, 0, 0);
       expect(decision.recommendation).toBe('Merge with caution');
-      expect(decision.explanation).toContain('risk score');
+      expect(decision.explanation).toContain('60/100');
     });
 
-    it('safe to merge when below all thresholds', () => {
+    it('caution when high present even if score is low', () => {
       const decision = engine.deriveMergeDecision(25, 0, 2);
-      expect(decision.recommendation).toBe('Safe to merge');
-      expect(decision.explanation).toContain('Low risk');
+      expect(decision.recommendation).toBe('Merge with caution');
     });
 
     it('critical count takes priority over score', () => {
@@ -209,9 +208,9 @@ describe('RiskEngine', () => {
       expect(decision.recommendation).toBe('Merge blocked');
     });
 
-    it('high count takes priority over score when >= 3', () => {
-      const decision = engine.deriveMergeDecision(10, 0, 5);
-      expect(decision.recommendation).toBe('Merge with caution');
+    it('warnings when only medium and score < 60', () => {
+      const decision = engine.deriveMergeDecision(30, 0, 0, 4, 0);
+      expect(decision.recommendation).toBe('Safe to merge with warnings');
     });
   });
 

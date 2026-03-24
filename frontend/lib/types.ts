@@ -18,6 +18,7 @@ export type {
   FindingCategory,
   RiskLevel,
   MergeRecommendation,
+  ReviewDecisionVerdict,
   PRMetadata,
   ExecutionMetadata,
   DiffContext,

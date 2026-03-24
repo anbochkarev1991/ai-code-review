@@ -65,12 +65,17 @@ export function FindingsStats({
         </div>
       )}
       {multiAgentCount !== undefined && multiAgentCount > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {multiAgentCount}
-          </span>
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent confirmed</span>
+        <div className="flex w-full flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+            <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              {multiAgentCount}
+            </span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent overlap</span>
+          </div>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-4">
+            {multiAgentCount} finding{multiAgentCount === 1 ? "" : "s"} independently flagged by more than one agent.
+          </p>
         </div>
       )}
     </div>
@@ -147,8 +152,14 @@ export function getMergeRecommendationStyle(rec: MergeRecommendation): {
       };
     case "Merge with caution":
       return {
-        bg: "bg-yellow-100 dark:bg-yellow-900/30",
-        text: "text-yellow-800 dark:text-yellow-300",
+        bg: "bg-amber-100 dark:bg-amber-900/30",
+        text: "text-amber-900 dark:text-amber-200",
+        icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
+      };
+    case "Safe to merge with warnings":
+      return {
+        bg: "bg-amber-50 dark:bg-amber-950/40",
+        text: "text-amber-900 dark:text-amber-200",
         icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
       };
     case "Safe to merge":
