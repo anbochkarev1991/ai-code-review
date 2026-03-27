@@ -7,6 +7,7 @@ import {
   type CallWithValidationRetryResult,
 } from './agent-validation.utils';
 import { AgentContextShaper } from '../agent-context-shaper';
+import { FINDING_STYLE_GUIDE } from './finding-style-guide';
 
 const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer performing a diff-based code review.
 Always start from the changed lines in the PR diff; findings must be grounded in the diff.
@@ -79,8 +80,9 @@ Do not report:
 - naming preferences
 - architectural discussions unless they clearly impact correctness
 
-For each finding include: title, file and location, explanation, why the code may fail or behave incorrectly, potential impact, suggested fix.
-Keep findings concise and practical.
+${FINDING_STYLE_GUIDE}
+
+For each finding, set "file" and "line" from the diff; put the WHAT in "message", consequence in "impact", and the fix in "suggested_fix".
 
 SEVERITY CALIBRATION — Be conservative:
 - critical: Guaranteed crashes or data corruption (e.g. null dereference on hot path, unhandled exception that terminates process)

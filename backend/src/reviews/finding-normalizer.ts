@@ -356,11 +356,19 @@ export class FindingNormalizer {
   private enforceQuality(finding: Finding): Finding {
     const updates: Partial<Finding> = {};
 
+    if (finding.title) {
+      const t = this.truncateTitleToMaxWords(finding.title, 12);
+      if (t !== finding.title) updates.title = t;
+    }
     if (finding.message) {
       updates.message = this.truncateToSentences(finding.message, 3);
     }
     if (finding.impact) {
       updates.impact = this.truncateToSentences(finding.impact, 2);
+    }
+    if (finding.suggested_fix) {
+      const fix = this.truncateToSentences(finding.suggested_fix, 3);
+      if (fix !== finding.suggested_fix) updates.suggested_fix = fix;
     }
 
     if (Object.keys(updates).length === 0) return finding;
@@ -629,6 +637,15 @@ export class FindingNormalizer {
     const sentences = text.match(/[^.!?]+[.!?]+/g);
     if (!sentences || sentences.length <= maxSentences) return text;
     return sentences.slice(0, maxSentences).join('').trim();
+  }
+
+  /** Hard ceiling when the model ignores title length guidance. */
+  private truncateTitleToMaxWords(title: string, maxWords: number): string {
+    const trimmed = title.trim();
+    if (!trimmed) return title;
+    const words = trimmed.split(/\s+/);
+    if (words.length <= maxWords) return trimmed;
+    return words.slice(0, maxWords).join(' ');
   }
 
   private sortFindings(findings: Finding[]): Finding[] {

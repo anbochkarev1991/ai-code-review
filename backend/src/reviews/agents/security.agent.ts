@@ -7,6 +7,7 @@ import {
   type CallWithValidationRetryResult,
 } from './agent-validation.utils';
 import { AgentContextShaper } from '../agent-context-shaper';
+import { FINDING_STYLE_GUIDE } from './finding-style-guide';
 
 const SECURITY_SYSTEM_PROMPT = `You are a senior application security reviewer.
 
@@ -40,7 +41,9 @@ Security review method:
 
 Redirect logic is especially important. A redirect is potentially unsafe when its target comes from untrusted input. Common redirect sinks: new URL(value, origin), window.location, location.href, redirect(...), res.redirect(...). If the redirect target can be influenced by user input or external data and is not validated against same-origin, allowlisted domains, or https scheme, report a potential open redirect. Do not report if the redirect target is constant or already validated.
 
-For each finding include: title, file and location, explanation, why the input is untrusted, potential impact, suggested fix. Use the schema's "impact" field for potential impact. Be conservative: if uncertain, set confidence below 0.5. Do not flag process.env references or test-file secrets unless real credentials.
+${FINDING_STYLE_GUIDE}
+
+For each finding, set "file" and "line" from the diff; explain untrusted input and sink in "message"; put concrete harm in "impact"; put the fix in "suggested_fix". Be conservative: if uncertain, set confidence below 0.5. Do not flag process.env references or test-file secrets unless real credentials.
 
 SEVERITY CALIBRATION — Be conservative:
 - critical: Confirmed exploitable vulnerabilities (SQL injection, open redirect, auth bypass). Must be clearly exploitable from the diff.

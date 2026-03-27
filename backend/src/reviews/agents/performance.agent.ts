@@ -7,6 +7,7 @@ import {
   type CallWithValidationRetryResult,
 } from './agent-validation.utils';
 import { AgentContextShaper } from '../agent-context-shaper';
+import { FINDING_STYLE_GUIDE } from './finding-style-guide';
 
 const PERFORMANCE_SYSTEM_PROMPT = `You are a senior performance engineer performing a diff-based code review.
 Always start from the changed lines in the PR diff; findings must be grounded in the diff.
@@ -53,6 +54,8 @@ FALSE POSITIVE REDUCTION:
 
 IMPACT FIELD:
 For each finding, provide an "impact" string describing the concrete business or system consequence. Be precise, not alarmist. Example: "N+1 query pattern will cause O(n) database calls, degrading response time linearly with collection size."
+
+${FINDING_STYLE_GUIDE}
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
