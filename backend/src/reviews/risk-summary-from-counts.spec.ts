@@ -40,6 +40,6 @@ describe('riskSummaryFromCounts', () => {
         low_count: 0,
         risk_score: 0,
       }),
-    ).toContain('No significant issues');
+    ).toContain('no significant issues found');
   });
 });

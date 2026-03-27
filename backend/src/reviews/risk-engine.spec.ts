@@ -186,9 +186,9 @@ describe('RiskEngine', () => {
       expect(decision.explanation).toContain('3 critical severity issues');
     });
 
-    it('caution when any high findings', () => {
+    it('blocked when any high findings', () => {
       const decision = engine.deriveMergeDecision(20, 0, 3);
-      expect(decision.recommendation).toBe('Merge with caution');
+      expect(decision.recommendation).toBe('Merge blocked');
       expect(decision.explanation).toContain('high severity');
     });
 
@@ -198,9 +198,9 @@ describe('RiskEngine', () => {
       expect(decision.explanation).toContain('60/100');
     });
 
-    it('caution when high present even if score is low', () => {
+    it('blocked when high present even if score is low', () => {
       const decision = engine.deriveMergeDecision(25, 0, 2);
-      expect(decision.recommendation).toBe('Merge with caution');
+      expect(decision.recommendation).toBe('Merge blocked');
     });
 
     it('critical count takes priority over score', () => {
@@ -208,9 +208,9 @@ describe('RiskEngine', () => {
       expect(decision.recommendation).toBe('Merge blocked');
     });
 
-    it('warnings when only medium and score < 60', () => {
+    it('caution when only medium and score < 60', () => {
       const decision = engine.deriveMergeDecision(30, 0, 0, 4, 0);
-      expect(decision.recommendation).toBe('Safe to merge with warnings');
+      expect(decision.recommendation).toBe('Merge with caution');
     });
   });
 

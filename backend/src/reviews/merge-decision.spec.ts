@@ -21,13 +21,13 @@ describe('decideMerge', () => {
     expect(result.explanation).toContain('3 critical severity issues');
   });
 
-  it('caution when any high finding (no criticals)', () => {
+  it('blocked when any high finding (no criticals)', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 3,
       risk_score: 10,
     });
-    expect(result.recommendation).toBe('Merge with caution');
+    expect(result.recommendation).toBe('Merge blocked');
     expect(result.explanation).toContain('high severity');
   });
 
@@ -41,13 +41,13 @@ describe('decideMerge', () => {
     expect(result.explanation).toContain('60/100');
   });
 
-  it('caution when high present even if score < 60', () => {
+  it('blocked when high present even if score < 60', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 2,
       risk_score: 59,
     });
-    expect(result.recommendation).toBe('Merge with caution');
+    expect(result.recommendation).toBe('Merge blocked');
   });
 
   it('safe to merge for zero findings', () => {

@@ -115,11 +115,11 @@ export function buildReviewSummaryParagraph(params: {
   if (sentences.length < 4) {
     if (mergeRecommendation === 'Merge blocked') {
       sentences.push(
-        'Recommendation: Block merge until critical issues are resolved.',
+        'Recommendation: Block merge until high/critical issues are resolved.',
       );
     } else if (mergeRecommendation === 'Merge with caution') {
       sentences.push(
-        'Recommendation: Proceed with caution and address high-severity findings before production deployment.',
+        'Recommendation: Proceed with caution and address medium-severity findings.',
       );
     } else {
       sentences.push('Recommendation: Safe to merge.');

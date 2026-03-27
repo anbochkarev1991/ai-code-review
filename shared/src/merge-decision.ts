@@ -137,9 +137,9 @@ export function getReviewDecision(findings: Finding[]): ReviewDecision {
  *
  * Priority (first match wins):
  *   1. Any critical finding → blocked
- *   2. Any high finding → cannot be "safe"; merge with caution
- *   3. risk_score >= 60 → merge with caution
- *   4. Any medium finding (no high/critical above) → safe with warnings
+ *   2. Any high finding → blocked
+ *   3. risk_score >= 60 → warning (edge-case guard)
+ *   4. Any medium finding → warning
  *   5. Otherwise → safe to merge
  *
  * risk_summary and merge_explanation should both use this same explanation.
@@ -160,9 +160,9 @@ export function decideMerge(input: MergeDecisionInput): MergeDecision {
 
   if (high_count > 0) {
     return {
-      verdict: 'warning',
-      recommendation: 'Merge with caution',
-      explanation: `Merge with caution: ${high_count} high severity issue${high_count === 1 ? '' : 's'} — not safe to merge without review.`,
+      verdict: 'blocked',
+      recommendation: 'Merge blocked',
+      explanation: `Blocked due to ${high_count} high severity issue${high_count === 1 ? '' : 's'}.`,
     };
   }
 
@@ -177,14 +177,14 @@ export function decideMerge(input: MergeDecisionInput): MergeDecision {
   if (medium_count > 0) {
     return {
       verdict: 'warning',
-      recommendation: 'Safe to merge with warnings',
-      explanation: `Safe to merge with warnings: ${medium_count} medium severity issue${medium_count === 1 ? '' : 's'}.`,
+      recommendation: 'Merge with caution',
+      explanation: `Merge with caution due to ${medium_count} medium severity issue${medium_count === 1 ? '' : 's'}.`,
     };
   }
 
   return {
     verdict: 'safe',
     recommendation: 'Safe to merge',
-    explanation: 'No significant issues; safe to merge.',
+    explanation: 'Safe to merge — no significant issues found',
   };
 }

@@ -154,12 +154,6 @@ export function getMergeRecommendationStyle(rec: MergeRecommendation): {
         text: "text-amber-900 dark:text-amber-200",
         icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
       };
-    case "Safe to merge with warnings":
-      return {
-        bg: "bg-amber-50 dark:bg-amber-950/40",
-        text: "text-amber-900 dark:text-amber-200",
-        icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z",
-      };
     case "Safe to merge":
       return {
         bg: "bg-green-100 dark:bg-green-900/30",

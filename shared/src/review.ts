@@ -10,7 +10,6 @@ export type RiskLevel = 'Low risk' | 'Moderate' | 'High' | 'Critical';
 
 export type MergeRecommendation =
   | 'Safe to merge'
-  | 'Safe to merge with warnings'
   | 'Merge with caution'
   | 'Merge blocked';
 

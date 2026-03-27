@@ -19,13 +19,28 @@ function verdictBadgeClass(v: ReviewDecisionVerdict | undefined): string {
 function verdictLabel(v: ReviewDecisionVerdict | undefined): string | null {
   switch (v) {
     case "blocked":
-      return "Blocked";
+      return "Blocked from merge";
     case "warning":
-      return "Warning";
+      return "Merge with caution";
     case "safe":
-      return "Safe";
+      return "Safe to merge";
     default:
       return null;
+  }
+}
+
+/** User-facing headline; aligns API `MergeRecommendation` with `decision_verdict` labels. */
+function mergeDecisionHeadline(
+  verdict: ReviewDecisionVerdict | undefined,
+  recommendation: MergeRecommendation,
+): string {
+  const fromVerdict = verdict ? verdictLabel(verdict) : null;
+  if (fromVerdict) return fromVerdict;
+  switch (recommendation) {
+    case "Merge blocked":
+      return "Blocked from merge";
+    default:
+      return recommendation;
   }
 }
 
@@ -50,20 +65,22 @@ export function MergeDecisionBanner({
 
   const style = getMergeRecommendationStyle(recommendation);
   const vLabel = verdictLabel(verdict);
+  const headline = mergeDecisionHeadline(verdict, recommendation);
+  const showBadge = vLabel != null && vLabel !== headline;
 
   return (
     <div
       className={`flex flex-col gap-2 rounded-lg border border-black/5 px-3 py-3 shadow-sm dark:border-white/10 ${style.bg} ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        {vLabel && (
+        {showBadge && (
           <span
             className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${verdictBadgeClass(verdict)}`}
           >
             {vLabel}
           </span>
         )}
-        <span className={`text-sm font-semibold ${style.text}`}>{recommendation}</span>
+        <span className={`text-sm font-semibold ${style.text}`}>{headline}</span>
       </div>
       {primaryRiskCategory && (
         <p className={`text-xs ${style.text} opacity-80`}>Primary risk: {primaryRiskCategory}</p>

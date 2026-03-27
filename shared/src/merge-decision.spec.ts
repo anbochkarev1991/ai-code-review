@@ -38,7 +38,7 @@ describe('decideMerge', () => {
     expect(result.explanation).toContain('3 critical severity issues');
   });
 
-  it('caution when any high finding (no criticals)', () => {
+  it('blocked when any high finding (no criticals)', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 2,
@@ -46,8 +46,8 @@ describe('decideMerge', () => {
       low_count: 0,
       risk_score: 10,
     });
-    expect(result.recommendation).toBe('Merge with caution');
-    expect(result.verdict).toBe('warning');
+    expect(result.recommendation).toBe('Merge blocked');
+    expect(result.verdict).toBe('blocked');
     expect(result.explanation).toContain('2 high severity');
   });
 
@@ -64,7 +64,7 @@ describe('decideMerge', () => {
     expect(result.explanation).toContain('60/100');
   });
 
-  it('warnings when only medium issues and score < 60', () => {
+  it('caution when only medium issues and score < 60', () => {
     const result = decideMerge({
       critical_count: 0,
       high_count: 0,
@@ -72,9 +72,9 @@ describe('decideMerge', () => {
       low_count: 0,
       risk_score: 30,
     });
-    expect(result.recommendation).toBe('Safe to merge with warnings');
+    expect(result.recommendation).toBe('Merge with caution');
     expect(result.verdict).toBe('warning');
-    expect(result.explanation).toContain('2 medium severity');
+    expect(result.explanation).toContain('Merge with caution due to 2 medium severity issues');
   });
 
   it('safe to merge when only low severity and score < 60', () => {
@@ -116,7 +116,8 @@ describe('decideMerge', () => {
       high_count: 1,
       risk_score: 15,
     });
-    expect(result.recommendation).toBe('Merge with caution');
+    expect(result.recommendation).toBe('Merge blocked');
+    expect(result.verdict).toBe('blocked');
   });
 
   it('is deterministic — same input always same output', () => {
