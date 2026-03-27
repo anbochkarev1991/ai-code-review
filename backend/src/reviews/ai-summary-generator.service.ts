@@ -4,6 +4,139 @@ import type { AiReviewSummary, Finding, ReviewSummary } from 'shared';
 
 type ParsedConcern = { severity: string; title: string; explanation?: string };
 
+/** Word numbers 1–20 that might appear in LLM prose instead of digits. */
+const WORD_NUMBER_TO_VALUE: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+
+const WORD_NUMBER_PATTERN = Object.keys(WORD_NUMBER_TO_VALUE).join('|');
+
+/**
+ * Single source for the opening severity sentence in AI overall_assessment.
+ * Uses structured counts from the review (must match findings after normalization).
+ */
+export function buildFactualSeverityPrefix(reviewSummary: ReviewSummary): string {
+  const {
+    critical_count: c,
+    high_count: h,
+    medium_count: m,
+    low_count: l,
+  } = reviewSummary;
+  const total = c + h + m + l;
+  if (total === 0) {
+    return 'No issues found.';
+  }
+
+  const segments: string[] = [];
+  const push = (n: number, label: string) => {
+    if (n <= 0) return;
+    const noun = n === 1 ? 'issue' : 'issues';
+    segments.push(`${n} ${label}-severity ${noun}`);
+  };
+  push(c, 'critical');
+  push(h, 'high');
+  push(m, 'medium');
+  push(l, 'low');
+
+  if (segments.length === 1) {
+    return `This PR contains ${segments[0]}.`;
+  }
+  if (segments.length === 2) {
+    return `This PR contains ${segments[0]} and ${segments[1]}.`;
+  }
+  const last = segments.pop()!;
+  return `This PR contains ${segments.join(', ')}, and ${last}.`;
+}
+
+/**
+ * Returns true if a sentence appears to claim numeric severity counts that are unsafe
+ * (vague quantifiers) or disagree with structured findings.
+ */
+function substringContradictsSeverityCount(
+  slice: string,
+  expected: Record<'critical' | 'high' | 'medium' | 'low', number>,
+): boolean {
+  const hasSeverityTalk =
+    /\b(critical|high|medium|low)[- ]severity\b/i.test(slice) ||
+    /\b(critical|high|medium|low)\s+(?:issue|issues|finding|findings)\b/i.test(
+      slice,
+    );
+  if (!hasSeverityTalk) return false;
+
+  if (/\b(several|multiple|a few)\b/i.test(slice)) return true;
+
+  let claimed: number | null = null;
+  const digit = slice.match(/\b(\d{1,2})\b/);
+  if (digit) claimed = parseInt(digit[1]!, 10);
+
+  const lower = slice.toLowerCase();
+  const wordMatch = lower.match(
+    new RegExp(`\\b(${WORD_NUMBER_PATTERN})\\b`, 'i'),
+  );
+  if (wordMatch && WORD_NUMBER_TO_VALUE[wordMatch[1]!.toLowerCase()] != null) {
+    claimed = WORD_NUMBER_TO_VALUE[wordMatch[1]!.toLowerCase()]!;
+  }
+
+  if (claimed == null) return false;
+
+  if (/\bcritical(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+    return claimed !== expected.critical;
+  }
+  if (/\bhigh(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+    return claimed !== expected.high;
+  }
+  if (/\bmedium(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+    return claimed !== expected.medium;
+  }
+  if (/\blow(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+    return claimed !== expected.low;
+  }
+
+  return false;
+}
+
+/**
+ * Removes sentences that claim numeric (or vague multi) severity counts, which must
+ * come only from buildFactualSeverityPrefix.
+ */
+export function stripSeverityCountClaims(
+  text: string,
+  expectedCounts: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  },
+): string {
+  const parts = text.split(/(?<=[.!?])\s+/).filter((p) => p.trim().length > 0);
+  const kept = parts.filter((sentence) => {
+    if (substringContradictsSeverityCount(sentence, expectedCounts)) {
+      return false;
+    }
+    return true;
+  });
+  return kept.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 function parseConcern(raw: string): ParsedConcern {
   const match = raw.match(/^\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s*(.*)/s);
   if (match) {
@@ -127,6 +260,8 @@ const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code rev
 
 1. overall_assessment: 1–2 concise sentences describing the PR state clearly. Answer: What are the main risks? Is this PR mostly safe, risky, or blocked?
 
+   **Important:** Do NOT state specific counts of critical/high/medium/low findings or issues (no numbers, no words like "three" or "multiple" tied to severity levels). The system prepends exact severity counts automatically.
+
 2. primary_risk: Single short label for the main concern category. Examples: "Security", "Reliability", "Architecture", "Maintainability", "Performance", "Code Quality".
 
 3. key_concerns: 3–5 items max. Put more severe or impactful concerns first.
@@ -154,6 +289,7 @@ const AI_SUMMARY_SYSTEM_PROMPT = `You are a senior engineer summarizing code rev
 - Marketing or dramatic language
 - Vague statements
 - Separate concerns that differ only by method/file name—merge into one pattern
+- Stating how many critical/high/medium/low findings or issues exist (counts are injected separately; do not approximate)
 
 ## Themes to mention when relevant
 Error handling gaps, validation issues, architectural coupling, security-sensitive behavior.`;
@@ -181,6 +317,14 @@ export class AiSummaryGeneratorService {
     findings: Finding[],
     reviewSummary: ReviewSummary,
   ): Promise<AiReviewSummary | undefined> {
+    const factualPrefix = buildFactualSeverityPrefix(reviewSummary);
+    const expectedCounts = {
+      critical: reviewSummary.critical_count,
+      high: reviewSummary.high_count,
+      medium: reviewSummary.medium_count,
+      low: reviewSummary.low_count,
+    };
+
     const client = this.getClient();
     if (!client) return undefined;
 
@@ -217,6 +361,15 @@ export class AiSummaryGeneratorService {
       if (!summary.primary_risk && reviewSummary.primary_risk_category) {
         summary.primary_risk = reviewSummary.primary_risk_category;
       }
+
+      const cleanedAssessment = stripSeverityCountClaims(
+        summary.overall_assessment,
+        expectedCounts,
+      );
+      summary.overall_assessment = cleanedAssessment
+        ? `${factualPrefix} ${cleanedAssessment}`
+        : factualPrefix;
+
       return summary;
     } catch (err) {
       this.logger.warn(
@@ -284,6 +437,8 @@ export class AiSummaryGeneratorService {
     }
 
     parts.push(
+      '',
+      'For overall_assessment: describe risks qualitatively only — no counts of findings by severity (the client will show exact counts).',
       '',
       'For key_concerns: Infer accurate descriptions from each finding\'s message (not just the title). Do not mischaracterize—e.g. if a finding says the value comes from env vars, do not label it as "hardcoded."',
       '',

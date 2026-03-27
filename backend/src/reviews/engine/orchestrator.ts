@@ -19,7 +19,6 @@ import { ArchitectureAgent } from '../agents/architecture.agent';
 import { CodeQualityAgent } from '../agents/code-quality.agent';
 import { PerformanceAgent } from '../agents/performance.agent';
 import { SecurityAgent } from '../agents/security.agent';
-import { AiSummaryGeneratorService } from '../ai-summary-generator.service';
 import { ContextBuilder } from '../context-builder';
 import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
@@ -61,7 +60,6 @@ export class ReviewOrchestrator {
     private readonly contextBuilder: ContextBuilder,
     private readonly aggregator: DeterministicAggregator,
     private readonly resultFormatter: ResultFormatter,
-    private readonly aiSummaryGenerator: AiSummaryGeneratorService,
   ) {}
 
   async runReview(
@@ -156,14 +154,6 @@ export class ReviewOrchestrator {
     result.signature = signature;
     result.performance = performance;
     result.review_metadata = reviewMetadata;
-
-    const aiSummary = await this.aiSummaryGenerator.generate(
-      aggregated.findings,
-      aggregated.review_summary,
-    );
-    if (aiSummary) {
-      result.ai_review_summary = aiSummary;
-    }
 
     return { status, result, trace };
   }

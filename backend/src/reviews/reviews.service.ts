@@ -16,6 +16,7 @@ import { ReviewOrchestrator } from './engine/orchestrator';
 import { GitHubService } from '../github/github.service';
 import { ReviewRunsRepository } from './review-runs.repository';
 import { SeverityNormalizer } from './severity-normalizer';
+import { AiSummaryGeneratorService } from './ai-summary-generator.service';
 
 const LARGE_PR_LINE_THRESHOLD = 1000;
 const MARKDOWN_ONLY_EXTENSIONS = new Set(['markdown']);
@@ -44,6 +45,7 @@ export class ReviewsService {
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
     private readonly severityNormalizer: SeverityNormalizer,
+    private readonly aiSummaryGenerator: AiSummaryGeneratorService,
   ) {}
 
   async findOne(
@@ -197,7 +199,7 @@ export class ReviewsService {
       };
     }
 
-    const normalizedResult: ReviewResult | undefined = engineResult.result
+    let normalizedResult: ReviewResult | undefined = engineResult.result
       ? this.syncReviewSummaryWithFindings({
           ...engineResult.result,
           findings: this.severityNormalizer.normalize(
@@ -205,6 +207,22 @@ export class ReviewsService {
           ),
         })
       : undefined;
+
+    if (
+      normalizedResult?.findings &&
+      normalizedResult.review_summary
+    ) {
+      const aiSummary = await this.aiSummaryGenerator.generate(
+        normalizedResult.findings,
+        normalizedResult.review_summary,
+      );
+      if (aiSummary) {
+        normalizedResult = {
+          ...normalizedResult,
+          ai_review_summary: aiSummary,
+        };
+      }
+    }
 
     const id = await this.reviewRunsRepository.create(
       {
