@@ -72,7 +72,8 @@ export function FindingsStats({
             <span className="text-xs text-emerald-600 dark:text-emerald-400">Multi-agent overlap</span>
           </div>
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400 pl-4">
-            {multiAgentCount} finding{multiAgentCount === 1 ? "" : "s"} independently flagged by more than one agent.
+            {multiAgentCount} finding{multiAgentCount === 1 ? "" : "s"} confirmed by multiple agents — different review
+            perspectives reached the same conclusion independently.
           </p>
         </div>
       )}

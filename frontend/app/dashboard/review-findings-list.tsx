@@ -399,6 +399,50 @@ function getFPRiskStyle(risk: string): { bg: string; text: string } {
 
 const AGENT_TOTAL = 4;
 
+/** Short line explaining why multi-agent consensus matters (shown under the badge). */
+function getConsensusExplanation(finding: Finding): string | null {
+  if (finding.consensus_level !== "multi-agent") return null;
+  if (finding.agent_count != null && finding.agent_count > 1) {
+    return `Detected independently by ${finding.agent_count} of ${AGENT_TOTAL} agents`;
+  }
+  if (finding.merged_agents && finding.merged_agents.length > 1) {
+    return `Confirmed by ${finding.merged_agents.length} agents`;
+  }
+  return "Detected independently by multiple agents";
+}
+
+type ConfidenceLabelResult = { label: string; className: string };
+
+/** Qualitative label from numeric confidence; multi-agent readings get one tier higher trust. */
+function getConfidenceLabel(
+  confidence: number,
+  consensusLevel: Finding["consensus_level"],
+): ConfidenceLabelResult {
+  const isMulti = consensusLevel === "multi-agent";
+  if (confidence >= 0.8) {
+    return isMulti
+      ? { label: "High confidence", className: "text-emerald-600 dark:text-emerald-400" }
+      : { label: "Moderate confidence", className: "text-zinc-500 dark:text-zinc-400" };
+  }
+  if (confidence >= 0.6) {
+    return isMulti
+      ? { label: "Moderate confidence", className: "text-zinc-500 dark:text-zinc-400" }
+      : { label: "Lower confidence", className: "text-amber-600 dark:text-amber-400" };
+  }
+  return { label: "Lower confidence", className: "text-amber-600 dark:text-amber-400" };
+}
+
+function SingleAgentIndicator({ finding }: { finding: Finding }) {
+  if (finding.consensus_level === "multi-agent" || !finding.agent_name) {
+    return null;
+  }
+  return (
+    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+      Single-agent finding — lower confidence
+    </span>
+  );
+}
+
 function MultiAgentBadge({ agentCount }: { agentCount?: number }) {
   const label =
     agentCount != null && agentCount > 1
@@ -421,6 +465,11 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
   const hasAIMetadata =
     finding.agent_name || finding.confidence !== undefined || finding.reasoning_trace;
   const isMultiAgent = finding.consensus_level === "multi-agent";
+  const consensusExplanation = isMultiAgent ? getConsensusExplanation(finding) : null;
+  const confidenceLabel =
+    finding.confidence !== undefined
+      ? getConfidenceLabel(finding.confidence, finding.consensus_level)
+      : null;
 
   return (
     <div
@@ -440,13 +489,20 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                 {finding.severity.toUpperCase()}
               </span>
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              {finding.category && (
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {finding.category}
-                </span>
+            <div className="mt-0.5 flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {finding.category && (
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {finding.category}
+                  </span>
+                )}
+                {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
+              </div>
+              {consensusExplanation && (
+                <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+                  {consensusExplanation}
+                </p>
               )}
-              {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
             </div>
           </div>
         </div>
@@ -528,8 +584,9 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                   )}
                 </div>
               )}
-              {finding.confidence !== undefined && (
-                <div className="flex items-center gap-1">
+              <SingleAgentIndicator finding={finding} />
+              {finding.confidence !== undefined && confidenceLabel && (
+                <div className="flex items-center gap-1 flex-wrap">
                   <span className="text-zinc-500 dark:text-zinc-400">Confidence:</span>
                   <div className="w-10 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden inline-block">
                     <div
@@ -538,6 +595,9 @@ function FindingSubCard({ finding, accessToken }: { finding: Finding; accessToke
                     />
                   </div>
                   <span className="font-mono">{(finding.confidence * 100).toFixed(0)}%</span>
+                  <span className={`text-[10px] font-medium ${confidenceLabel.className}`}>
+                    {confidenceLabel.label}
+                  </span>
                 </div>
               )}
               {finding.false_positive_risk && (
@@ -663,6 +723,11 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
   const hasAIMetadata =
     finding.agent_name || finding.confidence !== undefined || finding.reasoning_trace;
   const isMultiAgent = finding.consensus_level === "multi-agent";
+  const consensusExplanation = isMultiAgent ? getConsensusExplanation(finding) : null;
+  const confidenceLabel =
+    finding.confidence !== undefined
+      ? getConfidenceLabel(finding.confidence, finding.consensus_level)
+      : null;
 
   return (
     <div
@@ -684,13 +749,20 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
                   {finding.severity.toUpperCase()}
                 </span>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                {finding.category && (
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {finding.category}
-                  </span>
+              <div className="mt-1 flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {finding.category && (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {finding.category}
+                    </span>
+                  )}
+                  {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
+                </div>
+                {consensusExplanation && (
+                  <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+                    {consensusExplanation}
+                  </p>
                 )}
-                {isMultiAgent && <MultiAgentBadge agentCount={finding.agent_count} />}
               </div>
             </div>
           </div>
@@ -850,10 +922,11 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
                       )}
                     </div>
                   )}
-                  {finding.confidence !== undefined && (
-                    <div className="flex items-center gap-1.5">
+                  <SingleAgentIndicator finding={finding} />
+                  {finding.confidence !== undefined && confidenceLabel && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-zinc-500 dark:text-zinc-400">Confidence:</span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                           <div
                             className={`h-full ${getConfidenceColor(finding.confidence)}`}
@@ -862,6 +935,9 @@ function FindingCard({ finding, accessToken }: { finding: Finding; accessToken: 
                         </div>
                         <span className="text-zinc-600 dark:text-zinc-400 font-mono">
                           {(finding.confidence * 100).toFixed(0)}%
+                        </span>
+                        <span className={`text-[10px] font-medium ${confidenceLabel.className}`}>
+                          {confidenceLabel.label}
                         </span>
                       </div>
                     </div>
