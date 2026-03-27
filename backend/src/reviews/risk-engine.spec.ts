@@ -161,15 +161,11 @@ describe('RiskEngine', () => {
   });
 
   describe('deriveRiskLevel', () => {
-    it('maps score ranges correctly', () => {
-      expect(engine.deriveRiskLevel(0)).toBe('Low risk');
-      expect(engine.deriveRiskLevel(30)).toBe('Low risk');
-      expect(engine.deriveRiskLevel(31)).toBe('Moderate');
-      expect(engine.deriveRiskLevel(60)).toBe('Moderate');
-      expect(engine.deriveRiskLevel(61)).toBe('High');
-      expect(engine.deriveRiskLevel(80)).toBe('High');
-      expect(engine.deriveRiskLevel(81)).toBe('Critical');
-      expect(engine.deriveRiskLevel(100)).toBe('Critical');
+    it('derives display risk from merge verdict (single source of truth)', () => {
+      expect(engine.deriveRiskLevel('safe', false)).toBe('Low risk');
+      expect(engine.deriveRiskLevel('warning', false)).toBe('Moderate');
+      expect(engine.deriveRiskLevel('blocked', false)).toBe('High');
+      expect(engine.deriveRiskLevel('blocked', true)).toBe('Critical');
     });
   });
 

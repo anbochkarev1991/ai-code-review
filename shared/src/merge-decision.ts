@@ -12,7 +12,10 @@ import type {
   RiskBreakdown,
   RiskLevel,
 } from './review';
-import { calculateRiskBreakdown, deriveRiskLevelFromScore } from './risk-breakdown';
+import {
+  calculateRiskBreakdown,
+  deriveRiskLevelFromVerdict,
+} from './risk-breakdown';
 
 export interface MergeDecisionInput {
   critical_count: number;
@@ -110,7 +113,6 @@ export function getReviewDecision(findings: Finding[]): ReviewDecision {
   const severityCounts = countSeverities(findings);
   const riskBreakdown = calculateRiskBreakdown(findings);
   const riskScore = riskBreakdown.final_score;
-  const riskLevel = deriveRiskLevelFromScore(riskScore);
 
   const merge = decideMerge({
     critical_count: severityCounts.critical,
@@ -119,6 +121,11 @@ export function getReviewDecision(findings: Finding[]): ReviewDecision {
     low_count: severityCounts.low,
     risk_score: riskScore,
   });
+
+  const riskLevel = deriveRiskLevelFromVerdict(
+    merge.verdict,
+    severityCounts.critical > 0,
+  );
 
   return {
     decision: merge.verdict,

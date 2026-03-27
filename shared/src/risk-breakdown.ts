@@ -5,6 +5,7 @@
 import type {
   Finding,
   FindingSeverity,
+  ReviewDecisionVerdict,
   RiskBreakdown,
   RiskLevel,
 } from './review';
@@ -70,6 +71,28 @@ export function calculateRiskBreakdown(findings: Finding[]): RiskBreakdown {
   };
 }
 
+/**
+ * Display risk band for the UI — must match merge `decision_verdict` so label and
+ * decision never contradict (single source of truth: verdict from `decideMerge`).
+ */
+export function deriveRiskLevelFromVerdict(
+  verdict: ReviewDecisionVerdict,
+  hasCriticalFinding: boolean,
+): RiskLevel {
+  switch (verdict) {
+    case 'blocked':
+      return hasCriticalFinding ? 'Critical' : 'High';
+    case 'warning':
+      return 'Moderate';
+    case 'safe':
+      return 'Low risk';
+  }
+}
+
+/**
+ * Score-only banding (analytics / secondary use). Not used for the displayed
+ * `risk_level` on review summaries — use `deriveRiskLevelFromVerdict` instead.
+ */
 export function deriveRiskLevelFromScore(riskScore: number): RiskLevel {
   if (riskScore >= 81) return 'Critical';
   if (riskScore >= 61) return 'High';

@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import type { Finding, RiskLevel, RiskBreakdown } from 'shared';
+import type {
+  Finding,
+  ReviewDecisionVerdict,
+  RiskLevel,
+  RiskBreakdown,
+} from 'shared';
 import {
   calculateRiskBreakdown as sharedCalculateRiskBreakdown,
   decideMerge,
-  deriveRiskLevelFromScore,
+  deriveRiskLevelFromVerdict,
   type MergeDecision,
 } from 'shared';
 
@@ -20,8 +25,11 @@ export class RiskEngine {
     return sharedCalculateRiskBreakdown(findings);
   }
 
-  deriveRiskLevel(riskScore: number): RiskLevel {
-    return deriveRiskLevelFromScore(riskScore);
+  deriveRiskLevel(
+    verdict: ReviewDecisionVerdict,
+    hasCriticalFinding: boolean,
+  ): RiskLevel {
+    return deriveRiskLevelFromVerdict(verdict, hasCriticalFinding);
   }
 
   deriveMergeDecision(

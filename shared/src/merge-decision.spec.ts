@@ -194,6 +194,76 @@ describe('getReviewDecision', () => {
     expect(rd.recommendation).toBe('Merge blocked');
     expect(rd.severityCounts.critical).toBe(1);
   });
+
+  it('blocked from high severity uses High label even when risk score is in the former Low band', () => {
+    const rd = getReviewDecision([
+      makeFinding({
+        id: 'h1',
+        severity: 'high',
+        category: 'security',
+        title: 'Issue 1',
+      }),
+      makeFinding({
+        id: 'h2',
+        severity: 'high',
+        category: 'code-quality',
+        title: 'Issue 2',
+      }),
+    ]);
+    expect(rd.decision).toBe('blocked');
+    expect(rd.riskLevel).toBe('High');
+    expect(rd.riskScore).toBeLessThan(31);
+  });
+
+  it('critical blocked verdict maps riskLevel to Critical', () => {
+    const rd = getReviewDecision([
+      makeFinding({
+        id: 'c1',
+        severity: 'critical',
+        category: 'security',
+        title: 'CVE',
+      }),
+    ]);
+    expect(rd.decision).toBe('blocked');
+    expect(rd.riskLevel).toBe('Critical');
+  });
+
+  it('warning verdict maps riskLevel to Moderate', () => {
+    const rd = getReviewDecision([
+      makeFinding({
+        id: 'm1',
+        severity: 'medium',
+        category: 'performance',
+        title: 'N+1',
+      }),
+    ]);
+    expect(rd.decision).toBe('warning');
+    expect(rd.riskLevel).toBe('Moderate');
+  });
+
+  it('never labels blocked reviews as Low risk', () => {
+    const cases: Finding[][] = [
+      [
+        makeFinding({
+          id: 'c1',
+          severity: 'critical',
+          category: 'security',
+        }),
+      ],
+      [
+        makeFinding({
+          id: 'h1',
+          severity: 'high',
+          category: 'security',
+        }),
+      ],
+    ];
+    for (const findings of cases) {
+      const rd = getReviewDecision(findings);
+      expect(rd.decision).toBe('blocked');
+      expect(rd.riskLevel).not.toBe('Low risk');
+    }
+  });
 });
 
 describe('derivePrimaryRiskCategoryFromFindings', () => {
