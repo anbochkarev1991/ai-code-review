@@ -6,7 +6,11 @@ import type {
   PRMetadata,
   ReviewResult,
 } from 'shared';
-import { RiskEngine } from './risk-engine';
+import { getReviewDecision } from 'shared';
+import {
+  buildReviewSummaryParagraph,
+  detectSystemicPatterns,
+} from './review-summary-text';
 import { DiffParser } from './diff-parser';
 import { ReviewOrchestrator } from './engine/orchestrator';
 import { GitHubService } from '../github/github.service';
@@ -40,7 +44,6 @@ export class ReviewsService {
     private readonly reviewRunsRepository: ReviewRunsRepository,
     private readonly githubService: GitHubService,
     private readonly severityNormalizer: SeverityNormalizer,
-    private readonly riskEngine: RiskEngine,
   ) {}
 
   async findOne(
@@ -327,44 +330,48 @@ export class ReviewsService {
     const { findings, review_summary: rs } = result;
     if (!findings || !rs) return result;
 
-    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-    for (const f of findings) {
-      counts[f.severity]++;
-    }
-
-    const riskBreakdown = this.riskEngine.calculateRiskBreakdown(findings);
-    const riskScore = riskBreakdown.final_score;
-    const riskLevel = this.riskEngine.deriveRiskLevel(riskScore);
-    const mergeDecision = this.riskEngine.deriveMergeDecision(
-      riskScore,
-      counts.critical,
-      counts.high,
-      counts.medium,
-      counts.low,
-    );
-
+    const rd = getReviewDecision(findings);
+    const systemicPatterns = detectSystemicPatterns(findings);
     const multiAgentConfirmedCount = findings.filter(
       (f) => f.consensus_level === 'multi-agent',
     ).length;
 
+    const text = buildReviewSummaryParagraph({
+      findings,
+      counts: rd.severityCounts,
+      riskScore: rd.riskScore,
+      riskLevel: rd.riskLevel,
+      mergeRecommendation: rd.recommendation,
+      primaryRiskCategory: rd.primaryRisk,
+      systemicPatterns,
+      multiAgentConfirmedCount,
+    });
+
     return {
       ...result,
+      summary: text,
       review_summary: {
         ...rs,
         total_findings: findings.length,
-        critical_count: counts.critical,
-        high_count: counts.high,
-        medium_count: counts.medium,
-        low_count: counts.low,
-        risk_score: riskScore,
-        risk_level: riskLevel,
-        risk_breakdown: riskBreakdown,
-        merge_recommendation: mergeDecision.recommendation,
-        merge_explanation: mergeDecision.explanation,
-        decision_verdict: mergeDecision.verdict,
-        risk_summary: mergeDecision.explanation,
+        critical_count: rd.severityCounts.critical,
+        high_count: rd.severityCounts.high,
+        medium_count: rd.severityCounts.medium,
+        low_count: rd.severityCounts.low,
+        risk_score: rd.riskScore,
+        risk_level: rd.riskLevel,
+        risk_breakdown: rd.riskBreakdown,
+        merge_recommendation: rd.recommendation,
+        merge_explanation: rd.explanation,
+        decision_verdict: rd.decision,
+        risk_summary: rd.explanation,
+        primary_risk_category: rd.primaryRisk,
+        most_severe_issue:
+          findings.length > 0 ? findings[0].title : undefined,
+        systemic_patterns:
+          systemicPatterns.length > 0 ? systemicPatterns : undefined,
         multi_agent_confirmed_count:
           multiAgentConfirmedCount > 0 ? multiAgentConfirmedCount : undefined,
+        text,
       },
     };
   }

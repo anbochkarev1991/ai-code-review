@@ -288,10 +288,17 @@ export function ReviewSummary({
                   />
                 )}
               </div>
-              <FindingsStats
-                findings={findings}
-                multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
-              />
+              {reviewSummary && (
+                <FindingsStats
+                  counts={{
+                    critical: reviewSummary.critical_count,
+                    high: reviewSummary.high_count,
+                    medium: reviewSummary.medium_count,
+                    low: reviewSummary.low_count,
+                  }}
+                  multiAgentCount={reviewSummary.multi_agent_confirmed_count}
+                />
+              )}
 
               {mergeRec && (
                 <MergeDecisionBanner

@@ -94,14 +94,19 @@ export function ReviewSummarySidebar({
             />
           )}
 
-          {findings.length > 0 && (
+          {reviewSummary && findings.length > 0 && (
             <div className="mt-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 Findings by severity
               </p>
               <FindingsStats
-                findings={findings}
-                multiAgentCount={reviewSummary?.multi_agent_confirmed_count}
+                counts={{
+                  critical: reviewSummary.critical_count,
+                  high: reviewSummary.high_count,
+                  medium: reviewSummary.medium_count,
+                  low: reviewSummary.low_count,
+                }}
+                multiAgentCount={reviewSummary.multi_agent_confirmed_count}
               />
             </div>
           )}

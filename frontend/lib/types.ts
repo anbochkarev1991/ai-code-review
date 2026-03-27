@@ -1,4 +1,5 @@
 export type {
+  ReviewDecision,
   AiReviewSummary,
   Profile,
   MeResponse,

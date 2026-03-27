@@ -12,7 +12,6 @@ import { DeterministicAggregator } from './deterministic-aggregator';
 import { DiffParser } from './diff-parser';
 import { FindingDeduplicatorService } from './finding-deduplicator.service';
 import { FindingNormalizer } from './finding-normalizer';
-import { RiskEngine } from './risk-engine';
 import { ResultFormatter } from './result-formatter';
 import { ReviewOrchestrator } from './engine/orchestrator';
 import { ReviewRunsRepository } from './review-runs.repository';
@@ -33,7 +32,6 @@ import { SeverityNormalizer } from './severity-normalizer';
     ContextBuilder,
     AgentContextShaper,
     FindingNormalizer,
-    RiskEngine,
     DeterministicAggregator,
     ResultFormatter,
     ReviewOrchestrator,

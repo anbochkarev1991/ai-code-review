@@ -1,4 +1,18 @@
-import { decideMerge } from './merge-decision';
+import type { Finding } from './review';
+import {
+  decideMerge,
+  derivePrimaryRiskCategoryFromFindings,
+  getReviewDecision,
+} from './merge-decision';
+
+function makeFinding(partial: Partial<Finding> & Pick<Finding, 'id' | 'severity' | 'category'>): Finding {
+  return {
+    title: 't',
+    message: 'm',
+    confidence: 0.8,
+    ...partial,
+  };
+}
 
 describe('decideMerge', () => {
   it('blocks when critical_count > 0 (regardless of score)', () => {
@@ -114,5 +128,84 @@ describe('decideMerge', () => {
       risk_score: 45,
     };
     expect(decideMerge(input)).toEqual(decideMerge(input));
+  });
+});
+
+describe('getReviewDecision', () => {
+  it('matches decideMerge + counts + primary risk for non-empty findings', () => {
+    const findings: Finding[] = [
+      makeFinding({
+        id: '1',
+        severity: 'high',
+        category: 'security',
+        title: 'SQL risk',
+      }),
+      makeFinding({
+        id: '2',
+        severity: 'medium',
+        category: 'performance',
+        title: 'N+1',
+      }),
+    ];
+    const rd = getReviewDecision(findings);
+    const merge = decideMerge({
+      critical_count: rd.severityCounts.critical,
+      high_count: rd.severityCounts.high,
+      medium_count: rd.severityCounts.medium,
+      low_count: rd.severityCounts.low,
+      risk_score: rd.riskScore,
+    });
+    expect(rd.recommendation).toBe(merge.recommendation);
+    expect(rd.decision).toBe(merge.verdict);
+    expect(rd.explanation).toBe(merge.explanation);
+    expect(rd.severityCounts).toEqual({
+      critical: 0,
+      high: 1,
+      medium: 1,
+      low: 0,
+    });
+    expect(rd.primaryRisk).toBe('security');
+  });
+
+  it('empty findings: safe merge and zero score', () => {
+    const rd = getReviewDecision([]);
+    expect(rd.decision).toBe('safe');
+    expect(rd.recommendation).toBe('Safe to merge');
+    expect(rd.riskScore).toBe(0);
+    expect(rd.primaryRisk).toBeUndefined();
+    expect(rd.severityCounts).toEqual({
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    });
+  });
+
+  it('critical finding yields blocked verdict', () => {
+    const rd = getReviewDecision([
+      makeFinding({
+        id: 'c1',
+        severity: 'critical',
+        category: 'security',
+      }),
+    ]);
+    expect(rd.decision).toBe('blocked');
+    expect(rd.recommendation).toBe('Merge blocked');
+    expect(rd.severityCounts.critical).toBe(1);
+  });
+});
+
+describe('derivePrimaryRiskCategoryFromFindings', () => {
+  it('picks category with highest weighted score', () => {
+    const cat = derivePrimaryRiskCategoryFromFindings([
+      makeFinding({ id: 'a', severity: 'low', category: 'security' }),
+      makeFinding({ id: 'b', severity: 'low', category: 'security' }),
+      makeFinding({ id: 'c', severity: 'high', category: 'performance' }),
+    ]);
+    expect(cat).toBe('performance');
+  });
+
+  it('returns undefined for empty list', () => {
+    expect(derivePrimaryRiskCategoryFromFindings([])).toBeUndefined();
   });
 });

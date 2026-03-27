@@ -1,26 +1,24 @@
 "use client";
 
-import type {
-  Finding,
-  MergeRecommendation,
-  RiskLevel,
-} from "@/lib/types";
+import type { MergeRecommendation, RiskLevel } from "@/lib/types";
 
+export interface SeverityCountSnapshot {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+/** Renders server-derived severity counts (same source as merge decision). */
 export function FindingsStats({
-  findings,
+  counts,
   multiAgentCount,
 }: {
-  findings: Finding[];
+  counts: SeverityCountSnapshot;
   multiAgentCount?: number;
 }) {
-  const counts = {
-    critical: findings.filter((f: Finding) => f.severity === "critical").length,
-    high: findings.filter((f: Finding) => f.severity === "high").length,
-    medium: findings.filter((f: Finding) => f.severity === "medium").length,
-    low: findings.filter((f: Finding) => f.severity === "low").length,
-  };
-
-  const total = findings.length;
+  const total =
+    counts.critical + counts.high + counts.medium + counts.low;
 
   if (total === 0) {
     return null;

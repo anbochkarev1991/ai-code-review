@@ -8,8 +8,6 @@ import { type AgentOutput } from 'shared';
 import { DeterministicAggregator } from '../src/reviews/deterministic-aggregator';
 import { FindingDeduplicatorService } from '../src/reviews/finding-deduplicator.service';
 import { FindingNormalizer } from '../src/reviews/finding-normalizer';
-import { RiskEngine } from '../src/reviews/risk-engine';
-
 const MOCK_OUTPUTS: AgentOutput[] = [
   {
     findings: [
@@ -82,11 +80,9 @@ const MOCK_OUTPUTS: AgentOutput[] = [
 ];
 
 async function main() {
-  const riskEngine = new RiskEngine();
   const findingNormalizer = new FindingNormalizer();
   const findingDeduplicator = new FindingDeduplicatorService();
   const aggregator = new DeterministicAggregator(
-    riskEngine,
     findingNormalizer,
     findingDeduplicator,
   );
