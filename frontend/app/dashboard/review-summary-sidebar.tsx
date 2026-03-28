@@ -6,7 +6,10 @@ import type {
 } from "@/lib/types";
 import { MergeDecisionBanner } from "@/app/dashboard/merge-decision-banner";
 import { RiskScoreGauge } from "@/app/dashboard/risk-score-gauge";
-import { FindingsStats } from "@/app/dashboard/review-summary-shared";
+import {
+  buildDecisionBreakdown,
+  FindingsStats,
+} from "@/app/dashboard/review-summary-shared";
 
 const CATEGORY_LABELS: Record<string, string> = {
   security: "Security",
@@ -61,6 +64,19 @@ export function ReviewSummarySidebar({
   const hasSummary = displayText.trim() !== "";
   const mergeRec = reviewSummary?.merge_recommendation;
 
+  const breakdownItems =
+    reviewSummary &&
+    buildDecisionBreakdown({
+      verdict: reviewSummary.decision_verdict,
+      critical_count: reviewSummary.critical_count,
+      high_count: reviewSummary.high_count,
+      medium_count: reviewSummary.medium_count,
+      low_count: reviewSummary.low_count,
+      risk_score: reviewSummary.risk_score,
+      primary_risk_category: reviewSummary.primary_risk_category,
+      findings,
+    });
+
   return (
     <aside className="flex min-h-0 min-w-0 flex-col md:h-full md:min-h-0 md:flex-1">
       <div className="md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto">
@@ -75,6 +91,7 @@ export function ReviewSummarySidebar({
               verdict={reviewSummary?.decision_verdict}
               explanation={reviewSummary?.merge_explanation}
               primaryRiskCategory={reviewSummary?.primary_risk_category}
+              breakdownItems={breakdownItems}
               className="mt-4"
             />
           )}

@@ -49,6 +49,8 @@ export interface MergeDecisionBannerProps {
   verdict?: ReviewDecisionVerdict;
   explanation?: string;
   primaryRiskCategory?: string;
+  /** Deterministic bullets derived from findings; max 3. */
+  breakdownItems?: string[];
   className?: string;
 }
 
@@ -57,6 +59,7 @@ export function MergeDecisionBanner({
   verdict,
   explanation,
   primaryRiskCategory,
+  breakdownItems,
   className,
 }: MergeDecisionBannerProps) {
   if (!recommendation) {
@@ -88,6 +91,25 @@ export function MergeDecisionBanner({
       {explanation && (
         <p className={`text-sm leading-snug ${style.text} opacity-95`}>{explanation}</p>
       )}
+      {breakdownItems &&
+        breakdownItems.length > 0 &&
+        verdict != null &&
+        verdict !== "safe" && (
+          <div className="mt-2 border-t border-black/10 pt-2 dark:border-white/10">
+            <p
+              className={`text-[10px] font-semibold uppercase tracking-wide ${style.text} opacity-70`}
+            >
+              {verdict === "blocked" ? "Why blocked" : "Why cautioned"}
+            </p>
+            <ul
+              className={`mt-1.5 list-inside list-disc space-y-1 text-xs leading-snug ${style.text} opacity-80`}
+            >
+              {breakdownItems.slice(0, 3).map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
     </div>
   );
 }

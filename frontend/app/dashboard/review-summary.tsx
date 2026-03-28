@@ -11,7 +11,10 @@ import type {
   ReviewMetadata,
 } from "@/lib/types";
 import { RiskScoreGauge } from "@/app/dashboard/risk-score-gauge";
-import { FindingsStats } from "@/app/dashboard/review-summary-shared";
+import {
+  buildDecisionBreakdown,
+  FindingsStats,
+} from "@/app/dashboard/review-summary-shared";
 import { MergeDecisionBanner } from "@/app/dashboard/merge-decision-banner";
 
 interface ReviewSummaryProps {
@@ -266,6 +269,20 @@ export function ReviewSummary({
   const showMainVariantHeader =
     variant === "main" && (showSystemic || showDegraded);
 
+  const findingsList = findings ?? [];
+  const mergeBreakdownItems =
+    reviewSummary &&
+    buildDecisionBreakdown({
+      verdict: reviewSummary.decision_verdict,
+      critical_count: reviewSummary.critical_count,
+      high_count: reviewSummary.high_count,
+      medium_count: reviewSummary.medium_count,
+      low_count: reviewSummary.low_count,
+      risk_score: reviewSummary.risk_score,
+      primary_risk_category: reviewSummary.primary_risk_category,
+      findings: findingsList,
+    });
+
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
       {isPartial && <PartialReviewBanner />}
@@ -306,6 +323,7 @@ export function ReviewSummary({
                   verdict={reviewSummary?.decision_verdict}
                   explanation={reviewSummary?.merge_explanation}
                   primaryRiskCategory={reviewSummary?.primary_risk_category}
+                  breakdownItems={mergeBreakdownItems}
                   className="mt-3"
                 />
               )}
@@ -383,6 +401,7 @@ export function ReviewSummary({
                   verdict={reviewSummary?.decision_verdict}
                   explanation={reviewSummary?.merge_explanation}
                   primaryRiskCategory={reviewSummary?.primary_risk_category}
+                  breakdownItems={mergeBreakdownItems}
                   className="mt-3"
                 />
               )}
