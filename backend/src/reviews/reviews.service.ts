@@ -208,10 +208,7 @@ export class ReviewsService {
         })
       : undefined;
 
-    if (
-      normalizedResult?.findings &&
-      normalizedResult.review_summary
-    ) {
+    if (normalizedResult?.findings && normalizedResult.review_summary) {
       const aiSummary = await this.aiSummaryGenerator.generate(
         normalizedResult.findings,
         normalizedResult.review_summary,
@@ -383,8 +380,7 @@ export class ReviewsService {
         decision_verdict: rd.decision,
         risk_summary: rd.explanation,
         primary_risk_category: rd.primaryRisk,
-        most_severe_issue:
-          findings.length > 0 ? findings[0].title : undefined,
+        most_severe_issue: findings.length > 0 ? findings[0].title : undefined,
         systemic_patterns:
           systemicPatterns.length > 0 ? systemicPatterns : undefined,
         multi_agent_confirmed_count:

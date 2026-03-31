@@ -173,8 +173,7 @@ export class SeverityNormalizer {
     if (excessCount <= 0) return findings;
 
     const singleAgentHighs = highIndices.filter(
-      (h) =>
-        !h.isMultiAgent && findings[h.index].category !== 'security',
+      (h) => !h.isMultiAgent && findings[h.index].category !== 'security',
     );
     const toDowngrade = new Set(
       singleAgentHighs.slice(0, excessCount).map((h) => h.index),

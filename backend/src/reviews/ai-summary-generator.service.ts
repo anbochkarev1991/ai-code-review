@@ -34,7 +34,9 @@ const WORD_NUMBER_PATTERN = Object.keys(WORD_NUMBER_TO_VALUE).join('|');
  * Single source for the opening severity sentence in AI overall_assessment.
  * Uses structured counts from the review (must match findings after normalization).
  */
-export function buildFactualSeverityPrefix(reviewSummary: ReviewSummary): string {
+export function buildFactualSeverityPrefix(
+  reviewSummary: ReviewSummary,
+): string {
   const {
     critical_count: c,
     high_count: h,
@@ -86,28 +88,40 @@ function substringContradictsSeverityCount(
 
   let claimed: number | null = null;
   const digit = slice.match(/\b(\d{1,2})\b/);
-  if (digit) claimed = parseInt(digit[1]!, 10);
+  if (digit) claimed = parseInt(digit[1], 10);
 
   const lower = slice.toLowerCase();
   const wordMatch = lower.match(
     new RegExp(`\\b(${WORD_NUMBER_PATTERN})\\b`, 'i'),
   );
-  if (wordMatch && WORD_NUMBER_TO_VALUE[wordMatch[1]!.toLowerCase()] != null) {
-    claimed = WORD_NUMBER_TO_VALUE[wordMatch[1]!.toLowerCase()]!;
+  if (wordMatch && WORD_NUMBER_TO_VALUE[wordMatch[1].toLowerCase()] != null) {
+    claimed = WORD_NUMBER_TO_VALUE[wordMatch[1].toLowerCase()]!;
   }
 
   if (claimed == null) return false;
 
-  if (/\bcritical(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+  if (
+    /\bcritical(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(
+      slice,
+    )
+  ) {
     return claimed !== expected.critical;
   }
-  if (/\bhigh(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+  if (
+    /\bhigh(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)
+  ) {
     return claimed !== expected.high;
   }
-  if (/\bmedium(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+  if (
+    /\bmedium(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(
+      slice,
+    )
+  ) {
     return claimed !== expected.medium;
   }
-  if (/\blow(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)) {
+  if (
+    /\blow(?:[- ]severity|\s+(?:issue|issues|finding|findings))\b/i.test(slice)
+  ) {
     return claimed !== expected.low;
   }
 

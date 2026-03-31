@@ -104,8 +104,7 @@ export class DeterministicAggregator {
       merge_explanation: rd.explanation,
       decision_verdict: rd.decision,
       primary_risk_category: rd.primaryRisk,
-      most_severe_issue:
-        findings.length > 0 ? findings[0].title : undefined,
+      most_severe_issue: findings.length > 0 ? findings[0].title : undefined,
       systemic_patterns:
         systemicPatterns.length > 0 ? systemicPatterns : undefined,
       multi_agent_confirmed_count:
