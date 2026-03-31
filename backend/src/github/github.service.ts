@@ -68,6 +68,8 @@ function parsePullForCompare(pull: unknown): GitHubPullForCompare {
   }
   const baseSha = base.sha;
   const headSha = head.sha;
+  const baseRef = base.ref;
+  const headRef = head.ref;
   if (typeof baseSha !== 'string' || baseSha.length === 0) {
     throw new UnauthorizedException(
       'Invalid pull request response from GitHub',
@@ -78,7 +80,32 @@ function parsePullForCompare(pull: unknown): GitHubPullForCompare {
       'Invalid pull request response from GitHub',
     );
   }
-  return pull as GitHubPullForCompare;
+  if (typeof baseRef !== 'string' || baseRef.length === 0) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+  if (typeof headRef !== 'string' || headRef.length === 0) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+
+  const out: GitHubPullForCompare = {
+    base: { sha: baseSha, ref: baseRef },
+    head: { sha: headSha, ref: headRef },
+  };
+  if (typeof pull.title === 'string') {
+    out.title = pull.title;
+  }
+  if (typeof pull.commits === 'number' && Number.isFinite(pull.commits)) {
+    out.commits = pull.commits;
+  }
+  const u = pull.user;
+  if (isPlainObject(u) && typeof u.login === 'string' && u.login.length > 0) {
+    out.user = { login: u.login };
+  }
+  return out;
 }
 
 /** Validates a single PR in list response before accessing `head.ref`. */
