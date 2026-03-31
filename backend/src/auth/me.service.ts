@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import type { MeResponse, Profile, Plan } from '../types';
@@ -35,6 +35,18 @@ export class MeService {
           .maybeSingle(),
       ],
     );
+
+    if (profileResult.error) {
+      throw new InternalServerErrorException('Failed to load profile');
+    }
+    if (subscriptionResult.error) {
+      throw new InternalServerErrorException('Failed to load subscription');
+    }
+    if (githubResult.error) {
+      throw new InternalServerErrorException(
+        'Failed to load GitHub connection',
+      );
+    }
 
     type ProfilesRow = {
       id: string;

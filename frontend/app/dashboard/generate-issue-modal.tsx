@@ -155,45 +155,53 @@ export function GenerateIssueModal({
   const backdropRef = useRef<HTMLDivElement>(null);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const generate = useCallback(async () => {
-    setState("loading");
-    setErrorMessage("");
-    try {
-      const backendUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-      const res = await fetch(`${backendUrl}/reviews/generate-issue`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          finding,
-          pr_metadata: prMetadata,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(
-          body?.message ?? `Request failed with status ${res.status}`
+  const generate = useCallback(
+    async (signal?: AbortSignal) => {
+      setState("loading");
+      setErrorMessage("");
+      try {
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+        const res = await fetch(`${backendUrl}/reviews/generate-issue`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            finding,
+            pr_metadata: prMetadata,
+          }),
+          signal,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            body?.message ?? `Request failed with status ${res.status}`
+          );
+        }
+        const data = await res.json();
+        setIssueText(data.issue_text);
+        setState("success");
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+        setErrorMessage(
+          err instanceof Error ? err.message : "Failed to generate issue"
         );
+        setState("error");
       }
-      const data = await res.json();
-      setIssueText(data.issue_text);
-      setState("success");
-    } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Failed to generate issue"
-      );
-      setState("error");
-    }
-  }, [finding, prMetadata, accessToken]);
+    },
+    [finding, prMetadata, accessToken]
+  );
 
   useEffect(() => {
-    if (open) {
-      generate();
-    }
+    if (!open) return;
+    const ac = new AbortController();
+    void generate(ac.signal);
     return () => {
+      ac.abort();
       if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
     };
   }, [open, generate]);
@@ -303,7 +311,8 @@ export function GenerateIssueModal({
                 </p>
               </div>
               <button
-                onClick={generate}
+                type="button"
+                onClick={() => void generate()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -332,7 +341,8 @@ export function GenerateIssueModal({
         {state === "success" && (
           <div className="flex items-center justify-between gap-3 border-t border-zinc-200 dark:border-zinc-700 px-5 py-3">
             <button
-              onClick={generate}
+              type="button"
+              onClick={() => void generate()}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

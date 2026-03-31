@@ -1,5 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
-import { validateStripeCheckoutRedirectUrl } from "./redirect-validation";
+import {
+  getSafeRelativeRedirectPath,
+  validateStripeCheckoutRedirectUrl,
+} from "./redirect-validation";
+
+describe("getSafeRelativeRedirectPath", () => {
+  it("allows simple paths and preserves query strings", () => {
+    expect(getSafeRelativeRedirectPath("/dashboard")).toBe("/dashboard");
+    expect(getSafeRelativeRedirectPath("/reviews?x=1")).toBe("/reviews?x=1");
+  });
+
+  it("rejects protocol-relative and non-relative values", () => {
+    expect(getSafeRelativeRedirectPath("//evil.example")).toBe("/dashboard");
+    expect(getSafeRelativeRedirectPath("https://evil.example")).toBe("/dashboard");
+    expect(getSafeRelativeRedirectPath(null)).toBe("/dashboard");
+    expect(getSafeRelativeRedirectPath("")).toBe("/dashboard");
+  });
+
+  it("rejects colon or backslash in path segment", () => {
+    expect(getSafeRelativeRedirectPath("/foo\\bar")).toBe("/dashboard");
+    expect(getSafeRelativeRedirectPath("/foo:bar")).toBe("/dashboard");
+  });
+});
 
 describe("validateStripeCheckoutRedirectUrl", () => {
   it("accepts https checkout.stripe.com URL", () => {

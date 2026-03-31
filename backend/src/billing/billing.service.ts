@@ -1,9 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import type { User } from '@supabase/supabase-js';
 import type { CheckoutBody, CheckoutResponse } from 'shared';
 import type { Plan, UsageResponse } from '../types';
+import { assertStripeCheckoutReturnUrlAllowed } from './checkout-return-url';
 
 const USAGE_LIMITS: Record<Plan, number> = {
   free: 10,
@@ -12,6 +18,7 @@ const USAGE_LIMITS: Record<Plan, number> = {
 
 @Injectable()
 export class BillingService {
+  private readonly logger = new Logger(BillingService.name);
   private stripe: Stripe | null = null;
 
   private getStripe(): Stripe {
@@ -33,6 +40,8 @@ export class BillingService {
     if (!body.success_url || !body.cancel_url) {
       throw new BadRequestException('success_url and cancel_url are required');
     }
+    assertStripeCheckoutReturnUrlAllowed(body.success_url);
+    assertStripeCheckoutReturnUrlAllowed(body.cancel_url);
 
     const priceId = process.env.STRIPE_PRO_PRICE_ID;
     if (!priceId) {
@@ -75,12 +84,18 @@ export class BillingService {
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
 
-    const { data: sub } = await supabase
+    const { data: sub, error: subError } = await supabase
       .from('subscriptions')
       .select('stripe_customer_id')
       .eq('user_id', user.id)
       .not('stripe_customer_id', 'is', null)
       .maybeSingle();
+
+    if (subError) {
+      throw new InternalServerErrorException(
+        'Failed to read subscription for checkout',
+      );
+    }
 
     if (sub?.stripe_customer_id) {
       return sub.stripe_customer_id as string;
@@ -156,6 +171,15 @@ export class BillingService {
         .maybeSingle(),
     ]);
 
+    if (subscriptionResult.error) {
+      throw new InternalServerErrorException(
+        'Failed to read subscription for usage',
+      );
+    }
+    if (usageResult.error) {
+      throw new InternalServerErrorException('Failed to read usage');
+    }
+
     let plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
     const emulatedEmails = (process.env.PRO_EMULATE_EMAILS ?? '')
       .split(',')
@@ -191,25 +215,17 @@ export class BillingService {
 
     const currentMonth = new Date().toISOString().slice(0, 7);
 
-    const existing = await supabase
-      .from('usage')
-      .select('review_count')
-      .eq('user_id', userId)
-      .eq('month', currentMonth)
-      .maybeSingle();
-
-    const newCount = ((existing.data?.review_count as number) ?? 0) + 1;
-    const now = new Date().toISOString();
-
-    await supabase.from('usage').upsert(
-      {
-        user_id: userId,
-        month: currentMonth,
-        review_count: newCount,
-        updated_at: now,
-      },
-      { onConflict: 'user_id,month' },
+    const { error: rpcError } = await supabase.rpc(
+      'increment_usage_review_count',
+      { p_month: currentMonth },
     );
+
+    if (rpcError) {
+      this.logger.error(
+        `increment_usage_review_count failed: ${rpcError.message}`,
+      );
+      throw new InternalServerErrorException('Failed to update usage');
+    }
   }
 
   async handleWebhookEvent(event: Stripe.Event): Promise<void> {
@@ -277,16 +293,40 @@ export class BillingService {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from('subscriptions')
       .select('id')
       .eq('user_id', userId)
       .maybeSingle();
 
+    if (selectError) {
+      this.logger.error(
+        `checkout.session.completed: subscription lookup failed: ${selectError.message}`,
+      );
+      throw new InternalServerErrorException('Database error');
+    }
+
     if (existing) {
-      await supabase.from('subscriptions').update(row).eq('user_id', userId);
+      const { error: updateError } = await supabase
+        .from('subscriptions')
+        .update(row)
+        .eq('user_id', userId);
+      if (updateError) {
+        this.logger.error(
+          `checkout.session.completed: update failed: ${updateError.message}`,
+        );
+        throw new InternalServerErrorException('Database error');
+      }
     } else {
-      await supabase.from('subscriptions').insert(row);
+      const { error: insertError } = await supabase
+        .from('subscriptions')
+        .insert(row);
+      if (insertError) {
+        this.logger.error(
+          `checkout.session.completed: insert failed: ${insertError.message}`,
+        );
+        throw new InternalServerErrorException('Database error');
+      }
     }
   }
 
@@ -296,11 +336,18 @@ export class BillingService {
     const stripeSubscriptionId = subscription.id;
     const supabase = this.getSupabaseAdmin();
 
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from('subscriptions')
       .select('id')
       .eq('stripe_subscription_id', stripeSubscriptionId)
       .maybeSingle();
+
+    if (selectError) {
+      this.logger.error(
+        `subscription.updated: lookup failed: ${selectError.message}`,
+      );
+      throw new InternalServerErrorException('Database error');
+    }
 
     if (!existing) return;
 
@@ -317,7 +364,7 @@ export class BillingService {
       ).toISOString();
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('subscriptions')
       .update({
         plan,
@@ -326,6 +373,13 @@ export class BillingService {
         updated_at: new Date().toISOString(),
       })
       .eq('stripe_subscription_id', stripeSubscriptionId);
+
+    if (updateError) {
+      this.logger.error(
+        `subscription.updated: update failed: ${updateError.message}`,
+      );
+      throw new InternalServerErrorException('Database error');
+    }
   }
 
   private async handleCustomerSubscriptionDeleted(
@@ -334,15 +388,22 @@ export class BillingService {
     const stripeSubscriptionId = subscription.id;
     const supabase = this.getSupabaseAdmin();
 
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from('subscriptions')
       .select('id')
       .eq('stripe_subscription_id', stripeSubscriptionId)
       .maybeSingle();
 
+    if (selectError) {
+      this.logger.error(
+        `subscription.deleted: lookup failed: ${selectError.message}`,
+      );
+      throw new InternalServerErrorException('Database error');
+    }
+
     if (!existing) return;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('subscriptions')
       .update({
         plan: 'free',
@@ -350,5 +411,12 @@ export class BillingService {
         updated_at: new Date().toISOString(),
       })
       .eq('stripe_subscription_id', stripeSubscriptionId);
+
+    if (updateError) {
+      this.logger.error(
+        `subscription.deleted: update failed: ${updateError.message}`,
+      );
+      throw new InternalServerErrorException('Database error');
+    }
   }
 }

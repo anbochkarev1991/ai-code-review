@@ -99,7 +99,7 @@ npm run start:backend   # Run backend production
 - **Schemas:** `agentOutputSchema`, `reviewRunSchema`, `mergeDecisionSchema`, etc. Used for validation and type inference.
 
 ### Environment Variables
-- **Backend:** `.env` in `backend/` (never committed). Uses `PORT`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, etc.
+- **Backend:** `.env` in `backend/` (never committed). Uses `PORT`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `FRONTEND_URL` (must match the frontend origin used in Stripe `success_url` / `cancel_url`), etc.
 - **Frontend:** `.env.local` in `frontend/` (never committed). Client code uses **only** `NEXT_PUBLIC_*` vars. Server code can use any env var.
 
 ---
@@ -112,7 +112,8 @@ npm run start:backend   # Run backend production
 - **PR diff format:** Backend `/github/repos/:owner/:repo/pulls/:pr_number/diff` returns raw unified diff string. Don't re-parse — pass directly to `DiffParser`.
 - **Supabase client:** Server components use `createServerClient()` (cookies), client components use `createBrowserClient()` (no cookies). Don't mix them.
 - **Shared imports:** Both apps import from `shared` package. After changing `shared/src/`, rebuild it before testing backend/frontend changes.
-- **Checkout redirects:** Never assign API-returned URLs to `window.location` without validating scheme (`https`) and host (Stripe checkout allowlist). See `frontend/lib/redirect-validation.ts` and [docs/frontend-security.md](docs/frontend-security.md).
+- **Checkout redirects:** Never assign API-returned URLs to `window.location` without validating scheme (`https`) and host (Stripe checkout allowlist). See `frontend/lib/redirect-validation.ts` and [docs/frontend-security.md](docs/frontend-security.md). The backend validates Stripe return URLs against `FRONTEND_URL` (hostname + port).
+- **Post-login redirects:** `/auth/callback` only allows safe relative `next` paths (see `getSafeRelativeRedirectPath` in `frontend/lib/redirect-validation.ts`).
 
 ---
 

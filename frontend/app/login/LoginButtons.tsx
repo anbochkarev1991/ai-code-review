@@ -1,28 +1,52 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export function LoginButtons() {
   const supabase = createClient();
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = useCallback(
     async (provider: "google" | "azure") => {
-      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo },
-      });
-      
-      // Debug: Log the OAuth URL to see what redirect_uri Supabase is using
-      if (data?.url) {
-        const url = new URL(data.url);
-        const redirectUri = url.searchParams.get("redirect_uri");
-        console.log("Supabase OAuth redirect_uri:", redirectUri);
-        console.log("Full OAuth URL:", data.url);
-      }
-      if (error) {
-        console.error("OAuth error:", error);
+      setOauthError(null);
+      setIsLoading(true);
+      try {
+        const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo },
+        });
+
+        if (error) {
+          setOauthError(error.message || "Sign-in failed. Please try again.");
+          console.error("OAuth error:", error);
+          return;
+        }
+
+        if (data?.url) {
+          if (process.env.NODE_ENV === "development") {
+            try {
+              const url = new URL(data.url);
+              console.log(
+                "Supabase OAuth redirect_uri:",
+                url.searchParams.get("redirect_uri"),
+              );
+            } catch {
+              /* ignore */
+            }
+          }
+          window.location.href = data.url;
+        } else {
+          setOauthError("No OAuth URL returned. Try again or contact support.");
+        }
+      } catch (e: unknown) {
+        setOauthError(
+          e instanceof Error ? e.message : "Sign-in failed. Please try again.",
+        );
+      } finally {
+        setIsLoading(false);
       }
     },
     [supabase]
@@ -30,18 +54,28 @@ export function LoginButtons() {
 
   return (
     <div className="flex flex-col gap-3 w-full max-w-xs">
+      {oauthError ? (
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+          role="alert"
+        >
+          {oauthError}
+        </p>
+      ) : null}
       <button
         type="button"
+        disabled={isLoading}
         onClick={() => handleSignIn("google")}
-        className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-5 font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+        className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-5 font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
       >
         <GoogleIcon className="h-5 w-5" />
         Sign in with Google
       </button>
       <button
         type="button"
+        disabled={isLoading}
         onClick={() => handleSignIn("azure")}
-        className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-5 font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+        className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white px-5 font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
       >
         <MicrosoftIcon className="h-5 w-5" />
         Sign in with Microsoft

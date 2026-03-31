@@ -3,7 +3,16 @@
 import { useUsage } from "./usage-context";
 
 export function UsageCounter() {
-  const { usage } = useUsage();
+  const { usage, usageLoadFailed } = useUsage();
+
+  if (usageLoadFailed) {
+    return (
+      <p className="text-sm text-amber-700 dark:text-amber-300">
+        Couldn&apos;t load usage this month. Refresh the page or try again
+        later.
+      </p>
+    );
+  }
 
   if (!usage) return null;
 

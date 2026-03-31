@@ -26,6 +26,25 @@ interface GitHubUserResponse {
   avatar_url?: string;
 }
 
+function parseGitHubUserJson(json: unknown): GitHubUserResponse {
+  if (!isPlainObject(json)) {
+    throw new UnauthorizedException('Invalid GitHub user response');
+  }
+  const id = json.id;
+  const login = json.login;
+  if (typeof id !== 'number' || !Number.isFinite(id)) {
+    throw new UnauthorizedException('Invalid GitHub user response');
+  }
+  if (typeof login !== 'string' || login.length === 0) {
+    throw new UnauthorizedException('Invalid GitHub user response');
+  }
+  const out: GitHubUserResponse = { id, login };
+  if (typeof json.avatar_url === 'string') {
+    out.avatar_url = json.avatar_url;
+  }
+  return out;
+}
+
 /** Pull payload from GET /repos/{owner}/{repo}/pulls/{number} — validated before nested access. */
 interface GitHubPullForCompare {
   base: { sha: string; ref: string };
@@ -171,7 +190,8 @@ export class GitHubService {
       throw new UnauthorizedException('Failed to fetch GitHub user');
     }
 
-    return response.json() as Promise<GitHubUserResponse>;
+    const userJson: unknown = await response.json();
+    return parseGitHubUserJson(userJson);
   }
 
   async createOrUpdateConnection(
@@ -191,11 +211,15 @@ export class GitHubService {
     });
     const now = new Date().toISOString();
 
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('github_connections')
       .select('id')
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (existingError) {
+      throw new UnauthorizedException('Failed to read GitHub connection');
+    }
 
     if (existing) {
       const { error } = await supabase
@@ -278,17 +302,34 @@ export class GitHubService {
       );
     }
 
-    const data = (await response.json()) as Array<{
-      full_name: string;
-      private: boolean;
-      default_branch: string;
-    }>;
+    const raw: unknown = await response.json();
+    if (!Array.isArray(raw)) {
+      throw new UnauthorizedException('Invalid repository list from GitHub');
+    }
 
-    const repos: Repo[] = data.map((r) => ({
-      full_name: r.full_name,
-      private: r.private,
-      default_branch: r.default_branch,
-    }));
+    const repos: Repo[] = [];
+    for (const item of raw) {
+      if (!isPlainObject(item)) {
+        throw new UnauthorizedException('Invalid repository list from GitHub');
+      }
+      const full_name = item.full_name;
+      const privateFlag = item.private;
+      const default_branch = item.default_branch;
+      if (typeof full_name !== 'string' || full_name.length === 0) {
+        throw new UnauthorizedException('Invalid repository list from GitHub');
+      }
+      if (typeof privateFlag !== 'boolean') {
+        throw new UnauthorizedException('Invalid repository list from GitHub');
+      }
+      if (typeof default_branch !== 'string' || default_branch.length === 0) {
+        throw new UnauthorizedException('Invalid repository list from GitHub');
+      }
+      repos.push({
+        full_name,
+        private: privateFlag,
+        default_branch,
+      });
+    }
 
     return { repos };
   }
@@ -376,19 +417,38 @@ export class GitHubService {
       throw new UnauthorizedException('Failed to fetch diff from GitHub');
     }
 
-    const compare = (await compareResponse.json()) as {
-      files?: Array<{
-        filename: string;
-        patch: string | null;
-        status?: string;
-      }>;
-    };
-
-    const files: DiffFile[] = (compare.files ?? []).map((f) => ({
-      filename: f.filename,
-      patch: f.patch ?? '',
-      status: (f.status ?? 'modified') as DiffFileStatus,
-    }));
+    const compareJson: unknown = await compareResponse.json();
+    if (!isPlainObject(compareJson)) {
+      throw new UnauthorizedException('Invalid compare response from GitHub');
+    }
+    const files: DiffFile[] = [];
+    const list = compareJson.files;
+    if (list !== undefined && !Array.isArray(list)) {
+      throw new UnauthorizedException('Invalid compare response from GitHub');
+    }
+    if (Array.isArray(list)) {
+      for (const f of list) {
+        if (!isPlainObject(f)) {
+          continue;
+        }
+        const filename = f.filename;
+        if (typeof filename !== 'string' || filename.length === 0) {
+          continue;
+        }
+        const patch =
+          f.patch === null || f.patch === undefined
+            ? ''
+            : typeof f.patch === 'string'
+              ? f.patch
+              : '';
+        const statusRaw = f.status;
+        const status =
+          typeof statusRaw === 'string' && statusRaw.length > 0
+            ? (statusRaw as DiffFileStatus)
+            : ('modified' as DiffFileStatus);
+        files.push({ filename, patch, status });
+      }
+    }
 
     const diff = files
       .map((f) => f.patch)

@@ -47,16 +47,14 @@ function parseLlmResponse(content: string): LlmDedupResponse | null {
     const parsed: unknown = JSON.parse(stripped);
     if (!parsed || typeof parsed !== 'object') return null;
     const o = parsed as Record<string, unknown>;
-    const groups = Array.isArray(o.groups) ? o.groups : [];
+    const groupsRaw: unknown[] = Array.isArray(o.groups) ? o.groups : [];
     const ungrouped_ids = Array.isArray(o.ungrouped_ids) ? o.ungrouped_ids : [];
     return {
-      groups: groups.filter(
-        (g): g is LlmGroup =>
-          g &&
-          typeof g === 'object' &&
-          typeof (g as LlmGroup).root_cause === 'string' &&
-          Array.isArray((g as LlmGroup).finding_ids),
-      ),
+      groups: groupsRaw.filter((item): item is LlmGroup => {
+        if (item === null || typeof item !== 'object') return false;
+        const g = item as Record<string, unknown>;
+        return typeof g.root_cause === 'string' && Array.isArray(g.finding_ids);
+      }),
       ungrouped_ids: ungrouped_ids.filter(
         (id): id is string => typeof id === 'string',
       ),

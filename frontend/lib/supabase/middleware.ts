@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
   if (isProtectedPath(pathname) && !user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = LOGIN_PATH;
-    loginUrl.searchParams.set("redirectTo", pathname);
+    // Do not add redirectTo without validation — would risk open redirects if used post-login.
     return NextResponse.redirect(loginUrl);
   }
 

@@ -1,4 +1,27 @@
 /**
+ * Safe relative path for post-login redirects (blocks protocol-relative //, \\, : in path).
+ * Falls back to `/dashboard` if `next` is missing or unsafe.
+ */
+export function getSafeRelativeRedirectPath(next: string | null): string {
+  const fallback = "/dashboard";
+  if (next == null) {
+    return fallback;
+  }
+  const trimmed = next.trim();
+  if (trimmed === "") {
+    return fallback;
+  }
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return fallback;
+  }
+  const pathOnly = trimmed.split(/[?#]/)[0] ?? trimmed;
+  if (pathOnly.includes("\\") || pathOnly.includes(":")) {
+    return fallback;
+  }
+  return trimmed;
+}
+
+/**
  * Client-side guard before assigning API-provided URLs to location.href.
  * Stripe Checkout hosted pages use checkout.stripe.com (test and live).
  */

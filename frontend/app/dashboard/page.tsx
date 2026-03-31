@@ -19,7 +19,7 @@ import { UsageCounter } from "./usage-counter";
 
 async function fetchBillingUsage(
   accessToken: string
-): Promise<UsageResponse | null> {
+): Promise<{ usage: UsageResponse | null; loadFailed: boolean }> {
   const backendUrl = getBackendUrl();
   try {
     const res = await fetch(`${backendUrl}/billing/usage`, {
@@ -28,16 +28,20 @@ async function fetchBillingUsage(
       },
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("billing/usage HTTP error:", res.status, res.statusText);
+      return { usage: null, loadFailed: true };
+    }
     const contentType = res.headers.get("content-type");
     if (!contentType?.includes("application/json")) {
       console.error("Expected JSON but got:", contentType);
-      return null;
+      return { usage: null, loadFailed: true };
     }
-    return res.json();
+    const usage = (await res.json()) as UsageResponse;
+    return { usage, loadFailed: false };
   } catch (error: unknown) {
     console.error("Error fetching billing usage:", error);
-    return null;
+    return { usage: null, loadFailed: true };
   }
 }
 
@@ -116,10 +120,11 @@ export default async function DashboardPage() {
     );
   }
 
-  const [me, usage] = await Promise.all([
+  const [me, usageFetch] = await Promise.all([
     fetchMe(session.access_token),
     fetchBillingUsage(session.access_token),
   ]);
+  const { usage, loadFailed: usageLoadFailed } = usageFetch;
   const reposData =
     me?.github_connected ? await fetchRepos(session.access_token) : null;
 
@@ -137,7 +142,11 @@ export default async function DashboardPage() {
         </div>
 
         {me ? (
-          <UsageProvider initialUsage={usage} accessToken={session.access_token}>
+          <UsageProvider
+            initialUsage={usage}
+            initialUsageLoadFailed={usageLoadFailed}
+            accessToken={session.access_token}
+          >
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Left Sidebar - Profile & Stats */}
             <div className="flex flex-col gap-6 lg:col-span-1">

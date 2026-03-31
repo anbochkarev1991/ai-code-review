@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Logger,
   Param,
   Query,
   Req,
@@ -20,6 +21,8 @@ const GITHUB_OAUTH_SCOPE = 'read:user repo';
 
 @Controller('github')
 export class GitHubController {
+  private readonly logger = new Logger(GitHubController.name);
+
   constructor(private readonly githubService: GitHubService) {}
 
   @Get('oauth')
@@ -97,7 +100,11 @@ export class GitHubController {
         state,
       );
       return { url: `${frontendUrl}/dashboard?github=connected` };
-    } catch {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`GitHub OAuth callback failed: ${message}`, stack);
+
       return {
         url: `${frontendUrl}/dashboard?github=error&message=exchange_failed`,
       };
