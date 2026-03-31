@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface Repo {
   full_name: string;
   private: boolean;
@@ -22,6 +24,40 @@ export interface Pull {
 
 export interface PullsResponse {
   pulls: Pull[];
+}
+
+const repoSchema = z.object({
+  full_name: z.string(),
+  private: z.boolean(),
+  default_branch: z.string(),
+});
+
+export const reposResponseSchema = z.object({
+  repos: z.array(repoSchema),
+});
+
+const pullSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  state: z.string(),
+  head: z.object({ ref: z.string() }),
+  created_at: z.string(),
+});
+
+export const pullsResponseSchema = z.object({
+  pulls: z.array(pullSchema),
+});
+
+/** Safe parse for GET /github/repos JSON bodies. */
+export function parseReposResponse(json: unknown): ReposResponse | null {
+  const r = reposResponseSchema.safeParse(json);
+  return r.success ? r.data : null;
+}
+
+/** Safe parse for GET .../pulls JSON bodies. */
+export function parsePullsResponse(json: unknown): PullsResponse | null {
+  const r = pullsResponseSchema.safeParse(json);
+  return r.success ? r.data : null;
 }
 
 export type DiffFileStatus = 'added' | 'modified' | 'removed' | 'renamed' | 'copied' | 'changed';

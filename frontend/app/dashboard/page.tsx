@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
+import { parseReposResponse } from "shared";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
 import { GitHubCallbackHandler } from "./github-callback-handler";
@@ -87,7 +88,8 @@ async function fetchRepos(
       console.error("Expected JSON but got:", contentType);
       return null;
     }
-    return res.json();
+    const json: unknown = await res.json();
+    return parseReposResponse(json);
   } catch (error: unknown) {
     console.error("Error fetching repos:", error);
     return null;
@@ -96,9 +98,8 @@ async function fetchRepos(
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data?.session;
 
   if (!session?.access_token) {
     return (

@@ -47,11 +47,19 @@ async function main() {
     process.exit(1);
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from('subscriptions')
     .select('id')
     .eq('user_id', user.id)
     .maybeSingle();
+
+  if (selectError) {
+    console.error(
+      'Failed to check existing subscription:',
+      selectError.message,
+    );
+    process.exit(1);
+  }
 
   const row = {
     user_id: user.id,

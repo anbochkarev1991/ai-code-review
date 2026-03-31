@@ -5,9 +5,8 @@ import type { MeResponse } from "@/lib/types";
 
 export async function Header() {
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data?.session;
 
   const isAuthenticated = !!session?.user;
   const user = session?.user;

@@ -90,9 +90,8 @@ export default async function ReviewDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data?.session;
 
   if (!session?.access_token) {
     return (

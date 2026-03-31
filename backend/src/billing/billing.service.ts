@@ -16,6 +16,10 @@ const USAGE_LIMITS: Record<Plan, number> = {
   pro: 200,
 };
 
+function isStripeEventObject(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -247,8 +251,19 @@ export class BillingService {
   }
 
   private async handleCheckoutSessionCompleted(
-    session: Stripe.Checkout.Session,
+    obj: Stripe.Event.Data.Object,
   ): Promise<void> {
+    if (
+      !isStripeEventObject(obj) ||
+      !('customer' in obj) ||
+      !('subscription' in obj)
+    ) {
+      this.logger.warn(
+        'checkout.session.completed: unexpected webhook object shape; expected customer and subscription',
+      );
+      return;
+    }
+    const session = obj as unknown as Stripe.Checkout.Session;
     const userId =
       (session.metadata?.user_id as string) ?? session.client_reference_id;
     if (!userId) {
@@ -270,8 +285,10 @@ export class BillingService {
 
     let currentPeriodEnd: string | null = null;
     try {
-      const subscription =
-        await this.getStripe().subscriptions.retrieve(stripeSubscriptionId);
+      const subscription = await this.getStripe().subscriptions.retrieve(
+        stripeSubscriptionId,
+        { expand: ['items'] },
+      );
       const firstItem = subscription.items?.data?.[0];
       if (firstItem?.current_period_end) {
         currentPeriodEnd = new Date(
@@ -331,8 +348,20 @@ export class BillingService {
   }
 
   private async handleCustomerSubscriptionUpdated(
-    subscription: Stripe.Subscription,
+    obj: Stripe.Event.Data.Object,
   ): Promise<void> {
+    if (
+      !isStripeEventObject(obj) ||
+      typeof obj.id !== 'string' ||
+      obj.id.length === 0 ||
+      typeof obj.status !== 'string'
+    ) {
+      this.logger.warn(
+        'customer.subscription.updated: unexpected webhook object shape; expected id and status',
+      );
+      return;
+    }
+    const subscription = obj as unknown as Stripe.Subscription;
     const stripeSubscriptionId = subscription.id;
     const supabase = this.getSupabaseAdmin();
 
@@ -357,7 +386,18 @@ export class BillingService {
     const status = isActive ? 'active' : 'canceled';
 
     let currentPeriodEnd: string | null = null;
-    const firstItem = subscription.items?.data?.[0];
+    let subForPeriod: Stripe.Subscription = subscription;
+    try {
+      subForPeriod = await this.getStripe().subscriptions.retrieve(
+        stripeSubscriptionId,
+        { expand: ['items'] },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `subscription.updated: full retrieve failed, using webhook payload for period end: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const firstItem = subForPeriod.items?.data?.[0];
     if (firstItem?.current_period_end) {
       currentPeriodEnd = new Date(
         firstItem.current_period_end * 1000,
@@ -383,8 +423,19 @@ export class BillingService {
   }
 
   private async handleCustomerSubscriptionDeleted(
-    subscription: Stripe.Subscription,
+    obj: Stripe.Event.Data.Object,
   ): Promise<void> {
+    if (
+      !isStripeEventObject(obj) ||
+      typeof obj.id !== 'string' ||
+      obj.id.length === 0
+    ) {
+      this.logger.warn(
+        'customer.subscription.deleted: unexpected webhook object shape; expected id',
+      );
+      return;
+    }
+    const subscription = obj as unknown as Stripe.Subscription;
     const stripeSubscriptionId = subscription.id;
     const supabase = this.getSupabaseAdmin();
 

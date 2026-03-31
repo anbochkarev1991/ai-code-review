@@ -79,10 +79,8 @@ export class GitHubController {
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(state);
+    const { data, error } = await supabase.auth.getUser(state);
+    const user = data?.user;
 
     if (error || !user) {
       return {

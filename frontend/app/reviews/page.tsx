@@ -61,9 +61,8 @@ function getStatusColor(status: string): string {
 
 export default async function ReviewsPage() {
   const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data?.session;
 
   if (!session?.access_token) {
     return (

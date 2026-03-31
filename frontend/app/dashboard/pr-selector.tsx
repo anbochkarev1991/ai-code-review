@@ -2,6 +2,7 @@
 
 import { useEffect, useState, startTransition, useRef } from "react";
 import type { Pull, PullsResponse } from "@/lib/types";
+import { parsePullsResponse } from "shared";
 
 interface PRSelectorProps {
   owner: string;
@@ -43,7 +44,8 @@ export function PRSelector({
       .then(async (res: Response) => {
         if (cancelled) return null;
         if (!res.ok) return null;
-        return res.json() as Promise<PullsResponse>;
+        const json: unknown = await res.json();
+        return parsePullsResponse(json);
       })
       .then((data: PullsResponse | null) => {
         if (cancelled) return;
