@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { GetReviewsResponse, ReviewRun } from "@/lib/types";
+import { parseGetReviewsResponse } from "shared";
 
 async function fetchReviews(
   accessToken: string,
@@ -20,7 +21,8 @@ async function fetchReviews(
       }
     );
     if (!res.ok) return null;
-    return res.json();
+    const json: unknown = await res.json();
+    return parseGetReviewsResponse(json);
   } catch (error: unknown) {
     // Handle network errors, DNS failures, etc.
     console.error("Failed to fetch reviews:", error);
@@ -150,8 +152,8 @@ export default async function ReviewsPage() {
                         <>
                           <span className="hidden sm:inline">•</span>
                           <span>
-                            {review.result_snapshot.findings.length} finding
-                            {review.result_snapshot.findings.length !== 1
+                            {review.result_snapshot.findings?.length ?? 0} finding
+                            {(review.result_snapshot.findings?.length ?? 0) !== 1
                               ? "s"
                               : ""}
                           </span>

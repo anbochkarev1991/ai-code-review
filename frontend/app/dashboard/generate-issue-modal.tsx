@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import type { Finding } from "@/lib/types";
+import { parseGenerateIssueResponse } from "shared";
 
 type ModalState = "loading" | "success" | "error";
 
@@ -180,7 +181,11 @@ export function GenerateIssueModal({
             body?.message ?? `Request failed with status ${res.status}`
           );
         }
-        const data = await res.json();
+        const json: unknown = await res.json();
+        const data = parseGenerateIssueResponse(json);
+        if (!data) {
+          throw new Error("Invalid response: missing issue_text");
+        }
         setIssueText(data.issue_text);
         setState("success");
       } catch (err: unknown) {

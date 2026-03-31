@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import type { PostReviewsResponse, ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
+import type { ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
+import { parsePostReviewsResponse } from "shared";
 import { AiReviewSummaryBlock } from "./ai-review-summary-block";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummarySidebar } from "./review-summary-sidebar";
@@ -72,7 +73,11 @@ export function RunReviewButton({
         );
       }
 
-      const data = (await response.json()) as PostReviewsResponse;
+      const json: unknown = await response.json();
+      const data = parsePostReviewsResponse(json);
+      if (!data) {
+        throw new Error("Invalid review response payload");
+      }
 
       if (data.error_message) {
         setError(data.error_message);

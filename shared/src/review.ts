@@ -347,6 +347,73 @@ export interface GenerateIssueResponse {
   issue_text: string;
 }
 
+const reviewStatusSchema = z.enum(['complete', 'partial', 'failed']);
+
+export const postReviewsResponseSchema = z
+  .object({
+    id: z.string(),
+    status: reviewStatusSchema,
+    result_snapshot: z.unknown().optional(),
+    trace: z.unknown().optional(),
+    error_message: z.string().optional(),
+    usage: z.unknown().optional(),
+  })
+  .transform((value) => value as PostReviewsResponse);
+
+export function parsePostReviewsResponse(
+  json: unknown,
+): PostReviewsResponse | null {
+  const parsed = postReviewsResponseSchema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
+export const getReviewResponseSchema = z
+  .object({
+    id: z.string(),
+    status: reviewStatusSchema,
+    result_snapshot: z.unknown().optional(),
+    trace: z.unknown().optional(),
+    error_message: z.union([z.string(), z.null()]).optional(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .transform((value) => value as GetReviewResponse);
+
+export function parseGetReviewResponse(json: unknown): GetReviewResponse | null {
+  const parsed = getReviewResponseSchema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
+export const getReviewsResponseSchema = z
+  .object({
+    items: z.array(z.unknown()),
+    total: z.number(),
+  })
+  .transform(
+    (value): GetReviewsResponse => ({
+      items: value.items as ReviewRun[],
+      total: value.total,
+    }),
+  );
+
+export function parseGetReviewsResponse(
+  json: unknown,
+): GetReviewsResponse | null {
+  const parsed = getReviewsResponseSchema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
+export const generateIssueResponseSchema = z.object({
+  issue_text: z.string(),
+});
+
+export function parseGenerateIssueResponse(
+  json: unknown,
+): GenerateIssueResponse | null {
+  const parsed = generateIssueResponseSchema.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
 // ── Engine options (PART 10) ──
 
 export interface GitContext {

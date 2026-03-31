@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { MeResponse, ReposResponse, UsageResponse } from "@/lib/types";
-import { parseReposResponse } from "shared";
+import { parseMeResponse, parseReposResponse } from "shared";
 import { RepoAndPRSelectors } from "./repo-and-pr-selectors";
 import { UpgradeToProButton } from "./upgrade-to-pro-button";
 import { GitHubCallbackHandler } from "./github-callback-handler";
@@ -64,7 +64,8 @@ async function fetchMe(accessToken: string): Promise<MeResponse | null> {
       console.error("Expected JSON but got:", contentType);
       return null;
     }
-    return res.json();
+    const json: unknown = await res.json();
+    return parseMeResponse(json);
   } catch (error: unknown) {
     console.error("Error fetching me:", error);
     return null;
@@ -125,9 +126,11 @@ export default async function DashboardPage() {
     fetchMe(session.access_token),
     fetchBillingUsage(session.access_token),
   ]);
+  const meProfile = me?.profile;
+  const mePlan = me?.plan ?? "free";
+  const githubConnected = me?.github_connected ?? false;
   const { usage, loadFailed: usageLoadFailed } = usageFetch;
-  const reposData =
-    me?.github_connected ? await fetchRepos(session.access_token) : null;
+  const reposData = githubConnected ? await fetchRepos(session.access_token) : null;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -142,7 +145,7 @@ export default async function DashboardPage() {
           </h1>
         </div>
 
-        {me ? (
+        {meProfile ? (
           <UsageProvider
             initialUsage={usage}
             initialUsageLoadFailed={usageLoadFailed}
@@ -154,10 +157,10 @@ export default async function DashboardPage() {
               {/* Profile Card */}
               <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="flex items-center gap-4">
-                  {me.profile.avatar_url ? (
+                  {meProfile.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={me.profile.avatar_url}
+                      src={meProfile.avatar_url}
                       alt="Avatar"
                       width={64}
                       height={64}
@@ -165,15 +168,15 @@ export default async function DashboardPage() {
                     />
                   ) : (
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-200 text-xl font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400 flex-shrink-0">
-                      {(me.profile.display_name ?? me.profile.email)?.[0]?.toUpperCase() ?? "?"}
+                      {(meProfile.display_name ?? meProfile.email)?.[0]?.toUpperCase() ?? "?"}
                     </div>
                   )}
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <p className="truncate font-semibold text-lg text-zinc-900 dark:text-zinc-100">
-                      {me.profile.display_name ?? "User"}
+                      {meProfile.display_name ?? "User"}
                     </p>
                     <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">
-                      {me.profile.email}
+                      {meProfile.email}
                     </p>
                   </div>
                 </div>
@@ -189,13 +192,13 @@ export default async function DashboardPage() {
                   <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
                     <span className="text-sm text-zinc-600 dark:text-zinc-400">Plan</span>
                     <span className="text-sm font-medium capitalize text-zinc-900 dark:text-zinc-100">
-                      {usage?.plan ?? me.plan}
+                      {usage?.plan ?? mePlan}
                     </span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
                     <span className="text-sm text-zinc-600 dark:text-zinc-400">GitHub</span>
                     <span className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {me.github_connected ? (
+                      {githubConnected ? (
                         <>
                           <span className="h-2 w-2 rounded-full bg-green-500"></span>
                           Connected
@@ -212,7 +215,7 @@ export default async function DashboardPage() {
               </div>
 
               {/* Upgrade Card (Free plan only) */}
-              {me.plan === "free" && (
+              {mePlan === "free" && (
                 <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                   <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     Upgrade
@@ -263,7 +266,7 @@ export default async function DashboardPage() {
                   Run Code Review
                 </h2>
 
-                {!me.github_connected ? (
+                {!githubConnected ? (
                   <div className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
                     <div className="rounded-full bg-zinc-100 p-4 dark:bg-zinc-800">
                       <svg

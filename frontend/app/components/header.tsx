@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { HeaderClient } from "./header-client";
-import type { MeResponse } from "@/lib/types";
+import { parseMeResponse } from "shared";
 
 export async function Header() {
   const supabase = await createClient();
@@ -30,9 +30,10 @@ export async function Header() {
         cache: "no-store",
       });
       if (res.ok) {
-        const meData: MeResponse = await res.json();
-        userName = meData.profile.display_name || undefined;
-        avatarUrl = meData.profile.avatar_url || undefined;
+        const json: unknown = await res.json();
+        const meData = parseMeResponse(json);
+        userName = meData?.profile?.display_name || undefined;
+        avatarUrl = meData?.profile?.avatar_url || undefined;
       }
     } catch {
       // Silently fallback to Supabase metadata

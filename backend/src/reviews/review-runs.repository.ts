@@ -78,6 +78,11 @@ export class ReviewRunsRepository {
         `Failed to create review run: ${error.message}`,
       );
     }
+    if (!data) {
+      throw new InternalServerErrorException(
+        'Review run insert returned no row',
+      );
+    }
     return data.id as string;
   }
 

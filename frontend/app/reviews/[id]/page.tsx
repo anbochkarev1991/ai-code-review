@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { GetReviewResponse } from "@/lib/types";
+import { parseGetReviewResponse } from "shared";
 import { AiReviewSummaryBlock } from "@/app/dashboard/ai-review-summary-block";
 import { ReviewFindingsList } from "@/app/dashboard/review-findings-list";
 import { ReviewSummarySidebar } from "@/app/dashboard/review-summary-sidebar";
@@ -43,7 +44,11 @@ async function fetchReview(
     if (!contentType?.includes("application/json")) {
       return { ok: false, reason: "server_error" };
     }
-    const data = (await res.json()) as GetReviewResponse;
+    const json: unknown = await res.json();
+    const data = parseGetReviewResponse(json);
+    if (!data) {
+      return { ok: false, reason: "server_error" };
+    }
     return { ok: true, data };
   } catch (error: unknown) {
     console.error("Failed to fetch review:", error);
@@ -155,6 +160,11 @@ export default async function ReviewDetailPage({
   }
 
   const review = reviewResult.data;
+  const resultSnapshot = review.result_snapshot;
+  const hasRenderableSnapshot =
+    !!resultSnapshot &&
+    typeof resultSnapshot.summary === "string" &&
+    Array.isArray(resultSnapshot.findings);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -204,35 +214,35 @@ export default async function ReviewDetailPage({
               </div>
             )}
 
-            {review.result_snapshot && (
+            {hasRenderableSnapshot && resultSnapshot && (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] md:items-start">
                 <div className="md:col-start-2 md:row-start-1 md:flex md:h-full md:min-h-0 md:flex-col md:pb-6">
                   <ReviewSummarySidebar
-                    summary={review.result_snapshot.summary}
-                    findings={review.result_snapshot.findings}
-                    reviewSummary={review.result_snapshot.review_summary}
+                    summary={resultSnapshot.summary}
+                    findings={resultSnapshot.findings}
+                    reviewSummary={resultSnapshot.review_summary}
                   />
                 </div>
                 <div className="flex min-w-0 flex-col gap-8 md:col-start-1 md:row-start-1 md:pb-6">
-                  {review.result_snapshot.ai_review_summary && (
+                  {resultSnapshot.ai_review_summary && (
                     <AiReviewSummaryBlock
-                      aiReviewSummary={review.result_snapshot.ai_review_summary}
+                      aiReviewSummary={resultSnapshot.ai_review_summary}
                     />
                   )}
                   <ReviewSummary
-                    summary={review.result_snapshot.summary}
-                    findings={review.result_snapshot.findings}
-                    executionMetadata={review.result_snapshot.execution_metadata}
-                    reviewSummary={review.result_snapshot.review_summary}
-                    prMetadata={review.result_snapshot.pr_metadata}
-                    performance={review.result_snapshot.performance}
-                    signature={review.result_snapshot.signature}
+                    summary={resultSnapshot.summary}
+                    findings={resultSnapshot.findings}
+                    executionMetadata={resultSnapshot.execution_metadata}
+                    reviewSummary={resultSnapshot.review_summary}
+                    prMetadata={resultSnapshot.pr_metadata}
+                    performance={resultSnapshot.performance}
+                    signature={resultSnapshot.signature}
                     reviewStatus={review.status}
-                    reviewMetadata={review.result_snapshot.review_metadata}
+                    reviewMetadata={resultSnapshot.review_metadata}
                     variant="main"
                   />
                   <ReviewFindingsList
-                    findings={review.result_snapshot.findings}
+                    findings={resultSnapshot.findings}
                     accessToken={session.access_token}
                   />
                 </div>
@@ -243,7 +253,7 @@ export default async function ReviewDetailPage({
               <ReviewTrace trace={review.trace} />
             )}
 
-            {!review.result_snapshot &&
+            {!hasRenderableSnapshot &&
               !review.error_message &&
               review.status !== "failed" && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:p-4 text-xs sm:text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
