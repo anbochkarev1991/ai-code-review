@@ -6,6 +6,7 @@ import {
   inferLikelihood,
   isStylisticFinding,
   affectsRuntime,
+  securitySeverityOverride,
 } from './severity-classifier';
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
@@ -51,7 +52,8 @@ describe('severity-classifier', () => {
           severity: 'critical',
           confidence: 0.96,
           impact: 'SQL injection may allow full database compromise.',
-          message: 'User input is concatenated into the query without sanitization.',
+          message:
+            'User input is concatenated into the query without sanitization.',
         }),
       );
       expect(s).toBe('critical');
@@ -116,13 +118,152 @@ describe('severity-classifier', () => {
       );
       expect(out.severity).toBe(computeSeverity(out));
     });
+
+    describe('security redirect / unvalidated URL override', () => {
+      it('assigns CRITICAL for open redirect in OAuth callback with confidence >= 0.8', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'medium',
+            confidence: 0.85,
+            title: 'Open redirect in OAuth callback handler',
+            message:
+              'The redirect target is built from query params and passed to redirect() without allowlisting.',
+            impact: 'Attackers can steal OAuth tokens via phishing redirects.',
+          }),
+        );
+        expect(s).toBe('critical');
+      });
+
+      it('assigns HIGH for open redirect in general navigation with confidence >= 0.8', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'medium',
+            confidence: 0.85,
+            title: 'Open redirect via next query parameter',
+            message:
+              'searchParams.get("next") is passed to redirect() without validation.',
+            impact:
+              'Users can be sent to attacker-controlled URLs after login.',
+          }),
+        );
+        expect(s).toBe('high');
+      });
+
+      it('assigns HIGH for unvalidated external URL in window.location with confidence 0.8', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'medium',
+            confidence: 0.8,
+            title: 'window.location assigned from API response URL',
+            message:
+              'The URL from the API is assigned to window.location without https or allowlist checks.',
+            impact: 'Arbitrary navigation and potential phishing.',
+          }),
+        );
+        expect(s).toBe('high');
+      });
+
+      it('assigns HIGH for redirect sink with confidence 0.7 (relaxed threshold)', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'medium',
+            confidence: 0.7,
+            title: 'Redirect uses untrusted next parameter',
+            message: 'searchParams.get("next") is passed to redirect().',
+            impact: 'Arbitrary URL navigation.',
+          }),
+        );
+        expect(s).toBe('high');
+      });
+
+      it('caps at MEDIUM when strict allowlist / mitigation is described', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'high',
+            confidence: 0.9,
+            title: 'Redirect target validated against allowlist',
+            message:
+              'User-supplied next is passed to redirect() but strict validation restricts to same-origin paths.',
+            impact: 'Limited risk due to allowlist.',
+          }),
+        );
+        expect(s).toBe('medium');
+      });
+
+      it('does not promote open redirect when confidence < 0.7', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'medium',
+            confidence: 0.5,
+            title: 'Open redirect via next query param',
+            message:
+              'The next parameter is passed to redirect() without validation.',
+            impact: 'Users can be sent to an attacker-controlled destination.',
+          }),
+        );
+        expect(s).toBe('medium');
+      });
+
+      it('leaves non-redirect security findings on generic path', () => {
+        const s = computeSeverity(
+          makeFinding({
+            category: 'security',
+            severity: 'critical',
+            confidence: 0.96,
+            title: 'SQL injection in search handler',
+            message:
+              'User input is concatenated into the query without sanitization.',
+            impact: 'SQL injection may allow full database compromise.',
+          }),
+        );
+        expect(s).toBe('critical');
+      });
+    });
+  });
+
+  describe('securitySeverityOverride', () => {
+    it('returns null for non-security category', () => {
+      expect(
+        securitySeverityOverride(
+          makeFinding({
+            category: 'code-quality',
+            title: 'redirect() misuse',
+            message: 'Uses redirect from query.',
+            confidence: 0.9,
+          }),
+          0.9,
+        ),
+      ).toBeNull();
+    });
+
+    it('returns null when no redirect/url signals', () => {
+      expect(
+        securitySeverityOverride(
+          makeFinding({
+            category: 'security',
+            title: 'Missing CSRF token',
+            message: 'POST form has no CSRF protection.',
+            confidence: 0.9,
+          }),
+          0.9,
+        ),
+      ).toBeNull();
+    });
   });
 
   describe('inferImpactLevel', () => {
     it('detects high impact from impact string', () => {
       expect(
         inferImpactLevel(
-          makeFinding({ impact: 'Remote SQL injection leading to data breach.' }),
+          makeFinding({
+            impact: 'Remote SQL injection leading to data breach.',
+          }),
         ),
       ).toBe('high');
     });
@@ -156,9 +297,9 @@ describe('severity-classifier', () => {
     });
 
     it('returns high when confidence >= 0.95 and no uncertainty', () => {
-      expect(inferLikelihood(makeFinding({ message: 'Clear bug.' }), 0.96)).toBe(
-        'high',
-      );
+      expect(
+        inferLikelihood(makeFinding({ message: 'Clear bug.' }), 0.96),
+      ).toBe('high');
     });
 
     it('returns low when confidence < 0.6', () => {

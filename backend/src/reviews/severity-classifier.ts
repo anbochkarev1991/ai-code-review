@@ -33,6 +33,54 @@ const HIGH_IMPACT_KEYWORDS = [
   'auth bypass',
   'data breach',
   'remote code',
+  'open redirect',
+  'unvalidated url',
+];
+
+/** Signals for user-controlled or sink-based redirect / external URL misuse (security category only). */
+const REDIRECT_KEYWORDS = [
+  'open redirect',
+  'redirect',
+  'unvalidated url',
+  'unsafe redirect',
+  'url injection',
+  'location.href',
+  'window.location',
+  'res.redirect',
+  'redirect()',
+];
+
+/**
+ * Auth/OAuth/login flows — elevate open redirect to critical when combined with redirect signals.
+ * Phrases are chosen to avoid matching casual mentions like "after login" in general navigation text.
+ */
+const AUTH_CONTEXT_KEYWORDS = [
+  'oauth',
+  'oidc',
+  '/auth/',
+  'auth/callback',
+  'auth callback',
+  'oauth callback',
+  'login callback',
+  'sign-in',
+  'sign in flow',
+  'session fixation',
+  'token exchange',
+  'authorization code',
+];
+
+/** Mitigations: do not promote to critical/high via redirect override (PART 3). */
+const DOWNGRADE_KEYWORDS = [
+  'allowlisted',
+  'against allowlist',
+  'against an allowlist',
+  'domain allowlist',
+  'allow list',
+  'whitelist',
+  'same-origin',
+  'relative path',
+  'internal only',
+  'strict validation',
 ];
 
 const LOW_IMPACT_KEYWORDS = [
@@ -98,7 +146,8 @@ export function inferLikelihood(
   finding: Finding,
   confidence: number,
 ): LikelihoodLevel {
-  const combined = `${finding.message || ''} ${finding.title || ''} ${finding.impact || ''}`.toLowerCase();
+  const combined =
+    `${finding.message || ''} ${finding.title || ''} ${finding.impact || ''}`.toLowerCase();
   if (UNCERTAINTY_PHRASES.some((p) => combined.includes(p))) {
     return 'low';
   }
@@ -117,7 +166,8 @@ export function isStylisticFinding(finding: Finding): boolean {
 /** Whether the issue can affect runtime behavior (vs docs-only / readability-only). */
 export function affectsRuntime(finding: Finding): boolean {
   if (isStylisticFinding(finding)) return false;
-  const combined = `${finding.message || ''} ${finding.title || ''} ${finding.impact || ''}`.toLowerCase();
+  const combined =
+    `${finding.message || ''} ${finding.title || ''} ${finding.impact || ''}`.toLowerCase();
   if (NO_RUNTIME_PHRASES.some((p) => combined.includes(p))) return false;
   return true;
 }
@@ -131,6 +181,34 @@ function capAtMost(
 }
 
 /**
+ * Security-only severity adjustment for redirect / unvalidated external URL patterns.
+ * Does not add findings; only raises (or fixes) severity when text clearly matches.
+ * Returns null to use the generic impact/likelihood matrix.
+ */
+export function securitySeverityOverride(
+  finding: Finding,
+  confidence: number,
+): FindingSeverity | null {
+  if (finding.category !== 'security') return null;
+
+  const combined = `${finding.title} ${finding.message} ${finding.impact ?? ''} ${finding.suggested_fix ?? ''}`;
+
+  if (!containsAny(combined, REDIRECT_KEYWORDS)) return null;
+
+  if (containsAny(combined, DOWNGRADE_KEYWORDS)) {
+    return 'medium';
+  }
+
+  if (confidence < 0.7) return null;
+
+  if (containsAny(combined, AUTH_CONTEXT_KEYWORDS) && confidence >= 0.8) {
+    return 'critical';
+  }
+
+  return 'high';
+}
+
+/**
  * Deterministic severity from inferred impact, likelihood, and confidence.
  * Does not discover new findings — only reassigns severity for existing ones.
  */
@@ -141,6 +219,19 @@ export function computeSeverity(finding: Finding): FindingSeverity {
     return 'low';
   }
 
+  const securityOverride = securitySeverityOverride(finding, confidence);
+  if (securityOverride !== null) {
+    let s = securityOverride;
+    const likelihood = inferLikelihood(finding, confidence);
+    if (likelihood === 'low') {
+      s = capAtMost(s, 'medium');
+    }
+    if (!affectsRuntime(finding)) {
+      s = capAtMost(s, 'medium');
+    }
+    return s;
+  }
+
   const impact = inferImpactLevel(finding);
   const likelihood = inferLikelihood(finding, confidence);
 
@@ -148,11 +239,7 @@ export function computeSeverity(finding: Finding): FindingSeverity {
 
   let s: FindingSeverity;
 
-  if (
-    impact === 'high' &&
-    likelihood === 'high' &&
-    confidence >= 0.8
-  ) {
+  if (impact === 'high' && likelihood === 'high' && confidence >= 0.8) {
     base = 'critical';
   } else if (
     impact === 'high' &&
