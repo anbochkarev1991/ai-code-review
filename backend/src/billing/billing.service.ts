@@ -20,6 +20,38 @@ function isStripeEventObject(obj: unknown): obj is Record<string, unknown> {
   return typeof obj === 'object' && obj !== null;
 }
 
+function isPlan(value: unknown): value is Plan {
+  return value === 'free' || value === 'pro';
+}
+
+function parsePlan(value: unknown): Plan {
+  return isPlan(value) ? value : 'free';
+}
+
+function getPeriodEndIso(
+  subscription: Pick<Stripe.Subscription, 'items'>,
+): string | null {
+  const seconds = subscription.items?.data?.[0]?.current_period_end;
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return null;
+  }
+  return new Date(seconds * 1000).toISOString();
+}
+
+function getStringId(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (
+    isStripeEventObject(value) &&
+    typeof value.id === 'string' &&
+    value.id.length > 0
+  ) {
+    return value.id;
+  }
+  return null;
+}
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -184,7 +216,7 @@ export class BillingService {
       throw new InternalServerErrorException('Failed to read usage');
     }
 
-    let plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    let plan: Plan = parsePlan(subscriptionResult.data?.plan);
     const emulatedEmails = (process.env.PRO_EMULATE_EMAILS ?? '')
       .split(',')
       .map((e) => e.trim().toLowerCase())
@@ -196,7 +228,11 @@ export class BillingService {
     ) {
       plan = 'pro';
     }
-    const reviewCount: number = (usageResult.data?.review_count as number) ?? 0;
+    const reviewCountRaw = usageResult.data?.review_count;
+    const reviewCount =
+      typeof reviewCountRaw === 'number' && Number.isFinite(reviewCountRaw)
+        ? reviewCountRaw
+        : 0;
     const limit = USAGE_LIMITS[plan];
 
     return { review_count: reviewCount, limit, plan };
@@ -263,21 +299,22 @@ export class BillingService {
       );
       return;
     }
-    const session = obj as unknown as Stripe.Checkout.Session;
-    const userId =
-      (session.metadata?.user_id as string) ?? session.client_reference_id;
+    const metadata = isStripeEventObject(obj.metadata) ? obj.metadata : null;
+    const metadataUserId =
+      metadata && typeof metadata.user_id === 'string'
+        ? metadata.user_id
+        : null;
+    const clientReferenceId =
+      typeof obj.client_reference_id === 'string'
+        ? obj.client_reference_id
+        : null;
+    const userId = metadataUserId ?? clientReferenceId;
     if (!userId) {
       return;
     }
 
-    const stripeCustomerId =
-      typeof session.customer === 'string'
-        ? session.customer
-        : (session.customer?.id ?? null);
-    const stripeSubscriptionId =
-      typeof session.subscription === 'string'
-        ? session.subscription
-        : (session.subscription?.id ?? null);
+    const stripeCustomerId = getStringId(obj.customer);
+    const stripeSubscriptionId = getStringId(obj.subscription);
 
     if (!stripeCustomerId || !stripeSubscriptionId) {
       return;
@@ -289,12 +326,7 @@ export class BillingService {
         stripeSubscriptionId,
         { expand: ['items'] },
       );
-      const firstItem = subscription.items?.data?.[0];
-      if (firstItem?.current_period_end) {
-        currentPeriodEnd = new Date(
-          firstItem.current_period_end * 1000,
-        ).toISOString();
-      }
+      currentPeriodEnd = getPeriodEndIso(subscription);
     } catch {
       currentPeriodEnd = null;
     }
@@ -361,8 +393,8 @@ export class BillingService {
       );
       return;
     }
-    const subscription = obj as unknown as Stripe.Subscription;
-    const stripeSubscriptionId = subscription.id;
+    const stripeSubscriptionId = obj.id;
+    const subscriptionStatus = obj.status;
     const supabase = this.getSupabaseAdmin();
 
     const { data: existing, error: selectError } = await supabase
@@ -381,12 +413,12 @@ export class BillingService {
     if (!existing) return;
 
     const isActive =
-      subscription.status === 'active' || subscription.status === 'trialing';
+      subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
     const plan = isActive ? 'pro' : 'free';
     const status = isActive ? 'active' : 'canceled';
 
     let currentPeriodEnd: string | null = null;
-    let subForPeriod: Stripe.Subscription = subscription;
+    let subForPeriod: Pick<Stripe.Subscription, 'items'> | null = null;
     try {
       subForPeriod = await this.getStripe().subscriptions.retrieve(
         stripeSubscriptionId,
@@ -397,12 +429,7 @@ export class BillingService {
         `subscription.updated: full retrieve failed, using webhook payload for period end: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    const firstItem = subForPeriod.items?.data?.[0];
-    if (firstItem?.current_period_end) {
-      currentPeriodEnd = new Date(
-        firstItem.current_period_end * 1000,
-      ).toISOString();
-    }
+    currentPeriodEnd = subForPeriod ? getPeriodEndIso(subForPeriod) : null;
 
     const { error: updateError } = await supabase
       .from('subscriptions')
@@ -435,8 +462,7 @@ export class BillingService {
       );
       return;
     }
-    const subscription = obj as unknown as Stripe.Subscription;
-    const stripeSubscriptionId = subscription.id;
+    const stripeSubscriptionId = obj.id;
     const supabase = this.getSupabaseAdmin();
 
     const { data: existing, error: selectError } = await supabase

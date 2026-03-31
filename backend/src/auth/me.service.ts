@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import type { MeResponse, Profile, Plan } from '../types';
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPlan(value: unknown): value is Plan {
+  return value === 'free' || value === 'pro';
+}
+
 @Injectable()
 export class MeService {
   async getMe(user: User, accessToken: string): Promise<MeResponse> {
@@ -63,7 +71,9 @@ export class MeService {
           avatar_url: profileRow.avatar_url ?? undefined,
         }
       : (() => {
-          const md = user.user_metadata as Record<string, unknown> | undefined;
+          const md = isPlainObject(user.user_metadata)
+            ? user.user_metadata
+            : undefined;
           const asString = (v: unknown): string | undefined =>
             typeof v === 'string' ? v : undefined;
           return {
@@ -74,7 +84,9 @@ export class MeService {
           };
         })();
 
-    let plan: Plan = (subscriptionResult.data?.plan as Plan) ?? 'free';
+    let plan: Plan = isPlan(subscriptionResult.data?.plan)
+      ? subscriptionResult.data.plan
+      : 'free';
     const emulatedEmails = (process.env.PRO_EMULATE_EMAILS ?? '')
       .split(',')
       .map((e) => e.trim().toLowerCase())
