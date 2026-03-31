@@ -84,12 +84,24 @@ describe('SeverityNormalizer', () => {
   });
 
   describe('Deterministic severity classifier (Rule 0)', () => {
-    it('downgrades inflated CRITICAL to MEDIUM when confidence < 0.8', () => {
+    it('preserves security CRITICAL when confidence < 0.8 (no downgrade)', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'critical',
           confidence: 0.5,
           category: 'security',
+          impact: 'Potential issue.',
+        }),
+      ]);
+      expect(result[0].severity).toBe('critical');
+    });
+
+    it('downgrades inflated CRITICAL to MEDIUM when confidence < 0.8 (non-security)', () => {
+      const result = normalizer.normalize([
+        makeFinding({
+          severity: 'critical',
+          confidence: 0.5,
+          category: 'architecture',
           impact: 'Potential issue.',
         }),
       ]);
@@ -122,12 +134,25 @@ describe('SeverityNormalizer', () => {
       expect(result[0].severity).toBe('high');
     });
 
-    it('caps at MEDIUM when confidence < 0.8 even if agent said HIGH', () => {
+    it('preserves security HIGH when confidence < 0.8 (no downgrade)', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'high',
           confidence: 0.75,
           category: 'security',
+          impact: 'Remote code execution.',
+          message: 'Clear evidence in diff.',
+        }),
+      ]);
+      expect(result[0].severity).toBe('high');
+    });
+
+    it('caps at MEDIUM when confidence < 0.8 even if agent said HIGH (non-security)', () => {
+      const result = normalizer.normalize([
+        makeFinding({
+          severity: 'high',
+          confidence: 0.75,
+          category: 'architecture',
           impact: 'Remote code execution.',
           message: 'Clear evidence in diff.',
         }),
@@ -206,7 +231,7 @@ describe('SeverityNormalizer', () => {
       expect(result[0].severity).toBe('medium');
     });
 
-    it('interaction: classifier caps below 0.8; multi-agent cannot boost without confidence >= 0.8', () => {
+    it('interaction: security preserves agent severity when confidence < 0.8 even with multi-agent', () => {
       const result = normalizer.normalize([
         makeFinding({
           severity: 'high',
@@ -216,12 +241,12 @@ describe('SeverityNormalizer', () => {
           consensus_level: 'multi-agent' as ConsensusLevel,
         }),
       ]);
-      expect(result[0].severity).toBe('medium');
+      expect(result[0].severity).toBe('high');
     });
   });
 
   describe('Rule 2: max 3 HIGH per category', () => {
-    it('keeps top 3 by confidence and downgrades the rest', () => {
+    it('does not cap security HIGH count (security exempt from per-category cap)', () => {
       const findings = [
         makeFinding({
           id: 'h1',
@@ -229,7 +254,7 @@ describe('SeverityNormalizer', () => {
           confidence: 0.92,
           category: 'security',
           file: 'a.ts',
-          title: 'Unique finding about SQL injection',
+          title: 'Unique SQL injection finding',
           message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
@@ -238,7 +263,7 @@ describe('SeverityNormalizer', () => {
           confidence: 0.91,
           category: 'security',
           file: 'b.ts',
-          title: 'Unique finding about XSS vulnerability',
+          title: 'Unique XSS vulnerability finding',
           message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
@@ -247,7 +272,7 @@ describe('SeverityNormalizer', () => {
           confidence: 0.9,
           category: 'security',
           file: 'c.ts',
-          title: 'Unique finding about CSRF attack',
+          title: 'Unique CSRF attack finding',
           message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
@@ -256,7 +281,7 @@ describe('SeverityNormalizer', () => {
           confidence: 0.89,
           category: 'security',
           file: 'd.ts',
-          title: 'Unique finding about auth bypass',
+          title: 'Unique auth bypass finding',
           message: 'Clear vulnerability in changed lines.',
         }),
         makeFinding({
@@ -265,8 +290,63 @@ describe('SeverityNormalizer', () => {
           confidence: 0.88,
           category: 'security',
           file: 'e.ts',
-          title: 'Unique finding about path traversal',
+          title: 'Unique path traversal finding',
           message: 'Clear vulnerability in changed lines.',
+        }),
+      ];
+
+      const result = normalizer.normalize(findings);
+      const highCount = result.filter((f) => f.severity === 'high').length;
+
+      expect(highCount).toBe(5);
+    });
+
+    it('keeps top 3 by confidence per non-security category and downgrades the rest', () => {
+      const findings = [
+        makeFinding({
+          id: 'h1',
+          severity: 'high',
+          confidence: 0.92,
+          category: 'code-quality',
+          file: 'a.ts',
+          title: 'Unique correctness bug one',
+          message: 'Clear defect in changed lines without stylistic keywords.',
+        }),
+        makeFinding({
+          id: 'h2',
+          severity: 'high',
+          confidence: 0.91,
+          category: 'code-quality',
+          file: 'b.ts',
+          title: 'Unique correctness bug two',
+          message: 'Clear defect in changed lines without stylistic keywords.',
+        }),
+        makeFinding({
+          id: 'h3',
+          severity: 'high',
+          confidence: 0.9,
+          category: 'code-quality',
+          file: 'c.ts',
+          title: 'Unique correctness bug three',
+          message: 'Clear defect in changed lines without stylistic keywords.',
+        }),
+        makeFinding({
+          id: 'h4',
+          severity: 'high',
+          confidence: 0.89,
+          category: 'code-quality',
+          file: 'd.ts',
+          title: 'Unique correctness bug four',
+          message: 'Clear defect in changed lines without stylistic keywords.',
+        }),
+        makeFinding({
+          id: 'h5',
+          severity: 'high',
+          confidence: 0.88,
+          category: 'code-quality',
+          file: 'e.ts',
+          title: 'Unique correctness bug five',
+          message: 'Clear defect in changed lines without stylistic keywords.',
         }),
       ];
 
@@ -387,8 +467,10 @@ describe('SeverityNormalizer', () => {
       ];
 
       const result = normalizer.normalize(findings);
-      const highCount = result.filter((f) => f.severity === 'high').length;
-      expect(highCount).toBeLessThanOrEqual(3);
+      const nonSecurityHigh = result.filter(
+        (f) => f.severity === 'high' && f.category !== 'security',
+      ).length;
+      expect(nonSecurityHigh).toBeLessThanOrEqual(3);
     });
 
     it('does not downgrade when total findings <= 5', () => {
@@ -716,7 +798,10 @@ describe('SeverityNormalizer', () => {
           highPerCategory.set(f.category, count + 1);
         }
       }
-      for (const count of highPerCategory.values()) {
+      for (const [category, count] of highPerCategory.entries()) {
+        if (category === 'security') {
+          continue;
+        }
         expect(count).toBeLessThanOrEqual(3);
       }
     });

@@ -37,21 +37,59 @@ const HIGH_IMPACT_KEYWORDS = [
   'unvalidated url',
 ];
 
-/** Signals for user-controlled or sink-based redirect / external URL misuse (security category only). */
-const REDIRECT_KEYWORDS = [
-  'open redirect',
-  'redirect',
-  'unvalidated url',
-  'unsafe redirect',
-  'url injection',
-  'location.href',
-  'window.location',
+/** Explicit open-redirect class issues (security category only). */
+const OPEN_REDIRECT_PHRASES = ['open redirect', 'unsafe redirect'];
+
+/** Signals that redirect target is user- / attacker-controlled (pairs with redirect in text). */
+const USER_CONTROLLED_REDIRECT_SIGNALS = [
+  'user-controlled',
+  'user controlled',
+  'attacker-controlled',
+  'attacker controlled',
+  'attacker',
+  'untrusted',
+  'unvalidated',
+  'without validation',
+  'without allowlist',
+  'without an allowlist',
+  'searchparams',
+  'search params',
+  'query param',
+  'querystring',
+  'query string',
+  'get("next"',
+  "get('next'",
+  '["next"]',
+];
+
+const REDIRECT_SINK_KEYWORDS = [
   'res.redirect',
+  'redirect(',
   'redirect()',
+  'window.location',
+  'location.href',
+];
+
+/** Risk that URL is external / not validated (for sink-based rule 3). */
+const UNVALIDATED_EXTERNAL_URL_SIGNALS = [
+  'unvalidated',
+  'unvalidated url',
+  'external url',
+  'external site',
+  'external link',
+  'from api',
+  'from the api',
+  'api response',
+  'without https',
+  'without allowlist',
+  'no allowlist',
+  'arbitrary url',
+  'attacker-controlled',
+  'phishing',
 ];
 
 /**
- * Auth/OAuth/login flows — elevate open redirect to critical when combined with redirect signals.
+ * Auth/OAuth/login flows — elevate open redirect to critical when combined with open-redirect signals.
  * Phrases are chosen to avoid matching casual mentions like "after login" in general navigation text.
  */
 const AUTH_CONTEXT_KEYWORDS = [
@@ -69,7 +107,7 @@ const AUTH_CONTEXT_KEYWORDS = [
   'authorization code',
 ];
 
-/** Mitigations: do not promote to critical/high via redirect override (PART 3). */
+/** Mitigations: cap promotion via redirect override; monotonic rule still preserves higher agent severity. */
 const DOWNGRADE_KEYWORDS = [
   'allowlisted',
   'against allowlist',
@@ -114,6 +152,27 @@ const NO_RUNTIME_PHRASES = [
 function containsAny(haystack: string, needles: string[]): boolean {
   const h = haystack.toLowerCase();
   return needles.some((n) => h.includes(n.toLowerCase()));
+}
+
+/** Open redirect with user-controlled target (rule 1). */
+function isOpenRedirectUserControlled(combined: string): boolean {
+  if (containsAny(combined, OPEN_REDIRECT_PHRASES)) return true;
+  const c = combined.toLowerCase();
+  if (!c.includes('redirect')) return false;
+  return containsAny(combined, USER_CONTROLLED_REDIRECT_SIGNALS);
+}
+
+/** window.location / redirect + unvalidated external URL (rule 3). */
+function isRedirectSinkWithUnvalidatedExternalUrl(combined: string): boolean {
+  if (!containsAny(combined, REDIRECT_SINK_KEYWORDS)) return false;
+  return containsAny(combined, UNVALIDATED_EXTERNAL_URL_SIGNALS);
+}
+
+export function maxSeverity(
+  a: FindingSeverity,
+  b: FindingSeverity,
+): FindingSeverity {
+  return SEVERITY_ORDER[a] >= SEVERITY_ORDER[b] ? a : b;
 }
 
 export type ImpactLevel = 'high' | 'medium' | 'low';
@@ -182,7 +241,7 @@ function capAtMost(
 
 /**
  * Security-only severity adjustment for redirect / unvalidated external URL patterns.
- * Does not add findings; only raises (or fixes) severity when text clearly matches.
+ * Does not add findings; only assigns policy severity when text clearly matches existing finding.
  * Returns null to use the generic impact/likelihood matrix.
  */
 export function securitySeverityOverride(
@@ -193,7 +252,11 @@ export function securitySeverityOverride(
 
   const combined = `${finding.title} ${finding.message} ${finding.impact ?? ''} ${finding.suggested_fix ?? ''}`;
 
-  if (!containsAny(combined, REDIRECT_KEYWORDS)) return null;
+  const openRedirectUserControlled = isOpenRedirectUserControlled(combined);
+  const sinkUnvalidatedExternal =
+    isRedirectSinkWithUnvalidatedExternalUrl(combined);
+
+  if (!openRedirectUserControlled && !sinkUnvalidatedExternal) return null;
 
   if (containsAny(combined, DOWNGRADE_KEYWORDS)) {
     return 'medium';
@@ -201,10 +264,21 @@ export function securitySeverityOverride(
 
   if (confidence < 0.7) return null;
 
-  if (containsAny(combined, AUTH_CONTEXT_KEYWORDS) && confidence >= 0.8) {
+  // Rule 2: open redirect in auth/callback flow → CRITICAL
+  if (
+    openRedirectUserControlled &&
+    containsAny(combined, AUTH_CONTEXT_KEYWORDS) &&
+    confidence >= 0.8
+  ) {
     return 'critical';
   }
 
+  // Rule 1: open redirect (user-controlled) → HIGH
+  if (openRedirectUserControlled) {
+    return 'high';
+  }
+
+  // Rule 3: window.location / redirect + unvalidated external URL → HIGH
   return 'high';
 }
 
@@ -221,15 +295,7 @@ export function computeSeverity(finding: Finding): FindingSeverity {
 
   const securityOverride = securitySeverityOverride(finding, confidence);
   if (securityOverride !== null) {
-    let s = securityOverride;
-    const likelihood = inferLikelihood(finding, confidence);
-    if (likelihood === 'low') {
-      s = capAtMost(s, 'medium');
-    }
-    if (!affectsRuntime(finding)) {
-      s = capAtMost(s, 'medium');
-    }
-    return s;
+    return maxSeverity(finding.severity, securityOverride);
   }
 
   const impact = inferImpactLevel(finding);
@@ -261,6 +327,10 @@ export function computeSeverity(finding: Finding): FindingSeverity {
   }
   if (!affectsRuntime(finding)) {
     s = capAtMost(s, 'medium');
+  }
+
+  if (finding.category === 'security') {
+    s = maxSeverity(finding.severity, s);
   }
 
   return s;

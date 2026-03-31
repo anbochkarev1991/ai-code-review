@@ -34,8 +34,8 @@ export interface SeverityNormalizationStats {
  * Rules (applied in order):
  * 0. Deterministic severity from inferred impact, likelihood, and confidence (see severity-classifier)
  * 1. If consensus_level = multi-agent and confidence >= 0.8 → boost severity by one level (MEDIUM → HIGH)
- * 2. Cap max HIGH findings per category at 3
- * 3. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (max 3 HIGH unless multi-agent agreed)
+ * 2. Cap max HIGH findings per category at 3 (security category exempt)
+ * 3. If total > 5 findings, downgrade lowest-confidence HIGHs to MEDIUM (security exempt; max 3 HIGH unless multi-agent agreed)
  * 4. Merge root cause findings (same file + category + overlapping title words)
  *
  * All rules are deterministic.
@@ -124,6 +124,9 @@ export class SeverityNormalizer {
     const downgradedIndices = new Set<number>();
 
     for (const item of highFindings) {
+      if (item.finding.category === 'security') {
+        continue;
+      }
       const cat = item.finding.category || 'unknown';
       const count = highByCategory.get(cat) ?? 0;
       if (count >= MAX_HIGH_PER_REVIEW) {
@@ -169,7 +172,10 @@ export class SeverityNormalizer {
     const excessCount = highIndices.length - maxHighAllowed;
     if (excessCount <= 0) return findings;
 
-    const singleAgentHighs = highIndices.filter((h) => !h.isMultiAgent);
+    const singleAgentHighs = highIndices.filter(
+      (h) =>
+        !h.isMultiAgent && findings[h.index].category !== 'security',
+    );
     const toDowngrade = new Set(
       singleAgentHighs.slice(0, excessCount).map((h) => h.index),
     );
@@ -281,7 +287,8 @@ export class SeverityNormalizer {
         agentList.length > 0 ? agentList.join(', ') : primary.agent_name,
       merged_agents: agentList.length > 1 ? agentList : primary.merged_agents,
       consensus_level: consensus,
-      agent_count: agentList.length > 0 ? agentList.length : primary.agent_count,
+      agent_count:
+        agentList.length > 0 ? agentList.length : primary.agent_count,
     };
   }
 

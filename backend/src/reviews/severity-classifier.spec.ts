@@ -7,6 +7,7 @@ import {
   isStylisticFinding,
   affectsRuntime,
   securitySeverityOverride,
+  maxSeverity,
 } from './severity-classifier';
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
@@ -34,9 +35,10 @@ describe('severity-classifier', () => {
       expect(computeSeverity(f)).toBeDefined();
     });
 
-    it('caps at MEDIUM when confidence < 0.8 even if agent said critical', () => {
+    it('caps at MEDIUM when confidence < 0.8 even if agent said critical (non-security)', () => {
       const s = computeSeverity(
         makeFinding({
+          category: 'architecture',
           severity: 'critical',
           confidence: 0.79,
           impact: 'Full database compromise.',
@@ -44,6 +46,19 @@ describe('severity-classifier', () => {
         }),
       );
       expect(s).toBe('medium');
+    });
+
+    it('never downgrades security below agent severity when confidence < 0.8', () => {
+      const s = computeSeverity(
+        makeFinding({
+          category: 'security',
+          severity: 'critical',
+          confidence: 0.79,
+          impact: 'Full database compromise.',
+          message: 'No uncertainty.',
+        }),
+      );
+      expect(s).toBe('critical');
     });
 
     it('assigns CRITICAL only when impact high, likelihood high, confidence >= 0.8', () => {
@@ -71,9 +86,10 @@ describe('severity-classifier', () => {
       expect(s).toBe('high');
     });
 
-    it('caps at MEDIUM when likelihood is low (uncertainty in message)', () => {
+    it('caps at MEDIUM when likelihood is low (uncertainty in message, non-security)', () => {
       const s = computeSeverity(
         makeFinding({
+          category: 'architecture',
           severity: 'critical',
           confidence: 0.96,
           impact: 'SQL injection may allow compromise.',
@@ -81,6 +97,19 @@ describe('severity-classifier', () => {
         }),
       );
       expect(s).toBe('medium');
+    });
+
+    it('does not downgrade security below agent severity when likelihood wording is uncertain', () => {
+      const s = computeSeverity(
+        makeFinding({
+          category: 'security',
+          severity: 'critical',
+          confidence: 0.96,
+          impact: 'SQL injection may allow compromise.',
+          message: 'This might be exploitable under certain conditions.',
+        }),
+      );
+      expect(s).toBe('critical');
     });
 
     it('forces LOW for purely stylistic code-quality findings', () => {
@@ -180,7 +209,7 @@ describe('severity-classifier', () => {
         expect(s).toBe('high');
       });
 
-      it('caps at MEDIUM when strict allowlist / mitigation is described', () => {
+      it('does not downgrade security when strict allowlist / mitigation is described but agent severity is higher', () => {
         const s = computeSeverity(
           makeFinding({
             category: 'security',
@@ -192,7 +221,7 @@ describe('severity-classifier', () => {
             impact: 'Limited risk due to allowlist.',
           }),
         );
-        expect(s).toBe('medium');
+        expect(s).toBe('high');
       });
 
       it('does not promote open redirect when confidence < 0.7', () => {
@@ -224,6 +253,14 @@ describe('severity-classifier', () => {
         );
         expect(s).toBe('critical');
       });
+    });
+  });
+
+  describe('maxSeverity', () => {
+    it('returns the higher of two severities', () => {
+      expect(maxSeverity('medium', 'high')).toBe('high');
+      expect(maxSeverity('critical', 'high')).toBe('critical');
+      expect(maxSeverity('low', 'low')).toBe('low');
     });
   });
 
