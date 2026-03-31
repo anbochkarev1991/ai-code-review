@@ -20,16 +20,83 @@ const GITHUB_USER_URL = 'https://api.github.com/user';
 const GITHUB_REPOS_URL = 'https://api.github.com/user/repos';
 const GITHUB_PULLS_URL = 'https://api.github.com/repos';
 
-interface GitHubTokenResponse {
-  access_token: string;
-  token_type: string;
-  scope?: string;
-}
-
 interface GitHubUserResponse {
   id: number;
   login: string;
   avatar_url?: string;
+}
+
+/** Pull payload from GET /repos/{owner}/{repo}/pulls/{number} — validated before nested access. */
+interface GitHubPullForCompare {
+  base: { sha: string; ref: string };
+  head: { sha: string; ref: string };
+  title?: string;
+  user?: { login: string };
+  commits?: number;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseOAuthTokenJson(json: unknown): string {
+  if (!isPlainObject(json)) {
+    throw new UnauthorizedException('Invalid token response from GitHub');
+  }
+  if (typeof json.error === 'string' && json.error.length > 0) {
+    throw new UnauthorizedException(json.error);
+  }
+  const token = json.access_token;
+  if (typeof token !== 'string' || !token) {
+    throw new UnauthorizedException('No access token in response');
+  }
+  return token;
+}
+
+function parsePullForCompare(pull: unknown): GitHubPullForCompare {
+  if (!isPlainObject(pull)) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+  const base = pull.base;
+  const head = pull.head;
+  if (!isPlainObject(base) || !isPlainObject(head)) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+  const baseSha = base.sha;
+  const headSha = head.sha;
+  if (typeof baseSha !== 'string' || baseSha.length === 0) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+  if (typeof headSha !== 'string' || headSha.length === 0) {
+    throw new UnauthorizedException(
+      'Invalid pull request response from GitHub',
+    );
+  }
+  return pull as GitHubPullForCompare;
+}
+
+/** Validates a single PR in list response before accessing `head.ref`. */
+function isValidListPullEntry(p: unknown): p is {
+  number: number;
+  title: string;
+  state: string;
+  head: { ref: string };
+  created_at: string;
+} {
+  if (!isPlainObject(p)) return false;
+  if (typeof p.number !== 'number' || !Number.isFinite(p.number)) return false;
+  if (typeof p.title !== 'string') return false;
+  if (typeof p.state !== 'string') return false;
+  if (typeof p.created_at !== 'string') return false;
+  if (!isPlainObject(p.head)) return false;
+  if (typeof p.head.ref !== 'string' || p.head.ref.length === 0) return false;
+  return true;
 }
 
 @Injectable()
@@ -61,17 +128,8 @@ export class GitHubService {
       throw new UnauthorizedException('Failed to exchange code for token');
     }
 
-    const data = (await response.json()) as GitHubTokenResponse & {
-      error?: string;
-    };
-    if (data.error) {
-      throw new UnauthorizedException(data.error);
-    }
-    if (!data.access_token) {
-      throw new UnauthorizedException('No access token in response');
-    }
-
-    return data.access_token;
+    const json: unknown = await response.json();
+    return parseOAuthTokenJson(json);
   }
 
   async getGitHubUser(accessToken: string): Promise<GitHubUserResponse> {
@@ -233,15 +291,14 @@ export class GitHubService {
       );
     }
 
-    const data = (await response.json()) as Array<{
-      number: number;
-      title: string;
-      state: string;
-      head: { ref: string };
-      created_at: string;
-    }>;
+    const json: unknown = await response.json();
+    if (!Array.isArray(json)) {
+      throw new UnauthorizedException(
+        'Failed to fetch pull requests from GitHub',
+      );
+    }
 
-    const pulls: Pull[] = data.map((p) => ({
+    const pulls: Pull[] = json.filter(isValidListPullEntry).map((p) => ({
       number: p.number,
       title: p.title,
       state: p.state,
@@ -275,13 +332,8 @@ export class GitHubService {
       );
     }
 
-    const pull = (await pullResponse.json()) as {
-      base: { sha: string; ref: string };
-      head: { sha: string; ref: string };
-      title?: string;
-      user?: { login: string };
-      commits?: number;
-    };
+    const pullJson: unknown = await pullResponse.json();
+    const pull = parsePullForCompare(pullJson);
     const baseSha = pull.base.sha;
     const headSha = pull.head.sha;
 
