@@ -62,6 +62,15 @@ STRIPE_PRO_PRICE_ID=price_xxxxxxxxxxxxxxxxxxxxx
 - `sk_test_xxxxxxxxxxxxxxxxxxxxx` with your actual Secret key from Step 3
 - `price_xxxxxxxxxxxxxxxxxxxxx` with your actual Price ID from Step 2
 
+### Frontend: checkout redirect allowlist
+
+The dashboard “Upgrade to Pro” flow only navigates to `https://` URLs on **`checkout.stripe.com`** (Stripe-hosted Checkout). If you use a **custom checkout domain** from Stripe, add it to `frontend/.env.local`:
+
+```bash
+# Optional: comma-separated hostnames (no protocol), lowercase recommended
+NEXT_PUBLIC_STRIPE_CHECKOUT_ALLOWED_HOSTS=checkout.your-domain.com
+```
+
 ---
 
 ## Step 5: Set Up Webhooks (Local Development)

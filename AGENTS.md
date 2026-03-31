@@ -66,6 +66,7 @@ npm run build           # Production build (auto-builds shared first)
 npm run start           # Run production build
 npm run lint            # ESLint
 npm run typecheck       # TypeScript check
+npm test                # Vitest unit tests
 ```
 
 ### Root (monorepo)
@@ -111,6 +112,7 @@ npm run start:backend   # Run backend production
 - **PR diff format:** Backend `/github/repos/:owner/:repo/pulls/:pr_number/diff` returns raw unified diff string. Don't re-parse — pass directly to `DiffParser`.
 - **Supabase client:** Server components use `createServerClient()` (cookies), client components use `createBrowserClient()` (no cookies). Don't mix them.
 - **Shared imports:** Both apps import from `shared` package. After changing `shared/src/`, rebuild it before testing backend/frontend changes.
+- **Checkout redirects:** Never assign API-returned URLs to `window.location` without validating scheme (`https`) and host (Stripe checkout allowlist). See `frontend/lib/redirect-validation.ts` and [docs/frontend-security.md](docs/frontend-security.md).
 
 ---
 
@@ -125,6 +127,6 @@ npm run start:backend   # Run backend production
 ## Testing Expectations
 
 - **Backend:** Jest unit tests colocated with source (`*.spec.ts`). Run `npm test` in `backend/` before committing. Coverage includes agents, normalizers, risk engine, aggregator.
-- **Frontend:** No test framework configured yet. Manual testing via `npm run dev`.
+- **Frontend:** Run `npm test` in `frontend/` for Vitest unit tests (e.g. checkout redirect validation). Manual testing via `npm run dev`.
 - **Task verification:** Each TODOS.md task has a "How to test locally" column. Follow it before marking task complete.
 - **Pre-commit:** Run backend tests, verify task criteria, check lint/type errors, ensure no build artifacts in `git status`.

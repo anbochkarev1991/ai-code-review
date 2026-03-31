@@ -1,5 +1,6 @@
 "use client";
 
+import { validateStripeCheckoutRedirectUrl } from "@/lib/redirect-validation";
 import { useState } from "react";
 
 type UpgradeToProButtonProps = {
@@ -42,11 +43,14 @@ export function UpgradeToProButton({ accessToken }: UpgradeToProButtonProps) {
       }
 
       const data = (await res.json()) as { url: string };
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
+      if (!data?.url) {
         throw new Error("No checkout URL returned");
       }
+      const safe = validateStripeCheckoutRedirectUrl(data.url);
+      if (!safe.ok) {
+        throw new Error(safe.reason);
+      }
+      window.location.href = safe.url.toString();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
