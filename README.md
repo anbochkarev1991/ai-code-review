@@ -1,33 +1,196 @@
 # AI Code Review Assistant
 
-**Live demo:** [ai-code-review-gamma.vercel.app](https://ai-code-review-gamma.vercel.app/)
+Multi-agent PR analysis with deterministic scoring — four specialized LLM agents review pull requests for code quality, architecture, performance, and security in parallel, producing a quantified risk score and merge recommendation.
 
-An AI-powered code review tool that analyzes GitHub pull requests across four domains — code quality, architecture, performance, and security — using parallel LLM agents, deterministic risk scoring, and structured merge recommendations.
+Unlike tools that pass an entire PR to a single prompt and return unstructured prose, this system decomposes the review into specialized agents, normalizes their output through deterministic pipelines, and treats cost as a first-class constraint. The design prioritizes consistency and auditability: deterministic aggregation over black-box scoring, diff-scoped context over whole-file analysis, and per-agent token budgets over unbounded cost.
+
+**→ [View Architecture](#architecture)**
+
+**Live demo:** [ai-code-review-gamma.vercel.app](https://ai-code-review-gamma.vercel.app/)
 
 ![Landing page](docs/screenshots/landing-page.png)
 
 ---
 
+## What makes this system interesting
+
+- **Multi-agent orchestration with partial failure tolerance.** Four agents run in parallel via `Promise.allSettled` with independent timeouts and retries. A single agent failure degrades the review gracefully — it never blocks the pipeline.
+- **No LLM in the scoring path.** Risk scores, merge decisions, and severity normalization are pure functions. Same inputs always produce the same outputs — auditable and reproducible.
+- **Cost as a first-class constraint.** Per-agent token budgets (~4,500 tokens), tracked usage, and USD cost estimates are built into the pipeline — not bolted on after the fact.
+- **LLM output treated as noisy signal.** Findings pass through confidence clamping, diff boundary enforcement, severity calibration, and cross-agent deduplication before reaching the user.
+
+---
+
+## Core concepts
+
+- **Multi-agent, not single-prompt.** Four independent agents (code quality, architecture, performance, security) analyze the same diff in parallel. Findings are cross-referenced and deduplicated — multi-agent agreement boosts confidence.
+- **Diff-first analysis.** Only changed code is sent to agents. Enclosing functions and referenced declarations are pulled from GitHub as local context, but entire files are never shipped.
+- **Deterministic aggregation.** Risk scoring, merge decisions, and normalization are pure functions. Same diff + same agent outputs = same result, every time.
+- **Cost-aware by design.** Token usage is tracked per agent and converted to USD estimates. Per-agent budgets (~4,500 tokens) prevent runaway costs on large PRs.
+- **Structured, not conversational.** Agent output is Zod-validated. Findings pass through confidence clamping, severity calibration, and deduplication before reaching the user.
+- **Reproducible by default.** Reviews are stamped with SHA-256 hashes and engine/agent version tags. Deterministic scoring and fixed token budgets mean results are predictable across runs — not dependent on LLM temperature or unbounded context.
+
+### Design trade-offs
+
+- **Diff-first, not full-repo.** Sending entire files to an LLM is expensive and noisy — most of the content is unchanged code. By scoping analysis to the diff and pulling only enclosing functions and referenced declarations as local context, the system keeps token usage predictable and findings anchored to what actually changed. The tradeoff is reduced visibility into broader codebase patterns, which is acceptable for a PR-scoped tool.
+- **Deterministic aggregation, not LLM-based merging.** Risk scoring and merge decisions are pure functions — no LLM in the critical path after findings are produced. This makes outputs reproducible and auditable: the same findings always produce the same score and verdict. A fully LLM-based merge step would be more flexible but would sacrifice reproducibility and make debugging regressions harder.
+- **Fixed token budgets per agent.** Each agent receives ~4,500 tokens of diff content with local context. This caps per-review cost at a predictable ceiling and forces the context-shaping layer to prioritize high-signal hunks. The tradeoff is truncation on very large PRs — but unbounded context leads to unbounded cost and diluted agent attention.
+
+---
+
+## Architecture
+
+The system is designed as a multi-agent pipeline for structured pull request analysis.
+
+### Flow
+
+PR Diff → Agents → Aggregation → Final Review
+
+### Agents
+
+Each agent operates independently on a scoped diff context:
+
+* **Security Agent** — detects vulnerabilities and unsafe patterns
+* **Performance Agent** — identifies inefficiencies and bottlenecks
+* **Architecture Agent** — validates structural and design decisions
+* **Code Quality Agent** — enforces consistency and best practices
+
+### Aggregation Layer
+
+A deterministic aggregation layer merges all findings:
+
+* deduplicates overlapping issues
+* normalizes severity across agents
+* produces a single, consistent final score
+
+### Key Design Decisions
+
+* **Diff-first analysis**
+  Avoids full-repo context → reduces token usage and cost
+
+* **Deterministic output**
+  Ensures reproducible results across runs
+
+* **Cost-aware pipeline**
+  Limits unnecessary LLM calls and controls spend
+
+* **Multi-agent separation**
+  Improves signal quality vs single-prompt approaches
+
+### Why not a single LLM call?
+
+Single-prompt reviewers are cheaper to build but:
+
+* mix concerns (security, performance, etc.)
+* produce inconsistent outputs
+* are harder to reason about and debug
+
+This system trades simplicity for control, structure, and reliability.
+
+### System Diagram
+
+```mermaid
+graph TB
+    subgraph frontend [Frontend - Next.js]
+        Landing[Landing Page]
+        Pricing[Pricing]
+        Dashboard[Dashboard]
+        ReviewUI[Review Results]
+        ReviewHistory[Reviews History]
+    end
+
+    subgraph backend [Backend - NestJS]
+        AuthMod[Auth Module]
+        GitHubMod[GitHub Module]
+        BillingMod[Billing Module]
+
+        subgraph reviewPipeline [Review Pipeline]
+            Controller[Reviews Controller]
+            Service[Reviews Service]
+            Orchestrator[Review Orchestrator]
+            CtxBuilder[Context Builder]
+            CtxShaper[Agent Context Shaper]
+
+            subgraph agents [Agents]
+                CQ[Code Quality]
+                AR[Architecture]
+                PF[Performance]
+                SC[Security]
+            end
+
+            Normalizer[Finding Normalizer]
+            Deduplicator[Finding Deduplicator]
+            Aggregator[Deterministic Aggregator]
+            RiskEng[Risk Engine]
+            Formatter[Result Formatter]
+            SevNorm[Severity Normalizer]
+            AiSummary[AI Summary Generator]
+            IssueGen[Issue Generator]
+        end
+    end
+
+    subgraph external [External Services]
+        GitHubAPI[GitHub API]
+        OpenAI[OpenAI API]
+        Stripe[Stripe]
+        Supabase[Supabase]
+    end
+
+    Dashboard --> Controller
+    Controller --> Service
+    Service --> GitHubMod
+    GitHubMod --> GitHubAPI
+    Service --> Orchestrator
+    Orchestrator --> CtxBuilder
+    CtxBuilder --> GitHubAPI
+    CtxBuilder --> CtxShaper
+    CtxShaper --> agents
+    agents --> OpenAI
+    Orchestrator --> Normalizer
+    Normalizer --> Deduplicator
+    Deduplicator --> OpenAI
+    Deduplicator --> Aggregator
+    Aggregator --> RiskEng
+    Aggregator --> Formatter
+    Service --> SevNorm
+    SevNorm --> AiSummary
+    AiSummary --> OpenAI
+    IssueGen --> OpenAI
+    Controller --> BillingMod
+    BillingMod --> Stripe
+    AuthMod --> Supabase
+    Service --> Supabase
+```
+
+**Separation of concerns:**
+
+- **Frontend** handles auth (Supabase SSR), navigation, and rendering. It has no business logic — it sends requests to the backend and displays results.
+- **Backend** owns the entire review pipeline, billing, and GitHub integration. Each NestJS module (Auth, GitHub, Billing, Reviews) is self-contained.
+- **Shared** package contains TypeScript types, Zod schemas, merge-decision logic, risk breakdown/summary helpers, and model rate tables — used by both frontend and backend.
+- **Agents** are isolated injectable services. Each receives parsed diff files and returns structured findings validated against a shared schema.
+- **Aggregation** is deterministic — no randomness in scoring, merge decisions, or normalization. Same diff + same agent outputs = same result.
+
+---
+
 ## Overview
 
-AI Code Review Assistant is a full-stack application that connects to your GitHub repositories, fetches pull request diffs, and runs them through a multi-agent analysis pipeline. Each agent specializes in a different review domain. Findings are normalized, deduplicated, scored for risk, and presented as a structured review with a clear merge recommendation.
+The system connects to GitHub repositories, fetches PR diffs, and runs them through a multi-agent analysis pipeline. Findings are normalized, deduplicated, scored for risk, and presented as a structured review with a merge recommendation.
 
-The system is designed to work **diff-first** — it prioritizes changed code while pulling in limited local context (enclosing functions, referenced declarations) to improve finding accuracy without sending entire files.
+Teams use it as a fast first pass — covering domains easy to overlook under time pressure (performance anti-patterns, security issues, architectural drift) — while keeping human reviewers focused on design intent and business logic. The pipeline behaves predictably under varying PR sizes: token budgets cap cost, partial failures are handled without blocking, and all scoring is deterministic.
 
 ---
 
 ## Why this project exists
 
-Manual code reviews are time-consuming and inconsistent. Reviewers often focus on surface-level issues while missing architectural problems or security risks. When teams move fast, reviews get rushed or skipped.
+Manual code reviews are inconsistent. Reviewers gravitate toward surface-level issues while architectural problems and security risks go unnoticed. Under time pressure, reviews get rushed or skipped entirely.
 
 This project provides a structured, repeatable review pipeline that:
 
-- Runs in seconds, not hours — four agents analyze the PR diff in parallel.
-- Covers domains that are easy to overlook under time pressure (performance anti-patterns, security issues, architectural drift).
-- Produces a quantified risk score and a deterministic merge recommendation, giving teams a data-informed signal alongside human judgment.
-- Tracks review cost and token usage transparently, so there are no surprises.
+- Runs in seconds — four agents analyze the PR diff in parallel.
+- Produces a quantified risk score and deterministic merge recommendation, giving teams a data-informed signal alongside human judgment.
+- Tracks review cost and token usage transparently.
 
-It is not a replacement for human review. It is a fast, systematic first pass that catches what humans tend to miss.
+It is not a replacement for human review. It is a fast first pass that catches what humans tend to miss.
 
 ---
 
@@ -39,6 +202,9 @@ It is not a replacement for human review. It is a fast, systematic first pass th
 - **Deterministic risk scoring** — exponential risk model (0–100) based on severity-weighted findings.
 - **Centralized merge decision** — a single pure function in the shared package determines the merge verdict from severity counts and risk score. Any critical or high finding blocks merge; risk score >= 60 or any medium findings triggers caution.
 - **Multi-layer finding normalization** — confidence clamping, diff boundary enforcement, cross-agent consolidation, severity calibration (impact/likelihood matrix, multi-agent boosts, overflow controls), and false positive risk estimation.
+
+### Additional features
+
 - **LLM cross-file deduplication** — when 4+ findings exist, an LLM grouping step merges findings that share a root cause, consolidating agent metadata and consensus.
 - **Security severity overrides** — security findings receive policy-driven post-processing (e.g. open redirect in auth callback is escalated to critical) with confidence floors and downgrade guards.
 - **AI Review Summary** — concise executive overview with overall assessment, primary risk area, key concerns grouped by severity, and an AI-generated narrative recommendation.
@@ -179,91 +345,6 @@ Each agent receives a diff-first prompt with limited local context (enclosing fu
 
 ---
 
-## Architecture
-
-```mermaid
-graph TB
-    subgraph frontend [Frontend - Next.js]
-        Landing[Landing Page]
-        Pricing[Pricing]
-        Dashboard[Dashboard]
-        ReviewUI[Review Results]
-        ReviewHistory[Reviews History]
-    end
-
-    subgraph backend [Backend - NestJS]
-        AuthMod[Auth Module]
-        GitHubMod[GitHub Module]
-        BillingMod[Billing Module]
-
-        subgraph reviewPipeline [Review Pipeline]
-            Controller[Reviews Controller]
-            Service[Reviews Service]
-            Orchestrator[Review Orchestrator]
-            CtxBuilder[Context Builder]
-            CtxShaper[Agent Context Shaper]
-
-            subgraph agents [Agents]
-                CQ[Code Quality]
-                AR[Architecture]
-                PF[Performance]
-                SC[Security]
-            end
-
-            Normalizer[Finding Normalizer]
-            Deduplicator[Finding Deduplicator]
-            Aggregator[Deterministic Aggregator]
-            RiskEng[Risk Engine]
-            Formatter[Result Formatter]
-            SevNorm[Severity Normalizer]
-            AiSummary[AI Summary Generator]
-            IssueGen[Issue Generator]
-        end
-    end
-
-    subgraph external [External Services]
-        GitHubAPI[GitHub API]
-        OpenAI[OpenAI API]
-        Stripe[Stripe]
-        Supabase[Supabase]
-    end
-
-    Dashboard --> Controller
-    Controller --> Service
-    Service --> GitHubMod
-    GitHubMod --> GitHubAPI
-    Service --> Orchestrator
-    Orchestrator --> CtxBuilder
-    CtxBuilder --> GitHubAPI
-    CtxBuilder --> CtxShaper
-    CtxShaper --> agents
-    agents --> OpenAI
-    Orchestrator --> Normalizer
-    Normalizer --> Deduplicator
-    Deduplicator --> OpenAI
-    Deduplicator --> Aggregator
-    Aggregator --> RiskEng
-    Aggregator --> Formatter
-    Service --> SevNorm
-    SevNorm --> AiSummary
-    AiSummary --> OpenAI
-    IssueGen --> OpenAI
-    Controller --> BillingMod
-    BillingMod --> Stripe
-    AuthMod --> Supabase
-    Service --> Supabase
-```
-
-**Separation of concerns:**
-
-- **Frontend** handles auth (Supabase SSR), navigation, and rendering. It has no business logic — it sends requests to the backend and displays results.
-- **Backend** owns the entire review pipeline, billing, and GitHub integration. Each NestJS module (Auth, GitHub, Billing, Reviews) is self-contained.
-- **Shared** package contains TypeScript types, Zod schemas, merge-decision logic, risk breakdown/summary helpers, and model rate tables — used by both frontend and backend.
-- **Agents** are isolated injectable services. Each receives parsed diff files and returns structured findings validated against a shared schema.
-- **Aggregation** is deterministic — no randomness in scoring, merge decisions, or normalization. Same diff + same agent outputs = same result.
-
----
-
 ## Technical highlights
 
 - **Diff-first with local context.** The `DiffParser` filters out non-code files (lock files, binaries, generated assets). The `ContextBuilder` then fetches full files from GitHub and extracts enclosing functions, referenced declarations, and called helpers per hunk. The `AgentContextShaper` builds per-agent prompts within a ~4,500-token budget, with the security agent receiving only security-relevant context.
@@ -287,6 +368,8 @@ graph TB
 - **Cost transparency.** Token usage is tracked per agent and converted to USD estimates using per-model rate tables defined in the shared package.
 
 - **Review integrity.** Each review is stamped with a SHA-256 hash of the diff + engine/agent versions (v3.0.0), enabling reproducibility verification.
+
+- **Controlled evaluation setup.** The test suite uses predefined diffs with known, seeded issues (SQL injection, missing auth checks, performance anti-patterns) to measure detection quality across the pipeline — normalization accuracy, severity calibration, deduplication correctness, and merge-decision consistency. This provides a repeatable baseline for comparing approaches and tuning agent prompts without relying on subjective review quality assessments.
 
 - **Input validation and security hardening.** All external API responses (GitHub, Stripe, Supabase) are validated before nested access. Frontend validates Stripe checkout redirect URLs against an allowlist and sanitizes post-login redirect paths. Backend validates Stripe return URLs against `FRONTEND_URL`. See [docs/frontend-security.md](docs/frontend-security.md).
 
