@@ -45,15 +45,14 @@ describe('ReviewsController', () => {
     } as AuthenticatedRequest;
     const mockBody = { repo_full_name: 'owner/repo', pr_number: 42 };
 
-    it('should return updated usage in the response after a completed review', async () => {
+    it('should increment usage upfront and return updated usage', async () => {
       billingService.getUsage
         .mockResolvedValueOnce({ review_count: 3, limit: 10, plan: 'free' })
         .mockResolvedValueOnce({ review_count: 4, limit: 10, plan: 'free' });
 
       reviewsService.runReview.mockResolvedValue({
         id: 'review-1',
-        status: 'complete',
-        result_snapshot: { summary: 'ok', findings: [] },
+        status: 'pending',
       });
 
       billingService.incrementUsage.mockResolvedValue(undefined);
@@ -72,53 +71,26 @@ describe('ReviewsController', () => {
       expect(billingService.getUsage).toHaveBeenCalledTimes(2);
     });
 
-    it('should increment usage for partial reviews too', async () => {
+    it('should return pending status (pipeline runs in background)', async () => {
       billingService.getUsage
         .mockResolvedValueOnce({ review_count: 3, limit: 10, plan: 'free' })
         .mockResolvedValueOnce({ review_count: 4, limit: 10, plan: 'free' });
 
       reviewsService.runReview.mockResolvedValue({
-        id: 'review-partial',
-        status: 'partial',
-        result_snapshot: { summary: 'ok', findings: [] },
+        id: 'review-async',
+        status: 'pending',
       });
 
       billingService.incrementUsage.mockResolvedValue(undefined);
 
       const result = await controller.create(mockUser, mockReq, mockBody);
 
-      expect(result.usage).toEqual({
-        review_count: 4,
-        limit: 10,
-        plan: 'free',
-      });
+      expect(result.status).toBe('pending');
+      expect(result.id).toBe('review-async');
       expect(billingService.incrementUsage).toHaveBeenCalledWith(
         'user-123',
         'test-token',
       );
-    });
-
-    it('should return usage even when review fails (status !== complete)', async () => {
-      billingService.getUsage.mockResolvedValue({
-        review_count: 3,
-        limit: 10,
-        plan: 'free',
-      });
-
-      reviewsService.runReview.mockResolvedValue({
-        id: 'review-2',
-        status: 'failed',
-        error_message: 'Pipeline error',
-      });
-
-      const result = await controller.create(mockUser, mockReq, mockBody);
-
-      expect(result.usage).toEqual({
-        review_count: 3,
-        limit: 10,
-        plan: 'free',
-      });
-      expect(billingService.incrementUsage).not.toHaveBeenCalled();
     });
 
     it('should throw PAYMENT_REQUIRED when quota is exceeded', async () => {

@@ -15,7 +15,7 @@ export type MergeRecommendation =
 
 export type ReviewDecisionVerdict = 'safe' | 'warning' | 'blocked';
 
-export type ReviewStatus = 'complete' | 'partial' | 'failed';
+export type ReviewStatus = 'pending' | 'processing' | 'complete' | 'partial' | 'failed';
 
 export type AgentStatus = 'ok' | 'timeout' | 'error';
 
@@ -348,7 +348,7 @@ export interface GenerateIssueResponse {
   issue_text: string;
 }
 
-const reviewStatusSchema = z.enum(['complete', 'partial', 'failed']);
+const reviewStatusSchema = z.enum(['pending', 'processing', 'complete', 'partial', 'failed']);
 
 export const postReviewsResponseSchema = z
   .object({

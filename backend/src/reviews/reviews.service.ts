@@ -85,7 +85,18 @@ export class ReviewsService {
       prNumber,
     );
 
-    return this.runPipeline({
+    const id = await this.reviewRunsRepository.create(
+      {
+        userId,
+        repoFullName,
+        prNumber,
+        prTitle: diffResponse.pr_title ?? null,
+        status: 'pending',
+      },
+      userJwt,
+    );
+
+    const pipelineParams: RunPipelineParams = {
       userId,
       userJwt,
       repoFullName,
@@ -97,15 +108,59 @@ export class ReviewsService {
       prFiles: diffResponse.files,
       accessToken,
       headSha: diffResponse.head_sha ?? null,
+    };
+
+    this.runPipelineInBackground(id, pipelineParams).catch((err) => {
+      this.logger.error(
+        `Background pipeline failed for review ${id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     });
+
+    return { id, status: 'pending' };
   }
 
-  async runPipeline(params: RunPipelineParams): Promise<PostReviewsResponse> {
+  private async runPipelineInBackground(
+    reviewId: string,
+    params: RunPipelineParams,
+  ): Promise<void> {
+    try {
+      await this.reviewRunsRepository.update(
+        reviewId,
+        { status: 'processing' },
+        params.userJwt,
+      );
+      const result = await this.runPipeline(reviewId, params);
+      this.logger.log(
+        `Review ${reviewId} completed with status: ${result.status}`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Pipeline error for review ${reviewId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      try {
+        await this.reviewRunsRepository.update(
+          reviewId,
+          {
+            status: 'failed',
+            errorMessage:
+              err instanceof Error ? err.message : 'Unknown pipeline error',
+          },
+          params.userJwt,
+        );
+      } catch (updateErr) {
+        this.logger.error(
+          `Failed to update review ${reviewId} after error: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`,
+        );
+      }
+    }
+  }
+
+  async runPipeline(
+    reviewId: string,
+    params: RunPipelineParams,
+  ): Promise<PostReviewsResponse> {
     const {
-      userId,
       userJwt,
-      repoFullName,
-      prNumber,
       prTitle,
       prAuthor,
       commitCount,
@@ -115,12 +170,12 @@ export class ReviewsService {
       headSha,
     } = params;
 
-    const [owner, repo] = repoFullName.split('/');
+    const [owner, repo] = params.repoFullName.split('/');
 
     const parsedDiff = this.diffParser.parse(prFiles);
 
     const prMetadata: PRMetadata = {
-      pr_number: prNumber,
+      pr_number: params.prNumber,
       pr_title: prTitle ?? '',
       pr_author: prAuthor ?? undefined,
       commit_count: commitCount ?? undefined,
@@ -131,28 +186,14 @@ export class ReviewsService {
     };
 
     if (parsedDiff.files.length === 0) {
-      return this.handleEmptyDiff(
-        userId,
-        userJwt,
-        repoFullName,
-        prNumber,
-        prTitle,
-        prMetadata,
-      );
+      return this.handleEmptyDiff(reviewId, userJwt, prMetadata);
     }
 
     const allMarkdown = parsedDiff.files.every((f) =>
       MARKDOWN_ONLY_EXTENSIONS.has(f.language),
     );
     if (allMarkdown) {
-      return this.handleMarkdownOnly(
-        userId,
-        userJwt,
-        repoFullName,
-        prNumber,
-        prTitle,
-        prMetadata,
-      );
+      return this.handleMarkdownOnly(reviewId, userJwt, prMetadata);
     }
 
     if (parsedDiff.stats.totalChangedLines > LARGE_PR_LINE_THRESHOLD) {
@@ -179,12 +220,9 @@ export class ReviewsService {
     );
 
     if (engineResult.status === 'failed') {
-      const id = await this.reviewRunsRepository.create(
+      await this.reviewRunsRepository.update(
+        reviewId,
         {
-          userId,
-          repoFullName,
-          prNumber,
-          prTitle: prTitle ?? null,
           status: 'failed',
           trace: engineResult.trace,
           errorMessage: engineResult.error_message ?? 'All agents failed',
@@ -192,7 +230,7 @@ export class ReviewsService {
         userJwt,
       );
       return {
-        id,
+        id: reviewId,
         status: 'failed',
         trace: engineResult.trace,
         error_message: engineResult.error_message,
@@ -221,12 +259,9 @@ export class ReviewsService {
       }
     }
 
-    const id = await this.reviewRunsRepository.create(
+    await this.reviewRunsRepository.update(
+      reviewId,
       {
-        userId,
-        repoFullName,
-        prNumber,
-        prTitle: prTitle ?? null,
         status: engineResult.status,
         resultSnapshot: normalizedResult,
         trace: engineResult.trace,
@@ -235,7 +270,7 @@ export class ReviewsService {
     );
 
     return {
-      id,
+      id: reviewId,
       status: engineResult.status,
       result_snapshot: normalizedResult,
       trace: engineResult.trace,
@@ -243,11 +278,8 @@ export class ReviewsService {
   }
 
   private async handleEmptyDiff(
-    userId: string,
+    reviewId: string,
     userJwt: string,
-    repoFullName: string,
-    prNumber: number,
-    prTitle: string | null | undefined,
     prMetadata: PRMetadata,
   ): Promise<PostReviewsResponse> {
     const emptyResult: ReviewResult = {
@@ -276,27 +308,22 @@ export class ReviewsService {
       pr_metadata: prMetadata,
     };
 
-    const id = await this.reviewRunsRepository.create(
-      {
-        userId,
-        repoFullName,
-        prNumber,
-        prTitle: prTitle ?? null,
-        status: 'complete',
-        resultSnapshot: emptyResult,
-        trace: [],
-      },
+    await this.reviewRunsRepository.update(
+      reviewId,
+      { status: 'complete', resultSnapshot: emptyResult, trace: [] },
       userJwt,
     );
-    return { id, status: 'complete', result_snapshot: emptyResult, trace: [] };
+    return {
+      id: reviewId,
+      status: 'complete',
+      result_snapshot: emptyResult,
+      trace: [],
+    };
   }
 
   private async handleMarkdownOnly(
-    userId: string,
+    reviewId: string,
     userJwt: string,
-    repoFullName: string,
-    prNumber: number,
-    prTitle: string | null | undefined,
     prMetadata: PRMetadata,
   ): Promise<PostReviewsResponse> {
     const result: ReviewResult = {
@@ -325,19 +352,17 @@ export class ReviewsService {
       pr_metadata: prMetadata,
     };
 
-    const id = await this.reviewRunsRepository.create(
-      {
-        userId,
-        repoFullName,
-        prNumber,
-        prTitle: prTitle ?? null,
-        status: 'complete',
-        resultSnapshot: result,
-        trace: [],
-      },
+    await this.reviewRunsRepository.update(
+      reviewId,
+      { status: 'complete', resultSnapshot: result, trace: [] },
       userJwt,
     );
-    return { id, status: 'complete', result_snapshot: result, trace: [] };
+    return {
+      id: reviewId,
+      status: 'complete',
+      result_snapshot: result,
+      trace: [],
+    };
   }
 
   /** Recompute risk and merge fields from final findings (post SeverityNormalizer). */

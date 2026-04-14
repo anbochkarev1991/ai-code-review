@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import type { ReviewResult, ReviewStatus, TraceStep } from "@/lib/types";
-import { parsePostReviewsResponse } from "shared";
+import {
+  parsePostReviewsResponse,
+  parseGetReviewResponse,
+} from "shared";
 import { AiReviewSummaryBlock } from "./ai-review-summary-block";
 import { ReviewFindingsList } from "./review-findings-list";
 import { ReviewSummarySidebar } from "./review-summary-sidebar";
 import { ReviewSummary } from "./review-summary";
 import { ReviewTrace } from "./review-trace";
 import { useUsage } from "./usage-context";
+
+const POLL_INTERVAL_MS = 3_000;
+const POLL_MAX_ATTEMPTS = 200;
+
+const TERMINAL_STATUSES = new Set<ReviewStatus>(["complete", "partial", "failed"]);
 
 interface RunReviewButtonProps {
   repoFullName: string;
@@ -29,6 +37,7 @@ export function RunReviewButton({
   const [trace, setTrace] = useState<TraceStep[] | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelledRef = useRef(false);
 
   const startTimer = () => {
     setElapsed(0);
@@ -42,12 +51,54 @@ export function RunReviewButton({
     }
   };
 
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const pollReview = useCallback(
+    async (reviewId: string, backendUrl: string) => {
+      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+        if (cancelledRef.current) return;
+        await delay(POLL_INTERVAL_MS);
+        if (cancelledRef.current) return;
+
+        const res = await fetch(`${backendUrl}/reviews/${reviewId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok) {
+          throw new Error(`Polling failed: ${res.statusText}`);
+        }
+        const json: unknown = await res.json();
+        const review = parseGetReviewResponse(json);
+        if (!review) {
+          throw new Error("Invalid polling response");
+        }
+
+        setReviewStatus(review.status);
+        if (review.trace && review.trace.length > 0) {
+          setTrace(review.trace);
+        }
+
+        if (TERMINAL_STATUSES.has(review.status)) {
+          if (review.error_message) {
+            setError(review.error_message);
+          }
+          if (review.result_snapshot) {
+            setResult(review.result_snapshot);
+          }
+          return;
+        }
+      }
+      throw new Error("Review timed out — please check the Reviews page later.");
+    },
+    [accessToken],
+  );
+
   const handleRunReview = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
     setTrace(null);
     setReviewStatus(null);
+    cancelledRef.current = false;
     startTimer();
 
     const backendUrl =
@@ -79,27 +130,24 @@ export function RunReviewButton({
         throw new Error("Invalid review response payload");
       }
 
+      if (data.usage) {
+        pushUsage(data.usage);
+      }
+
       if (data.error_message) {
         setError(data.error_message);
-        setLoading(false);
-        setResult(null);
-        setTrace(null);
         return;
       }
 
-      if (data.status) {
-        setReviewStatus(data.status);
+      setReviewStatus(data.status);
+
+      if (TERMINAL_STATUSES.has(data.status)) {
+        if (data.result_snapshot) setResult(data.result_snapshot);
+        if (data.trace) setTrace(data.trace);
+        return;
       }
-      if (data.result_snapshot) {
-        setResult(data.result_snapshot);
-      }
-      if (data.trace) {
-        setTrace(data.trace);
-      }
-      if (data.usage) {
-        console.debug("[RunReviewButton] Pushing usage from review response", data.usage);
-        pushUsage(data.usage);
-      }
+
+      await pollReview(data.id, backendUrl);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

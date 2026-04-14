@@ -14,7 +14,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isReviewStatus(value: unknown): value is ReviewStatus {
-  return value === 'complete' || value === 'partial' || value === 'failed';
+  return (
+    value === 'pending' ||
+    value === 'processing' ||
+    value === 'complete' ||
+    value === 'partial' ||
+    value === 'failed'
+  );
 }
 
 function isAgentStatus(value: unknown): value is TraceStep['status'] {
@@ -259,6 +265,13 @@ export interface CreateReviewRunParams {
   errorMessage?: string | null;
 }
 
+export interface UpdateReviewRunParams {
+  status?: ReviewStatus;
+  resultSnapshot?: ReviewResult | null;
+  trace?: TraceStep[] | null;
+  errorMessage?: string | null;
+}
+
 /**
  * Repository for persisting review runs to Supabase review_runs table.
  * Uses user JWT for RLS so the insert is scoped to the authenticated user.
@@ -314,6 +327,43 @@ export class ReviewRunsRepository {
       );
     }
     return data.id;
+  }
+
+  async update(
+    id: string,
+    params: UpdateReviewRunParams,
+    userJwt: string,
+  ): Promise<void> {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new InternalServerErrorException('Supabase not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${userJwt}` } },
+    });
+
+    const row: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (params.status !== undefined) row.status = params.status;
+    if (params.resultSnapshot !== undefined)
+      row.result_snapshot = params.resultSnapshot;
+    if (params.trace !== undefined) row.trace = params.trace;
+    if (params.errorMessage !== undefined)
+      row.error_message = params.errorMessage;
+
+    const { error } = await supabase
+      .from('review_runs')
+      .update(row)
+      .eq('id', id);
+
+    if (error) {
+      throw new InternalServerErrorException(
+        `Failed to update review run: ${error.message}`,
+      );
+    }
   }
 
   /**

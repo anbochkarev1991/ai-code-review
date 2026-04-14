@@ -81,7 +81,7 @@ export class ReviewsController {
   }
 
   @Post()
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(JwtAuthGuard)
   async create(
     @CurrentUser() user: User,
@@ -119,15 +119,14 @@ export class ReviewsController {
       throw new BadRequestException('pr_number must be a valid number');
     }
 
+    await this.billingService.incrementUsage(user.id, token);
+
     const result = await this.reviewsService.runReview(
       user.id,
       token,
       repo_full_name,
       prNum,
     );
-    if (result.status === 'complete' || result.status === 'partial') {
-      await this.billingService.incrementUsage(user.id, token);
-    }
 
     const updatedUsage = await this.billingService.getUsage(
       user.id,
