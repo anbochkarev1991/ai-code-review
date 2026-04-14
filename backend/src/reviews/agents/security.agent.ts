@@ -67,7 +67,7 @@ export class SecurityAgent {
       if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for Security Agent');
       }
-      this.client = new OpenAI({ apiKey, timeout: 300_000 });
+      this.client = new OpenAI({ apiKey, timeout: 60_000 });
     }
     return this.client;
   }

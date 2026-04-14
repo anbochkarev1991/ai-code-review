@@ -106,7 +106,7 @@ export class CodeQualityAgent {
       if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for Code Quality Agent');
       }
-      this.client = new OpenAI({ apiKey, timeout: 300_000 });
+      this.client = new OpenAI({ apiKey, timeout: 60_000 });
     }
     return this.client;
   }

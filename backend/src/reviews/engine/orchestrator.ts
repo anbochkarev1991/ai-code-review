@@ -24,7 +24,7 @@ import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
 import { buildTraceStep, TRACE_AGENT_NAMES } from '../trace.utils';
 
-const DEFAULT_TIMEOUT_MS = 300_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 1_000;
 
 interface AgentDefinition {
