@@ -24,12 +24,24 @@ import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
 import { buildTraceStep, TRACE_AGENT_NAMES } from '../trace.utils';
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const MODEL_TIMEOUT_MS: Record<string, number> = {
+  'gpt-4o-mini': 30_000,
+  'gpt-4o': 60_000,
+  'gpt-4-turbo': 90_000,
+  'gpt-4': 90_000,
+  'gpt-5': 120_000,
+};
+const DEFAULT_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 1_000;
+
+function getModelTimeoutMs(): number {
+  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+  return MODEL_TIMEOUT_MS[model] ?? DEFAULT_TIMEOUT_MS;
+}
 
 interface AgentDefinition {
   name: string;
-  run: () => Promise<CallWithValidationRetryResult>;
+  run: (signal?: AbortSignal) => Promise<CallWithValidationRetryResult>;
 }
 
 export interface EngineRunResult {
@@ -68,7 +80,7 @@ export class ReviewOrchestrator {
     diff: string,
     options: ReviewEngineOptions = {},
   ): Promise<EngineRunResult> {
-    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = options.timeoutMs ?? getModelTimeoutMs();
     const pipelineStart = Date.now();
 
     const expandedFiles: ExpandedFile[] = options.gitContext
@@ -78,19 +90,19 @@ export class ReviewOrchestrator {
     const allAgents: AgentDefinition[] = [
       {
         name: TRACE_AGENT_NAMES[0],
-        run: () => this.codeQualityAgent.run(expandedFiles),
+        run: (signal) => this.codeQualityAgent.run(expandedFiles, signal),
       },
       {
         name: TRACE_AGENT_NAMES[1],
-        run: () => this.architectureAgent.run(expandedFiles),
+        run: (signal) => this.architectureAgent.run(expandedFiles, signal),
       },
       {
         name: TRACE_AGENT_NAMES[2],
-        run: () => this.performanceAgent.run(expandedFiles),
+        run: (signal) => this.performanceAgent.run(expandedFiles, signal),
       },
       {
         name: TRACE_AGENT_NAMES[3],
-        run: () => this.securityAgent.run(expandedFiles),
+        run: (signal) => this.securityAgent.run(expandedFiles, signal),
       },
     ];
 
@@ -192,7 +204,7 @@ export class ReviewOrchestrator {
     const start = Date.now();
 
     try {
-      const result = await this.withTimeout(agent.run(), timeoutMs, agent.name);
+      const result = await this.withTimeout(agent.run, timeoutMs, agent.name);
       return {
         agent_name: agent.name,
         status: 'ok',
@@ -217,7 +229,7 @@ export class ReviewOrchestrator {
 
       try {
         const result = await this.withTimeout(
-          agent.run(),
+          agent.run,
           timeoutMs,
           agent.name,
         );
@@ -338,16 +350,19 @@ export class ReviewOrchestrator {
     };
   }
 
-  private withTimeout<T>(
-    promise: Promise<T>,
+  private withTimeout(
+    agentFn: (signal?: AbortSignal) => Promise<CallWithValidationRetryResult>,
     ms: number,
     agentName: string,
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`${agentName} agent timed out after ${ms}ms`)),
-        ms,
-      );
+  ): Promise<CallWithValidationRetryResult> {
+    const controller = new AbortController();
+    const promise = agentFn(controller.signal);
+
+    return new Promise<CallWithValidationRetryResult>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`${agentName} agent timed out after ${ms}ms`));
+      }, ms);
       promise
         .then((val) => {
           clearTimeout(timer);

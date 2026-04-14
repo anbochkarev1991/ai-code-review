@@ -322,7 +322,7 @@ export class AiSummaryGeneratorService {
         );
         return null;
       }
-      this.client = new OpenAI({ apiKey });
+      this.client = new OpenAI({ apiKey, timeout: 120_000 });
     }
     return this.client;
   }

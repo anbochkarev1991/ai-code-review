@@ -176,6 +176,7 @@ export interface ModelRate {
 }
 
 export const MODEL_RATES: Record<string, ModelRate> = {
+  'gpt-5': { prompt: 2.5e-6, completion: 15e-6 },
   'gpt-4o': { prompt: 2.5e-6, completion: 10e-6 },
   'gpt-4o-mini': { prompt: 0.15e-6, completion: 0.6e-6 },
   'gpt-4-turbo': { prompt: 10e-6, completion: 30e-6 },

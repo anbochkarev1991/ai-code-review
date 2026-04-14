@@ -106,12 +106,15 @@ export class CodeQualityAgent {
       if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for Code Quality Agent');
       }
-      this.client = new OpenAI({ apiKey });
+      this.client = new OpenAI({ apiKey, timeout: 120_000 });
     }
     return this.client;
   }
 
-  async run(files: ExpandedFile[]): Promise<CallWithValidationRetryResult> {
+  async run(
+    files: ExpandedFile[],
+    signal?: AbortSignal,
+  ): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -137,6 +140,7 @@ Analyze the changed lines and their local context (surrounding function, variabl
       ],
       agentName: 'Code Quality',
       promptSizeChars: CODE_QUALITY_SYSTEM_PROMPT.length + userPrompt.length,
+      signal,
     });
   }
 }

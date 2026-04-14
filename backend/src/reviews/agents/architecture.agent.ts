@@ -72,12 +72,15 @@ export class ArchitectureAgent {
       if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for Architecture Agent');
       }
-      this.client = new OpenAI({ apiKey });
+      this.client = new OpenAI({ apiKey, timeout: 120_000 });
     }
     return this.client;
   }
 
-  async run(files: ExpandedFile[]): Promise<CallWithValidationRetryResult> {
+  async run(
+    files: ExpandedFile[],
+    signal?: AbortSignal,
+  ): Promise<CallWithValidationRetryResult> {
     const client = this.getClient();
     const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 
@@ -103,6 +106,7 @@ Analyze the changed code and its local context (surrounding function/module, imp
       ],
       agentName: 'Architecture',
       promptSizeChars: ARCHITECTURE_SYSTEM_PROMPT.length + userPrompt.length,
+      signal,
     });
   }
 }

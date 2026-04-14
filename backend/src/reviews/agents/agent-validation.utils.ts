@@ -78,12 +78,16 @@ export function parseAndValidate(
   }
 }
 
+const DEFAULT_MAX_TOKENS = 4096;
+
 export interface CallWithValidationRetryOptions {
   client: OpenAI;
   model: string;
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   agentName: string;
   promptSizeChars?: number;
+  maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 export interface CallWithValidationRetryResult {
@@ -103,17 +107,18 @@ export interface CallWithValidationRetryResult {
 export async function callWithValidationRetry(
   options: CallWithValidationRetryOptions,
 ): Promise<CallWithValidationRetryResult> {
-  const { client, model, messages, agentName } = options;
+  const { client, model, messages, agentName, maxTokens, signal } = options;
+  const max_tokens = maxTokens ?? DEFAULT_MAX_TOKENS;
   let currentMessages = [...messages];
   let lastError = '';
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let completion: OpenAI.Chat.ChatCompletion;
     try {
-      completion = await client.chat.completions.create({
-        model,
-        messages: currentMessages,
-      });
+      completion = await client.chat.completions.create(
+        { model, messages: currentMessages, max_tokens },
+        signal ? { signal } : undefined,
+      );
     } catch (err) {
       // Handle OpenAI API errors
       if (err instanceof OpenAI.APIError) {
