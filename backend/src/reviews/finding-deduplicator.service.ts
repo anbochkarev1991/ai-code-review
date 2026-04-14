@@ -78,7 +78,7 @@ export class FindingDeduplicatorService {
         );
         return null;
       }
-      this.client = new OpenAI({ apiKey, timeout: 120_000 });
+      this.client = new OpenAI({ apiKey, timeout: 300_000 });
     }
     return this.client;
   }

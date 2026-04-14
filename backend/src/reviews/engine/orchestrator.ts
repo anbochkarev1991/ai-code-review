@@ -24,20 +24,8 @@ import { DeterministicAggregator } from '../deterministic-aggregator';
 import { ResultFormatter } from '../result-formatter';
 import { buildTraceStep, TRACE_AGENT_NAMES } from '../trace.utils';
 
-const MODEL_TIMEOUT_MS: Record<string, number> = {
-  'gpt-4o-mini': 30_000,
-  'gpt-4o': 60_000,
-  'gpt-4-turbo': 90_000,
-  'gpt-4': 90_000,
-  'gpt-5': 120_000,
-};
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 300_000;
 const RETRY_DELAY_MS = 1_000;
-
-function getModelTimeoutMs(): number {
-  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
-  return MODEL_TIMEOUT_MS[model] ?? DEFAULT_TIMEOUT_MS;
-}
 
 interface AgentDefinition {
   name: string;
@@ -80,7 +68,7 @@ export class ReviewOrchestrator {
     diff: string,
     options: ReviewEngineOptions = {},
   ): Promise<EngineRunResult> {
-    const timeoutMs = options.timeoutMs ?? getModelTimeoutMs();
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const pipelineStart = Date.now();
 
     const expandedFiles: ExpandedFile[] = options.gitContext
