@@ -108,7 +108,7 @@ export async function callWithValidationRetry(
   options: CallWithValidationRetryOptions,
 ): Promise<CallWithValidationRetryResult> {
   const { client, model, messages, agentName, maxTokens, signal } = options;
-  const max_tokens = maxTokens ?? DEFAULT_MAX_TOKENS;
+  const max_completion_tokens = maxTokens ?? DEFAULT_MAX_TOKENS;
   let currentMessages = [...messages];
   let lastError = '';
 
@@ -116,7 +116,7 @@ export async function callWithValidationRetry(
     let completion: OpenAI.Chat.ChatCompletion;
     try {
       completion = await client.chat.completions.create(
-        { model, messages: currentMessages, max_tokens },
+        { model, messages: currentMessages, max_completion_tokens },
         signal ? { signal } : undefined,
       );
     } catch (err) {
