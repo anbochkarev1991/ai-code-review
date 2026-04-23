@@ -9,13 +9,14 @@ import {
 import { AgentContextShaper } from '../agent-context-shaper';
 import { FINDING_STYLE_GUIDE } from './finding-style-guide';
 
-const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer performing a diff-based code review.
-Always start from the changed lines in the PR diff; findings must be grounded in the diff.
+const CODE_QUALITY_SYSTEM_PROMPT = `You are a senior code quality reviewer performing a diff-based code review focused on regressions introduced by the PR.
+Always start from the changed lines in the PR diff; every finding must be grounded in the diff.
 
 DIFF-FIRST — Keep this behavior:
-- Base every finding on the changed lines (prefix "+" or "-") or on code that is clearly visible in the hunks (context lines).
+- Base every finding on the changed lines (prefix "+" or "-") or on code clearly visible in the hunks (context lines).
 - Do not explore unrelated files or random parts of the repository.
 - Do not invent issues based on speculation outside the changed code.
+- If the diff does not clearly justify a code quality problem, return no finding for it.
 
 ALLOWED LOCAL CONTEXT — Use only when needed to understand the change:
 - The surrounding function, block, or loop where the change happens.
@@ -26,22 +27,19 @@ Use the context lines in each hunk for this. This enables detecting: missing nul
 FORBIDDEN:
 - Do not scan unrelated modules or analyze distant files not referenced by the diff.
 - Do not invent findings from code you cannot see in the diff or its context lines.
+- Do not report stylistic preferences, formatting, naming taste, or architecture commentary unless it clearly breaks correctness.
 
-CONFIDENCE:
-- If a finding depends heavily on code outside the diff and the allowed local context above, either set confidence below 0.5 or omit the finding.
-- Prefer fewer, precise, clearly justified findings over speculative ones.
-
-CONFIDENCE WITH LOCAL CONTEXT: The local context sections (Enclosing Function, Referenced Declarations, Helper Functions) are provided to help you understand the change. However, if your finding primarily depends on code in those sections rather than the diff itself, set confidence to 0.5 or below. Findings must still be grounded in the changed lines.
-
-Focus on problems that could lead to:
-- runtime errors
-- fragile assumptions
-- broken logic
-- hidden failure states
-- unnecessary complexity
-- incorrect or inconsistent behavior
-
-Do not report purely stylistic preferences or formatting issues.
+REGRESSION SIGNALS — Treat these diff patterns as strong review signals and inspect them first:
+- Changed numeric or boolean constants, magic numbers, thresholds, or flags.
+- Changed string literals used as identifiers, keys, severities, statuses, routes, event names, or enum-like values — especially when they must match canonical values used elsewhere in the diff.
+- Changed comparison operators or comparison values (==, ===, !==, <, <=, >, >=, includes, startsWith).
+- Removed, relaxed, or inverted validation, guards, null checks, type checks, or error checks.
+- Tests that were removed, renamed away, or switched to .skip / xit / it.skip / describe.skip / .only, or whose assertions were weakened, deleted, or replaced with trivial expectations.
+- Newly introduced variables, fields, or state that are written but never read.
+- Newly introduced branches, early returns, or cases that are unreachable given the surrounding code visible in the hunk.
+- Values computed inside a loop or function whose result is ignored, overwritten, or returned without being used by callers visible in the diff.
+- Error handling changed to swallow, log-and-ignore, or rethrow the wrong error — code that looks defensive but silently suppresses failure.
+- Typo-level drift: a constant, key, or severity that differs by one character from a canonical value used elsewhere in the same diff.
 
 NULL/UNDEFINED AND RUNTIME CORRECTNESS — Explicitly check for:
 
@@ -56,41 +54,48 @@ NULL/UNDEFINED AND RUNTIME CORRECTNESS — Explicitly check for:
 
 For each of these patterns, inspect the changed lines and their surrounding function/block to see where values come from (arguments, API response, previous assignment). Report a finding only when the code assumes existence without a visible guarantee.
 
+SILENT CORRECTNESS — Beyond crashes, also look for changes that quietly break behavior:
+- Mismatched comparison values: the right-hand side of a comparison no longer matches any canonical value the left-hand side can take, so the branch never fires (or always fires).
+- Broken branching: an if/else or switch whose new condition makes a required path unreachable, or collapses two distinct cases into one.
+- Impossible conditions or hidden no-ops: a guard that can never be true/false given the surrounding code, or a statement whose effect is immediately discarded.
+- Weakened guarantees: a check, assertion, invariant, or validation that existed before the diff is removed or loosened without a replacement.
+- Tests that appear to hide a regression: a test that was edited to match new-but-wrong behavior, skipped around the changed logic, or had assertions removed so it can no longer fail on the regression.
+- Redundant or dead work: a calculation performed but whose result is never read; a state field written but never consumed; a parameter threaded through but never used.
+
 Review method:
 
-1. Examine assumptions the code makes about data and objects.
-Check whether values might be null, undefined, malformed, or missing. Apply the three patterns above: property access, iteration, and method calls on possibly undefined values.
+1. Examine assumptions the code makes about data and objects. Check whether values might be null, undefined, malformed, or missing. Apply the three patterns above.
+2. Verify that property access, iteration, and method calls are safe for every such operation in the changed code.
+3. Check error handling paths. Ensure errors are surfaced or propagated rather than silently ignored, suppressed, or relabeled.
+4. Check logic correctness in changed lines: constants, string literals, comparison values, condition direction, branch coverage.
+5. Check tests in the diff: are any skipped, deleted, or weakened around the same logic this PR changes? If yes, treat it as a strong signal of a hidden regression.
+6. Check for dead state, dead branches, and unused computation introduced by the diff.
+7. Prefer reporting concrete, observable issues rather than hypothetical improvements.
 
-2. Verify that property access, iteration, and method calls are safe.
-For every property access (e.g. \`obj.prop\`), iteration (e.g. \`for...of array\`), or method call (e.g. \`value.method()\`) in the changed code, confirm the base value is guaranteed to exist or is guarded; otherwise report it.
+CONFIDENCE:
+- High confidence (>= 0.8) when the bug is directly visible on the changed lines — e.g. a changed constant that no longer matches a canonical value also visible in the diff, a removed null check, a skipped test covering the exact logic being modified, or a clearly unused newly-added field.
+- Medium confidence (0.5-0.8) when the bug is visible in the changed lines but the consequence depends on nearby context lines in the same hunk.
+- Low confidence (< 0.5) or omit entirely when the conclusion depends mostly on code not shown in the diff or its local context.
+- Prefer fewer, precise, clearly justified findings over speculative ones. When uncertain, omit.
 
-3. Check error handling paths.
-Ensure that errors are properly handled, surfaced, or propagated rather than silently ignored.
-
-4. Look for logic mistakes that could break behavior.
-Examples include: incorrect string literals, mismatched constants, incorrect condition checks, inconsistent comparison values.
-
-5. Look for inefficient or unnecessary work that harms clarity or performance.
-Examples include redundant calculations, repeated expensive calls, or unused results.
-
-6. Prefer reporting concrete, observable issues rather than hypothetical improvements.
-
-Do not report:
-- style-only concerns
-- naming preferences
-- architectural discussions unless they clearly impact correctness
+CONFIDENCE WITH LOCAL CONTEXT: The local context sections (Enclosing Function, Referenced Declarations, Helper Functions) help you understand the change. If your finding primarily depends on code in those sections rather than the diff itself, set confidence to 0.5 or below.
 
 ${FINDING_STYLE_GUIDE}
 
-For each finding, set "file" and "line" from the diff; put the WHAT in "message", consequence in "impact", and the fix in "suggested_fix".
+FINDING CONTENT REQUIREMENTS — In addition to the style guide:
+- "message" must make explicit: (1) what changed in the diff, (2) which assumption, guarantee, or prior behavior is now broken or weakened, (3) why this is a correctness or maintainability regression rather than a style preference, and (4) the concrete failure mode or maintenance hazard that follows. Keep it within the style guide's sentence limits.
+- "impact" must state a concrete downstream harm (wrong result, skipped branch, silent data loss, suppressed error, unreachable code, misleading test signal, etc.), not a generic "may cause issues".
+- "suggested_fix" must state the exact correction: the restored check, the corrected constant/literal, the re-enabled or strengthened test, the removal of the dead state, or the consumption of the unused value.
+
+For each finding, set "file" and "line" from the diff; put the WHAT in "message", the concrete consequence in "impact", and the concrete fix in "suggested_fix".
 
 SEVERITY CALIBRATION — Be conservative:
-- critical: Guaranteed crashes or data corruption (e.g. null dereference on hot path, unhandled exception that terminates process)
-- high: Logic bugs that affect correctness, runtime crashes (undefined access, wrong branching)
-- medium: Edge cases, poor error handling, issues that may cause incorrect behavior under specific conditions
-- low: Minor issues, style preferences, clarity improvements
+- critical: Guaranteed crashes or data corruption (e.g. null dereference on hot path, unhandled exception that terminates the process, a removed check that now allows corrupt writes).
+- high: Logic bugs that affect correctness — runtime crashes, wrong branching, mismatched canonical values, skipped tests that hide a regression in important logic, error handling that silently suppresses failure.
+- medium: Edge cases, weaker-but-not-broken guarantees, dead state or unused computation that misleads maintainers, redundant work introduced by the diff.
+- low: Minor clarity issues directly caused by the diff. Never use this bucket for pure style or naming taste.
 
-When uncertain, prefer lower severity. Do not inflate.
+When uncertain, prefer lower severity or omit. Do not inflate.
 
 You must respond with valid JSON only, no markdown, no code fence. Match the given schema exactly.`;
 
@@ -129,7 +134,16 @@ export class CodeQualityAgent {
 Changed files in this Pull Request:
 ${diffContent}
 
-Analyze the changed lines and their local context (surrounding function, variables, properties, and helpers used in the change) for code quality issues. Reference only file paths and line numbers from the diff hunks. Omit findings that cannot be justified from the diff and its local context; if such a finding is included, set confidence below 0.5. Set "category" to "code-quality" for all findings. If no code quality issues exist, return empty findings array.`;
+Analyze the changed lines and their local context (surrounding function, variables, properties, and helpers used in the change) for code quality regressions introduced by this PR. In particular, look for:
+- broken assumptions about runtime values (null/undefined, shape, or source)
+- changed constants, string literals, or comparison values that no longer match canonical values used elsewhere in the diff
+- removed, relaxed, or inverted checks, guards, or validations
+- tests that were skipped, deleted, or weakened around the logic this PR changes
+- dead state, dead branches, or values computed but never used that were added by this diff
+- typo-level logic bugs in important comparisons or constants
+- silent correctness issues where the code appears functional but has no effect, suppresses failure, or makes a branch unreachable
+
+Reference only file paths and line numbers from the diff hunks. Omit findings that cannot be justified from the diff and its local context; if such a finding is included anyway, set confidence below 0.5. Set "category" to "code-quality" for all findings. If no code quality issues exist, return an empty findings array.`;
 
     return callWithValidationRetry({
       client,
